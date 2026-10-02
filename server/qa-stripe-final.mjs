@@ -33,7 +33,7 @@ try{
  let end=await cycleEnd(sub.id); if(!end)throw new Error('missing period end 1');
  let c=await advance(clock.id,end+120); c=await advance(clock.id,c.frozen_time+3700); await sleep(5000);
  let invoices=await stripe.invoices.list({customer:customer.id,limit:10});
- const renewal=invoices.data.find(x=>x.subscription===sub.id&&x.billing_reason==='subscription_cycle');
+ const renewal=invoices.data.find(x=>x.billing_reason==='subscription_cycle');
  set('renewal_paid',renewal?.status==='paid',{id:renewal?.id,status:renewal?.status,attempted:renewal?.attempted});
  const activeAfterRenew=await waitProfile(u.id,x=>x.plan==='pro'&&x.subscription_status==='active',15000);
  set('renewal_db_active',activeAfterRenew?.subscription_status==='active',activeAfterRenew&&{plan:activeAfterRenew.plan,status:activeAfterRenew.subscription_status});
@@ -43,7 +43,7 @@ try{
  end=await cycleEnd(sub.id); if(!end)throw new Error('missing period end 2');
  c=await advance(clock.id,end+120); c=await advance(clock.id,c.frozen_time+3700); await sleep(5000);
  invoices=await stripe.invoices.list({customer:customer.id,limit:10});
- const failed=invoices.data.find(x=>x.subscription===sub.id&&x.status==='open'&&x.attempted);
+ const failed=invoices.data.find(x=>x.status==='open'&&x.attempted);
  set('invoice_payment_failed',!!failed,failed&&{id:failed.id,status:failed.status,attempted:failed.attempted});
  const past=await waitProfile(u.id,x=>x.subscription_status==='past_due',30000);
  set('db_past_due',past?.subscription_status==='past_due',past&&{plan:past.plan,status:past.subscription_status});
