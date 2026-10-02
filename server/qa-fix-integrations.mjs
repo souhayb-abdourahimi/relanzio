@@ -24,7 +24,7 @@ try{
   description:'Relanzio staging'
  });
  out.stripe_webhook=ep.id;
- console.log('QA_STRIPE_WEBHOOK_SECRET='+ep.secret);
+ console.log('QA_STRIPE_WEBHOOK_CREATED='+ep.id);
  console.log('QA_STRIPE_PRICE_ID='+price.id);
  const wr=await fetch('https://api.brevo.com/v3/webhooks?type=transactional',{headers:{accept:'application/json','api-key':process.env.BREVO_API_KEY}});
  const wj=await wr.json();const hook=(wj.webhooks||[]).find(x=>x.url===APP+'/api/brevo/webhook');
