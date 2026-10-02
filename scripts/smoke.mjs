@@ -1,0 +1,3 @@
+const base=(process.env.SMOKE_BASE_URL||'').replace(/\/$/,'');if(!base)throw new Error('SMOKE_BASE_URL required');
+async function check(path,expected=200){const t=Date.now();const r=await fetch(base+path,{redirect:'manual'});if(r.status!==expected)throw new Error(`${path}: expected ${expected}, got ${r.status}`);return {path,status:r.status,ms:Date.now()-t}}
+const results=[];results.push(await check('/api/health'));const ready=await fetch(base+'/api/readiness');const body=await ready.json();if(ready.status!==200||!body.ready)throw new Error(`/api/readiness not ready: ${JSON.stringify(body)}`);results.push({path:'/api/readiness',status:ready.status,ready:body.ready});console.log(JSON.stringify({ok:true,results},null,2));

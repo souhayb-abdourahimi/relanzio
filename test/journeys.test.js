@@ -1,0 +1,9 @@
+import test from'node:test';import assert from'node:assert/strict';import{nextFollowupDate,quoteMetrics,scoreProspect,classifyReplyFallback}from'../server/logic.js';
+const personas=[
+ {name:'petite entreprise',employee_count:4,estimated_quotes_per_month:15,uses_digital_tools:true,is_service_business:true,email:'contact@artisan.fr',website:'https://artisan.fr',role:'Gérant',quote:1800},
+ {name:'agence',employee_count:7,estimated_quotes_per_month:20,uses_digital_tools:true,is_service_business:true,email:'hello@agency.fr',website:'https://agency.fr',role:'Fondateur',quote:4200},
+ {name:'indépendant',employee_count:1,estimated_quotes_per_month:8,uses_digital_tools:true,is_service_business:true,email:'contact@solo.fr',website:'https://solo.fr',role:'Owner',quote:950},
+ {name:'utilisateur débutant',employee_count:2,estimated_quotes_per_month:5,uses_digital_tools:false,is_service_business:true,email:'info@debutant.fr',website:'https://debutant.fr',role:'Gérant',quote:700}
+];
+for(const p of personas)test(`business journey simulation — ${p.name}`,()=>{const score=scoreProspect(p).score;assert.ok(score>=40);const first=nextFollowupDate('2026-10-01',0);assert.match(first,/2026-10-03/);const before=quoteMetrics([{status:'open',amount:p.quote,next_followup_at:first}]);assert.equal(before.openAmount,p.quote);const after=quoteMetrics([{status:'won',amount:p.quote,next_followup_at:null}]);assert.equal(after.wonAmount,p.quote);assert.equal(after.winRate,100)});
+test('prospect response journey handles interest, timing, price, refusal and opt-out',()=>{for(const [text,cat] of [['Je veux une démo','interested'],['Recontactez-moi plus tard','not_now'],['Quel est le tarif ?','pricing'],['Non merci, pas intéressé','not_interested'],['STOP','opt_out']])assert.equal(classifyReplyFallback(text).category,cat)});

@@ -1,0 +1,39 @@
+{
+  "name": "relanzio",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "node --watch server/index.js",
+    "dev:client": "vite --config client/vite.config.js",
+    "build": "vite build --config client/vite.config.js",
+    "start": "node server/index.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check server/index.js && node --check server/logic.js && node --check server/billing.js && node --check server/prospecting.js && node --check server/followups.js && node --check server/support.js && node --check server/ceo.js && node --check server/lifecycle.js && node --test test/*.test.js",
+    "preflight": "node scripts/preflight.mjs",
+    "load": "node test/load.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "prebuild": "node scripts/render-public-files.mjs"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.57.0",
+    "cors": "2.8.5",
+    "dotenv": "16.6.1",
+    "express": "5.1.0",
+    "helmet": "8.1.0",
+    "node-cron": "4.2.1",
+    "openai": "5.20.0",
+    "stripe": "18.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "5.0.2",
+    "concurrently": "9.2.1",
+    "vite": "7.1.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  }
+}
