@@ -41,22 +41,32 @@ async function profileByCustomer(customerId) {
 // Raw body must come before express.json.
 app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async (req,res)=>{
   if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe not configured');
+  let event;
   try {
-    const event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
-    const obj = event.data.object;
-    if (event.type === 'checkout.session.completed') {
-      const userId = obj.metadata?.user_id; const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const transition=billingTransition(event.type,obj);
-      if (userId) await db.from('profiles').update({ ...transition, stripe_customer_id:customerId||null, stripe_subscription_id:typeof obj.subscription==='string'?obj.subscription:null, updated_at:nowIso() }).eq('id',userId);
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+    const { error:claimError } = await db.from('stripe_webhook_events').insert({event_id:event.id,event_type:event.type});
+    if (claimError?.code === '23505') return res.json({received:true,duplicate:true});
+    if (claimError) throw claimError;
+    try {
+      const obj = event.data.object;
+      if (event.type === 'checkout.session.completed') {
+        const userId = obj.metadata?.user_id; const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const transition=billingTransition(event.type,obj);
+        if (userId) await db.from('profiles').update({ ...transition, stripe_customer_id:customerId||null, stripe_subscription_id:typeof obj.subscription==='string'?obj.subscription:null, updated_at:nowIso() }).eq('id',userId);
+      }
+      if (['customer.subscription.updated','customer.subscription.deleted'].includes(event.type)) {
+        const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const profile = await profileByCustomer(customerId);
+        if (profile) { const transition=billingTransition(event.type,obj,profile); await db.from('profiles').update({ ...transition, stripe_subscription_id:obj.id, updated_at:nowIso() }).eq('id',profile.id); }
+      }
+      if (['invoice.payment_failed','invoice.paid'].includes(event.type)) {
+        const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const profile = await profileByCustomer(customerId);
+        if (profile) await db.from('profiles').update({ ...billingTransition(event.type,obj,profile), updated_at:nowIso() }).eq('id',profile.id);
+      }
+      await db.from('stripe_webhook_events').update({processed_at:nowIso()}).eq('event_id',event.id);
+      res.json({received:true});
+    } catch(e) {
+      await db.from('stripe_webhook_events').delete().eq('event_id',event.id);
+      throw e;
     }
-    if (['customer.subscription.updated','customer.subscription.deleted'].includes(event.type)) {
-      const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const profile = await profileByCustomer(customerId);
-      if (profile) { const transition=billingTransition(event.type,obj,profile); await db.from('profiles').update({ ...transition, stripe_subscription_id:obj.id, updated_at:nowIso() }).eq('id',profile.id); }
-    }
-    if (['invoice.payment_failed','invoice.paid'].includes(event.type)) {
-      const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const profile = await profileByCustomer(customerId);
-      if (profile) await db.from('profiles').update({ ...billingTransition(event.type,obj,profile), updated_at:nowIso() }).eq('id',profile.id);
-    }
-    res.json({received:true});
   } catch(e) { res.status(400).send(`Webhook error: ${e.message}`); }
 });
 
