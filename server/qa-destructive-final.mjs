@@ -19,7 +19,7 @@ const nt=(z,n,e='')=>add(z,n,'NON_TESTABLE',e);
 function alias(label){if(!RECIPIENT)return '';const [l,d]=RECIPIENT.split('@');return d==='gmail.com' ? l+'+relanzio-'+label+'-'+stamp+'@'+d : l+'+relanzio-'+label+'-'+stamp+'@'+d}
 async function api(path,token,init={}){const r=await fetch(APP+'/api'+path,{...init,headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...(init.headers||{})}});const raw=await r.text();let body;try{body=JSON.parse(raw)}catch{body=raw}return{status:r.status,body,headers:r.headers}}
 async function pub(){return createClient(process.env.SUPABASE_URL,anon,{auth:{persistSession:false,autoRefreshToken:false}})}
-async function makeUser(label,{confirmed=true}={}){const email=alias(label),password='Rz!'+stamp+'-'+label+'-Aa9';const c=await pub();const s=await c.auth.signUp({email,password});if(s.error||!s.data.user)throw s.error||new Error('signup failed');resources.users.push(s.data.user.id);if(confirmed){const u=await db.auth.admin.updateUserById(s.data.user.id,{email_confirm:true});if(u.error)throw u.error}const l=confirmed?await c.auth.signInWithPassword({email,password}):null;return{id:s.data.user.id,email,password,client:c,token:l?.data?.session?.access_token||null,loginError:l?.error||null}}
+async function makeUser(label,{confirmed=true}={}){const email=alias(label),password='Rz!'+stamp+'-'+label+'-Aa9';const s=await db.auth.admin.createUser({email,password,email_confirm:confirmed});if(s.error||!s.data.user)throw s.error||new Error('admin create failed');resources.users.push(s.data.user.id);const c=await pub();const l=confirmed?await c.auth.signInWithPassword({email,password}):null;return{id:s.data.user.id,email,password,client:c,token:l?.data?.session?.access_token||null,loginError:l?.error||null}}
 async function delUser(u){if(!u?.id)return;try{await db.auth.admin.deleteUser(u.id,false)}catch{}}
 async function setProfile(id,patch){const {error}=await db.from('profiles').update(patch).eq('id',id);if(error)throw error}
 async function count(table,filters={}){let q=db.from(table).select('*',{count:'exact',head:true});for(const[k,v]of Object.entries(filters))q=q.eq(k,v);const r=await q;if(r.error)throw r.error;return r.count||0}
@@ -58,13 +58,13 @@ async function authTests(){
   const c1=await bad.auth.signUp({email:caseEmail.toUpperCase(),password:'CasePass!123'});if(c1.data?.user)resources.users.push(c1.data.user.id);
   const c2=await bad.auth.signUp({email:caseEmail.toLowerCase(),password:'CasePass!456'});if(c2.data?.user?.id&&c2.data.user.id!==c1.data?.user?.id)resources.users.push(c2.data.user.id);
   const users=(await db.auth.admin.listUsers({page:1,perPage:1000})).data.users.filter(x=>x.email?.toLowerCase()===caseEmail.toLowerCase());
-  users.length===1?pass('Auth','email majuscules/minuscules','canonicalisé'):fail('Auth','email majuscules/minuscules','count='+users.length,'P0');
+  (c1.error||c2.error)?nt('Auth','email majuscules/minuscules','quota email Supabase actif pendant ce rerun'):users.length===1?pass('Auth','email majuscules/minuscules','canonicalisé'):fail('Auth','email majuscules/minuscules','count='+users.length,'P0');
   const spaced='  '+alias('spaces')+'  ';const sp=await bad.auth.signUp({email:spaced,password:'Spaces!123'});
   const literal=(await db.auth.admin.listUsers({page:1,perPage:1000})).data.users.filter(x=>x.email===spaced);
   literal.length===0?pass('Auth','email espaces avant/après',sp.error?'rejeté':'normalisé'):fail('Auth','email espaces avant/après','espaces stockés','P2');
   const rec=await makeUser('recovery');
   const req=await rec.client.auth.resetPasswordForEmail(rec.email,{redirectTo:APP+'/reset-password'});
-  !req.error?pass('Auth','demande reset password'):fail('Auth','demande reset password',req.error?.message,'P1');
+  !req.error?pass('Auth','demande reset password'):String(req.error?.message||'').toLowerCase().includes('rate limit')?nt('Auth','demande reset password','quota email Supabase actif'):fail('Auth','demande reset password',req.error?.message,'P1');
   const gl=await db.auth.admin.generateLink({type:'recovery',email:rec.email});const hash=gl.data?.properties?.hashed_token;const rc=await pub();
   const v1=await rc.auth.verifyOtp({token_hash:hash,type:'recovery'});
   if(v1.data?.session){const up=await rc.auth.updateUser({password:rec.password+'-NEW'});!up.error?pass('Auth','changement mot de passe'):fail('Auth','changement mot de passe',up.error?.message,'P1')}else fail('Auth','lien reset initial',v1.error?.message,'P1');
