@@ -118,3 +118,15 @@ test('Docker build exposes every public launch variable used by Vite',()=>{
     assert.ok(docker.includes(`ENV ${key}=$${key}`), `${key} build ENV missing`);
   }
 });
+
+
+test('prepared B2B outreach uses commercial identity, source, privacy and opt-out',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  const email=readFileSync(new URL('../server/email.js',import.meta.url),'utf8');
+  assert.match(email,/senderEmail \|\| process\.env\.EMAIL_FROM_ADDRESS/);
+  assert.match(server,/senderEmail:commercialEmail/);
+  assert.match(server,/replyTo:commercialEmail/);
+  assert.match(server,/Source : \$\{source\}/);
+  assert.match(server,/https:\/\/relanzio\.com\/privacy/);
+  assert.match(server,/répondez STOP ou écrivez à/);
+});
