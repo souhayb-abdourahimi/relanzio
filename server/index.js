@@ -17,7 +17,7 @@ import { answerSupport } from './support.js';
 import { buildCeoMetrics, weeklyRecommendations } from './ceo.js';
 import { runLifecycleEmails } from './lifecycle.js';
 import { reportError } from './observability.js';
-import { billingTransition } from './billing.js';
+import { billingTransition, normalizeSubscriptionStatus, planForSubscriptionStatus } from './billing.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -25,6 +25,55 @@ const __dirname = dirname(fileURLToPath(import.meta.url)); const dist = join(__d
 const admins = () => (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 const isAdmin = user => admins().includes((user?.email || '').toLowerCase());
 const nowIso = () => new Date().toISOString();
+const MAX_QUOTE_AMOUNT = 9_999_999_999.99;
+const parseQuoteAmount = value => {
+  if (value === '' || value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 && n <= MAX_QUOTE_AMOUNT ? n : null;
+};
+const parseSentDate = value => {
+  const v = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(v + 'T00:00:00Z');
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0,10) !== v || d.getTime() > Date.now() + 86400000) return null;
+  return v;
+};
+const providerRank = {draft:0,sent:1,delivered:2,opened:3,clicked:4,failed:5,bounced:6};
+const shouldApplyProviderStatus = (current,next) => {
+  if (current === 'bounced') return next === 'bounced';
+  if (next === 'bounced') return true;
+  return (providerRank[next] ?? -1) >= (providerRank[current] ?? -1);
+};
+const subscriptionIdFromObject = (obj, profile) => {
+  const direct = typeof obj?.subscription === 'string' ? obj.subscription : obj?.subscription?.id;
+  const parent = typeof obj?.parent?.subscription_details?.subscription === 'string'
+    ? obj.parent.subscription_details.subscription
+    : obj?.parent?.subscription_details?.subscription?.id;
+  return direct || parent || profile?.stripe_subscription_id || null;
+};
+async function authoritativeBillingTransition(eventType,obj,profile={plan:'free',subscription_status:'none'}) {
+  const subscriptionId = ['customer.subscription.updated','customer.subscription.deleted'].includes(eventType)
+    ? obj?.id
+    : subscriptionIdFromObject(obj,profile);
+  if (stripe && subscriptionId) {
+    try {
+      const current = await stripe.subscriptions.retrieve(subscriptionId);
+      const status = normalizeSubscriptionStatus(current.status);
+      return { transition:{plan:planForSubscriptionStatus(status),subscription_status:status}, subscriptionId:current.id };
+    } catch (e) {
+      if (eventType === 'customer.subscription.deleted' && (e?.code === 'resource_missing' || e?.statusCode === 404)) {
+        return { transition:{plan:'free',subscription_status:'canceled'}, subscriptionId };
+      }
+      throw e;
+    }
+  }
+  return { transition:billingTransition(eventType,obj,profile), subscriptionId };
+}
+async function mustDb(promise) {
+  const result = await promise;
+  if (result.error) throw result.error;
+  return result.data;
+}
 
 app.use(helmet({ contentSecurityPolicy: process.env.NODE_ENV === 'production' ? { directives:{ defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'","'unsafe-inline'"],imgSrc:["'self'",'data:'],connectSrc:["'self'",'https://*.supabase.co'],frameAncestors:["'none'"],baseUri:["'self'"],formAction:["'self'"] } } : false, crossOriginEmbedderPolicy:false }));
 app.use(cors({ origin:process.env.NODE_ENV === 'production' ? process.env.APP_URL : true, credentials:false }));
@@ -50,18 +99,18 @@ app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async 
     try {
       const obj = event.data.object;
       if (event.type === 'checkout.session.completed') {
-        const userId = obj.metadata?.user_id; const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const transition=billingTransition(event.type,obj);
-        if (userId) await db.from('profiles').update({ ...transition, stripe_customer_id:customerId||null, stripe_subscription_id:typeof obj.subscription==='string'?obj.subscription:null, updated_at:nowIso() }).eq('id',userId);
+        const userId=obj.metadata?.user_id, customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id;
+        if(userId){const profile=await getProfile({id:userId,email:obj.customer_details?.email||''});const state=await authoritativeBillingTransition(event.type,obj,profile);await mustDb(db.from('profiles').update({...state.transition,stripe_customer_id:customerId||null,stripe_subscription_id:state.subscriptionId||null,updated_at:nowIso()}).eq('id',userId));}
       }
       if (['customer.subscription.updated','customer.subscription.deleted'].includes(event.type)) {
-        const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const profile = await profileByCustomer(customerId);
-        if (profile) { const transition=billingTransition(event.type,obj,profile); await db.from('profiles').update({ ...transition, stripe_subscription_id:obj.id, updated_at:nowIso() }).eq('id',profile.id); }
+        const customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id, profile=await profileByCustomer(customerId);
+        if(profile){const state=await authoritativeBillingTransition(event.type,obj,profile);await mustDb(db.from('profiles').update({...state.transition,stripe_subscription_id:state.subscriptionId||obj.id,updated_at:nowIso()}).eq('id',profile.id));}
       }
       if (['invoice.payment_failed','invoice.paid'].includes(event.type)) {
-        const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const profile = await profileByCustomer(customerId);
-        if (profile) await db.from('profiles').update({ ...billingTransition(event.type,obj,profile), updated_at:nowIso() }).eq('id',profile.id);
+        const customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id, profile=await profileByCustomer(customerId);
+        if(profile){const state=await authoritativeBillingTransition(event.type,obj,profile);await mustDb(db.from('profiles').update({...state.transition,stripe_subscription_id:state.subscriptionId||profile.stripe_subscription_id,updated_at:nowIso()}).eq('id',profile.id));}
       }
-      await db.from('stripe_webhook_events').update({processed_at:nowIso()}).eq('event_id',event.id);
+      await mustDb(db.from('stripe_webhook_events').update({processed_at:nowIso()}).eq('event_id',event.id));
       res.json({received:true});
     } catch(e) {
       await db.from('stripe_webhook_events').delete().eq('event_id',event.id);
@@ -87,14 +136,39 @@ app.post('/api/activity', requireUser, async(req,res)=>{try{await db.from('produ
 
 app.get('/api/profile', requireUser, async(req,res)=>{ try{res.json({profile:await getProfile(req.user)})}catch(e){res.status(500).json({error:e.message})} });
 app.patch('/api/profile', requireUser, async(req,res)=>{
-  try{ const profile=await getProfile(req.user); const patch={company_name:sanitizeText(req.body.company_name,120),role:sanitizeText(req.body.role,80),onboarding_completed:Boolean(req.body.onboarding_completed),marketing_opt_in:Boolean(req.body.marketing_opt_in),updated_at:nowIso()}; if(req.body.email_mode==='review')patch.email_mode='review'; if(req.body.email_mode==='automatic'&&profile.plan==='pro')patch.email_mode='automatic'; const {data,error}=await db.from('profiles').update(patch).eq('id',req.user.id).select('*').single(); if(error)throw error; res.json({profile:data}); }catch(e){res.status(500).json({error:e.message})}
+  try{
+    const profile=await getProfile(req.user), patch={updated_at:nowIso()};
+    if ('company_name' in req.body) { const v=sanitizeText(req.body.company_name,120); if(!v)return res.status(400).json({error:'Entreprise requise.'}); patch.company_name=v; }
+    if ('role' in req.body) patch.role=sanitizeText(req.body.role,80);
+    if ('onboarding_completed' in req.body) patch.onboarding_completed=Boolean(req.body.onboarding_completed);
+    if ('marketing_opt_in' in req.body) patch.marketing_opt_in=Boolean(req.body.marketing_opt_in);
+    if(req.body.email_mode==='review')patch.email_mode='review';
+    if(req.body.email_mode==='automatic'&&profile.plan==='pro')patch.email_mode='automatic';
+    const {data,error}=await db.from('profiles').update(patch).eq('id',req.user.id).select('*').single(); if(error)throw error; res.json({profile:data});
+  }catch(e){res.status(500).json({error:e.message})}
 });
 
 app.get('/api/quotes', requireUser, async(req,res)=>{
   try{ await getProfile(req.user); const {data:quotes,error}=await db.from('quotes').select('*').eq('user_id',req.user.id).order('created_at',{ascending:false}); if(error)throw error; res.json({quotes,metrics:quoteMetrics(quotes||[])}); }catch(e){res.status(500).json({error:e.message})}
 });
 app.post('/api/quotes', requireUser, async(req,res)=>{
-  try{ const profile=await getProfile(req.user); const {client_name,client_email,title,amount,sent_at,auto_send}=req.body; const email=normalizeEmail(client_email); if(!sanitizeText(client_name,120)||!isValidEmail(email)||!sanitizeText(title,180)||!/^\d{4}-\d{2}-\d{2}$/.test(sent_at||'')||!Number.isFinite(Number(amount))||Number(amount)<0)return res.status(400).json({error:'Champs invalides.'}); const sentDate=new Date(`${sent_at}T00:00:00Z`); if(Number.isNaN(sentDate.getTime())||sentDate>Date.now()+86400000)return res.status(400).json({error:"La date d’envoi est invalide."}); const {count}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',req.user.id).eq('status','open'); if(profile.plan!=='pro'&&count>=5)return res.status(403).json({error:'La formule gratuite est limitée à 5 devis actifs.'}); if(profile.plan==='pro'&&count>=100)return res.status(403).json({error:'Limite de 100 devis actifs atteinte. Contactez le support.'}); const row={user_id:req.user.id,client_name:sanitizeText(client_name,120),client_email:email,title:sanitizeText(title,180),amount:Number(amount),sent_at,status:'open',auto_send:profile.plan==='pro'&&profile.email_mode==='automatic'&&['active','trialing'].includes(profile.subscription_status)?Boolean(auto_send):false,followup_step:0,next_followup_at:nextDate(sent_at,0)}; const {data,error}=await db.from('quotes').insert(row).select('*').single(); if(error)throw error; if(!profile.activated_at)await db.from('profiles').update({activated_at:nowIso(),updated_at:nowIso()}).eq('id',req.user.id); await db.from('product_events').insert({user_id:req.user.id,event:'quote_created',path:'/app'}); res.status(201).json({quote:data}); }catch(e){res.status(500).json({error:e.message})}
+  try{
+    const profile=await getProfile(req.user);
+    const {client_name,client_email,title,amount,sent_at,auto_send}=req.body, email=normalizeEmail(client_email);
+    const parsedAmount=parseQuoteAmount(amount), parsedDate=parseSentDate(sent_at), requestKey=sanitizeText(req.get('Idempotency-Key'),100)||null;
+    if(!sanitizeText(client_name,120)||!isValidEmail(email)||!sanitizeText(title,180)||parsedAmount===null||!parsedDate)return res.status(400).json({error:'Champs invalides.'});
+    if(requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).maybeSingle();if(priorError)throw priorError;if(prior)return res.json({quote:prior,idempotent:true});}
+    const {count}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',req.user.id).eq('status','open');
+    if(profile.plan!=='pro'&&count>=5)return res.status(403).json({error:'La formule gratuite est limitée à 5 devis actifs.'});
+    if(profile.plan==='pro'&&count>=100)return res.status(403).json({error:'Limite de 100 devis actifs atteinte. Contactez le support.'});
+    const row={user_id:req.user.id,client_name:sanitizeText(client_name,120),client_email:email,title:sanitizeText(title,180),amount:parsedAmount,sent_at:parsedDate,status:'open',request_key:requestKey,auto_send:profile.plan==='pro'&&profile.email_mode==='automatic'&&['active','trialing'].includes(profile.subscription_status)?Boolean(auto_send):false,followup_step:0,next_followup_at:nextDate(parsedDate,0)};
+    const {data,error}=await db.from('quotes').insert(row).select('*').single();
+    if(error?.code==='23505'&&requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).single();if(priorError)throw priorError;return res.json({quote:prior,idempotent:true});}
+    if(error)throw error;
+    if(!profile.activated_at)await db.from('profiles').update({activated_at:nowIso(),updated_at:nowIso()}).eq('id',req.user.id);
+    await db.from('product_events').insert({user_id:req.user.id,event:'quote_created',path:'/app'});
+    res.status(201).json({quote:data});
+  }catch(e){res.status(500).json({error:e.message})}
 });
 app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
   try {
@@ -105,8 +179,8 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
     if ('client_name' in req.body) { const v=sanitizeText(req.body.client_name,120); if(!v)return res.status(400).json({error:'Client invalide.'}); patch.client_name=v; }
     if ('client_email' in req.body) { const v=normalizeEmail(req.body.client_email); if(!isValidEmail(v))return res.status(400).json({error:'Email invalide.'}); patch.client_email=v; }
     if ('title' in req.body) { const v=sanitizeText(req.body.title,180); if(!v)return res.status(400).json({error:'Objet invalide.'}); patch.title=v; }
-    if ('amount' in req.body) { const v=Number(req.body.amount); if(!Number.isFinite(v)||v<0)return res.status(400).json({error:'Montant invalide.'}); patch.amount=v; }
-    if ('sent_at' in req.body) { const v=String(req.body.sent_at||''); if(!/^\d{4}-\d{2}-\d{2}$/.test(v)||Number.isNaN(new Date(`${v}T00:00:00Z`).getTime()))return res.status(400).json({error:"Date d’envoi invalide."}); patch.sent_at=v; if((patch.status||existing.status)==='open')patch.next_followup_at=nextDate(v,existing.followup_step); }
+    if ('amount' in req.body) { const v=parseQuoteAmount(req.body.amount); if(v===null)return res.status(400).json({error:'Montant invalide.'}); patch.amount=v; }
+    if ('sent_at' in req.body) { const v=parseSentDate(req.body.sent_at); if(!v)return res.status(400).json({error:"Date d’envoi invalide."}); patch.sent_at=v; if((patch.status||existing.status)==='open')patch.next_followup_at=nextDate(v,existing.followup_step); }
     if ('auto_send' in req.body) { const profile=await getProfile(req.user); patch.auto_send=profile.plan==='pro'&&profile.email_mode==='automatic'&&['active','trialing'].includes(profile.subscription_status)?Boolean(req.body.auto_send):false; }
     const {data,error}=await db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id).select('*').single(); if(error)throw error; res.json({quote:data});
   } catch(e) { await reportError('quotes.update',e,{request_id:req.requestId}); res.status(500).json({error:'Impossible de modifier le devis.',request_id:req.requestId}); }
@@ -118,7 +192,17 @@ app.get('/api/quotes/:id/followup-preview', requireUser, async(req,res)=>{
   try { const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]); if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});res.json({preview:await createFollowupPreview(quote,profile)}); } catch(e){if(e.message==='SEQUENCE_COMPLETE')return res.status(409).json({error:'Séquence terminée.'});await reportError('followup.preview',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de préparer la relance.',request_id:req.requestId});}
 });
 app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
-  try { const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]);if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});if(profile.plan!=='pro'||!['active','trialing'].includes(profile.subscription_status))return res.status(403).json({error:'L’envoi depuis Relanzio nécessite un abonnement Pro actif.'});const result=await sendQuoteFollowup(quote,profile);res.json({sent:true,result}); } catch(e){await reportError('followup.manual_send',e,{request_id:req.requestId});res.status(500).json({error:'La relance n’a pas été envoyée. Aucun succès n’a été enregistré.',request_id:req.requestId});}
+  try {
+    const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]);
+    if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});
+    if(profile.plan!=='pro'||!['active','trialing'].includes(profile.subscription_status))return res.status(403).json({error:'L’envoi depuis Relanzio nécessite un abonnement Pro actif.'});
+    const result=await sendQuoteFollowup(quote,profile,sanitizeText(req.get('Idempotency-Key'),100)||null);
+    res.json({sent:true,result});
+  } catch(e){
+    if(['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_REQUEST_ALREADY_FAILED','EMAIL_RECIPIENT_SUPPRESSED'].includes(e.message))return res.status(409).json({error:e.message==='EMAIL_RECIPIENT_SUPPRESSED'?'Cette adresse ne peut plus recevoir de relances.':'Cette relance est déjà en cours ou a déjà été traitée.'});
+    await reportError('followup.manual_send',e,{request_id:req.requestId});
+    res.status(500).json({error:'La relance n’a pas été envoyée. Aucun succès n’a été enregistré.',request_id:req.requestId});
+  }
 });
 
 app.post('/api/billing/checkout', requireUser, async(req,res)=>{
@@ -139,8 +223,21 @@ app.delete('/api/account', requireUser, async(req,res)=>{
 // Brevo transactional events. Configure a custom x-webhook-secret header in Brevo.
 app.post('/api/brevo/webhook', async(req,res)=>{
   if(!safeEqual(String(req.headers['x-webhook-secret']||''),String(process.env.BREVO_WEBHOOK_SECRET||'')))return res.status(401).json({error:'Unauthorized'});
-  try{ const type=mapBrevoEvent(req.body.event); if(!type)return res.status(202).json({ignored:true}); const messageId=String(req.body['message-id']||req.body.messageId||''); const email=normalizeEmail(req.body.email||''); if(messageId){ const followStatus=type==='bounced'?'bounced':type; if(['delivered','opened','clicked','bounced'].includes(followStatus))await db.from('followups').update({status:followStatus}).eq('provider_message_id',messageId); const {data:pEvent}=await db.from('outreach_events').select('prospect_id').eq('provider_message_id',messageId).order('created_at',{ascending:false}).limit(1).maybeSingle(); if(pEvent)await db.from('outreach_events').insert({prospect_id:pEvent.prospect_id,type,provider_message_id:messageId,metadata:req.body}); }
-    if(type==='opt_out'&&email){await db.from('suppressions').upsert({email,reason:'provider_unsubscribe'});await db.from('prospects').update({status:'suppressed',updated_at:nowIso()}).eq('email',email)} res.json({ok:true}); }catch(e){res.status(500).json({error:e.message})}
+  try{
+    const type=mapBrevoEvent(req.body.event); if(!type)return res.status(202).json({ignored:true});
+    const messageId=String(req.body['message-id']||req.body.messageId||''), email=normalizeEmail(req.body.email||'');
+    if(messageId){
+      const followStatus=type==='bounced'?'bounced':type;
+      if(['delivered','opened','clicked','bounced'].includes(followStatus)){
+        const rows=await mustDb(db.from('followups').select('id,status').eq('provider_message_id',messageId));
+        for(const row of rows||[])if(shouldApplyProviderStatus(row.status,followStatus))await mustDb(db.from('followups').update({status:followStatus}).eq('id',row.id));
+      }
+      const {data:pEvent,error:pEventError}=await db.from('outreach_events').select('prospect_id').eq('provider_message_id',messageId).order('created_at',{ascending:false}).limit(1).maybeSingle();if(pEventError)throw pEventError;
+      if(pEvent)await mustDb(db.from('outreach_events').insert({prospect_id:pEvent.prospect_id,type,provider_message_id:messageId,metadata:req.body}));
+    }
+    if(type==='opt_out'&&email){await mustDb(db.from('suppressions').upsert({email,reason:'provider_unsubscribe'}));await mustDb(db.from('prospects').update({status:'suppressed',updated_at:nowIso()}).eq('email',email))}
+    res.json({ok:true});
+  }catch(e){res.status(500).json({error:'Webhook processing failed.'})}
 });
 
 // Founder acquisition CRM — quality capped, human-approved, no scraping endpoint.
@@ -172,7 +269,11 @@ app.post('/api/cron/run', async(req,res)=>{if(!safeEqual(String(req.headers['x-c
 cron.schedule('*/15 * * * *',async()=>{try{await runDueFollowups()}catch(e){await reportError('cron.followups',e)}},{noOverlap:true});
 cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
 
-app.use((err,req,res,next)=>{reportError('http.unhandled',err,{request_id:req.requestId,path:req.path}).finally(()=>{if(!res.headersSent)res.status(500).json({error:'Erreur interne.',request_id:req.requestId});});});
+app.use((err,req,res,next)=>{
+  if(err?.type==='entity.too.large'||err?.status===413)return res.status(413).json({error:'Requête trop volumineuse.'});
+  if(err instanceof SyntaxError&&err?.status===400)return res.status(400).json({error:'JSON invalide.'});
+  reportError('http.unhandled',err,{request_id:req.requestId,path:req.path}).finally(()=>{if(!res.headersSent)res.status(500).json({error:'Erreur interne.',request_id:req.requestId});});
+});
 process.on('unhandledRejection',e=>reportError('process.unhandledRejection',e));
 process.on('uncaughtException',e=>{reportError('process.uncaughtException',e).finally(()=>process.exit(1));});
 
