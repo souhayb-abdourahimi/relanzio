@@ -65,3 +65,10 @@ test('billing checkout reuses an open session for the same customer',()=>{
   assert.match(server,/checkout\.sessions\.list\(\{customer,status:'open',limit:10\}\)/);
   assert.match(server,/if\(reusable\)return res\.json\(\{url:reusable\.url,reused:true\}\)/);
 });
+
+
+test('Stripe customer and checkout creation use stable idempotency keys',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  assert.match(server,/idempotencyKey:`relanzio-customer-\$\{req\.user\.id\}`/);
+  assert.match(server,/idempotencyKey:`relanzio-checkout-\$\{req\.user\.id\}`/);
+});
