@@ -47,7 +47,7 @@ test('Vite and release preflight use the same root environment source',()=>{
     assert.ok(preflight.includes(`'${key}'`), `${key} must be a preflight requirement`);
     assert.ok(env.includes(`${key}=`), `${key} must be documented in root env`);
   }
-  for(const key of ['VITE_SUPPORT_EMAIL','VITE_LEGAL_NAME','VITE_LEGAL_ADDRESS','VITE_LEGAL_EMAIL','VITE_LEGAL_REGISTRATION','VITE_HOST_NAME','VITE_DATA_RETENTION']) {
+  for(const key of ['VITE_SUPPORT_EMAIL','VITE_CONTACT_EMAIL','VITE_BILLING_ENABLED','VITE_LEGAL_NAME','VITE_LEGAL_ADDRESS','VITE_LEGAL_EMAIL','VITE_LEGAL_REGISTRATION','VITE_LEGAL_PHONE','VITE_PUBLICATION_DIRECTOR']) {
     assert.ok(env.includes(`${key}=`), `${key} must be documented in root env`);
   }
 });
@@ -71,4 +71,32 @@ test('Stripe customer and checkout creation use stable idempotency keys',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
   assert.match(server,/idempotencyKey:`relanzio-customer-\$\{req\.user\.id\}`/);
   assert.match(server,/idempotencyKey:`relanzio-checkout-\$\{req\.user\.id\}`/);
+});
+
+
+test('pilot launch keeps billing and acquisition disabled by explicit gates',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  assert.match(server,/BILLING_ENABLED!=='true'/);
+  assert.match(server,/ACQUISITION_ENABLED!=='true'/);
+  assert.match(client,/VITE_BILLING_ENABLED==='true'/);
+});
+
+test('public site uses role-based Relanzio contact addresses and no persistent audience id',()=>{
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const lifecycle=readFileSync(new URL('../server/lifecycle.js',import.meta.url),'utf8');
+  assert.match(client,/support@relanzio\.com/);
+  assert.match(client,/contact@relanzio\.com/);
+  assert.match(lifecycle,/support@relanzio\.com/);
+  assert.doesNotMatch(client,/relanzio_aid/);
+  assert.doesNotMatch(client,/localStorage\.getItem\('relanzio_aid'\)/);
+});
+
+test('SEO release files include canonical, legal page and protected auth routes',()=>{
+  const html=readFileSync(new URL('../client/index.html',import.meta.url),'utf8');
+  const renderer=readFileSync(new URL('../scripts/render-public-files.mjs',import.meta.url),'utf8');
+  assert.match(html,/rel="canonical" href="https:\/\/relanzio\.com\/"\/?>/);
+  assert.match(html,/property="og:url" content="https:\/\/relanzio\.com\/"\/?>/);
+  assert.match(renderer,/'\/legal'/);
+  for(const path of ['/login','/signup','/reset-password'])assert.ok(renderer.includes(`Disallow: ${path}`));
 });
