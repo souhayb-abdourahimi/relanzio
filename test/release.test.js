@@ -51,3 +51,17 @@ test('Vite and release preflight use the same root environment source',()=>{
     assert.ok(env.includes(`${key}=`), `${key} must be documented in root env`);
   }
 });
+
+
+test('quote sent_at cannot be in the future',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  assert.match(server,/const today = new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
+  assert.match(server,/v > today/);
+  assert.doesNotMatch(server,/Date\.now\(\) \+ 86400000/);
+});
+
+test('billing checkout reuses an open session for the same customer',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  assert.match(server,/checkout\.sessions\.list\(\{customer,status:'open',limit:10\}\)/);
+  assert.match(server,/if\(reusable\)return res\.json\(\{url:reusable\.url,reused:true\}\)/);
+});
