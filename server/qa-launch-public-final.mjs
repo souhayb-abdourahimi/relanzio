@@ -20,7 +20,7 @@ try{
   const jr=await fetch(jsUrl);
   const js=await jr.text();
   const emails=[...new Set(js.match(/[A-Z0-9._%+-]+@relanzio\.com/gi)||[])].sort();
-  const urls=[...new Set(js.match(/https?:\\/\\/[^"'\\s<>)}]+/gi)||[])];
+  const urls=[...new Set(js.match(new RegExp('https?://[^"\\'\\s<>)}]+','gi'))||[])];
   const localhostUrls=urls.filter(u=>/\\/\\/(?:localhost|127\\.0\\.0\\.1)(?::|\\/|$)/i.test(u));
   const railwayUrls=urls.filter(u=>/\\.railway\\.app|up\\.railway\\.app/i.test(u));
   result.bundle={
