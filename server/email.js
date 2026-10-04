@@ -28,7 +28,7 @@ export async function generateFollowup(quote, step, companyName = "Votre entrepr
   }
 }
 
-export async function sendEmail({ to, subject, text, replyTo, senderName, tags = [] }) {
+export async function sendEmail({ to, subject, text, replyTo, senderName, senderEmail, tags = [] }) {
   if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM_ADDRESS) {
     throw new Error('EMAIL_PROVIDER_NOT_CONFIGURED');
   }
@@ -37,7 +37,7 @@ export async function sendEmail({ to, subject, text, replyTo, senderName, tags =
   if (suppressionError) throw new Error('EMAIL_SUPPRESSION_CHECK_FAILED');
   if (suppression) throw new Error('EMAIL_RECIPIENT_SUPPRESSED');
   const body = {
-    sender: { name: senderName || process.env.EMAIL_FROM_NAME || "Relanzio", email: process.env.EMAIL_FROM_ADDRESS },
+    sender: { name: senderName || process.env.EMAIL_FROM_NAME || "Relanzio", email: senderEmail || process.env.EMAIL_FROM_ADDRESS },
     to: [{ email: recipient }], subject, textContent: text
   };
   if (replyTo) body.replyTo = { email: replyTo };
