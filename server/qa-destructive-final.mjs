@@ -256,7 +256,7 @@ async function main(){
   nt('Domain','certificat navigateur et alertes UI','pas de navigateur TLS automatisable depuis le runtime; domaine Railway custom est configuré');
   await cleanup();
   const summary={total:tests.length,pass:tests.filter(x=>x.result==='PASS').length,fail:tests.filter(x=>x.result==='FAIL').length,non_testable:tests.filter(x=>x.result==='NON_TESTABLE').length,p0:tests.filter(x=>x.result==='FAIL'&&x.severity==='P0').length,p1:tests.filter(x=>x.result==='FAIL'&&x.severity==='P1').length,p2:tests.filter(x=>x.result==='FAIL'&&x.severity==='P2').length};
-  await db.from('system_events').insert({level:summary.fail?'error':'info',scope:'qa.destructive.2026-10-04.v1',message:summary.fail?'Destructive QA found failures':'Destructive QA passed',metadata:{run_id:runId,summary,tests}});
+  await db.from('system_events').insert({level:summary.fail?'error':'info',scope:'qa.destructive.2026-10-04.v2',message:summary.fail?'Destructive QA found failures':'Destructive QA passed',metadata:{run_id:runId,summary,tests}});
   console.log('DESTRUCTIVE_QA_SUMMARY='+JSON.stringify(summary));
   for(const x of tests.filter(x=>x.result==='FAIL'))console.error('QA_FAIL '+JSON.stringify(x));
   process.exit(17)
