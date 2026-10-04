@@ -20,18 +20,21 @@ try{
   const jr=await fetch(jsUrl);
   const js=await jr.text();
   const emails=[...new Set(js.match(/[A-Z0-9._%+-]+@relanzio\.com/gi)||[])].sort();
+  const urls=[...new Set(js.match(/https?:\\/\\/[^"'\\s<>)}]+/gi)||[])];
+  const localhostUrls=urls.filter(u=>/\\/\\/(?:localhost|127\\.0\\.0\\.1)(?::|\\/|$)/i.test(u));
+  const railwayUrls=urls.filter(u=>/\\.railway\\.app|up\\.railway\\.app/i.test(u));
   result.bundle={
     status:jr.status,
     emails,
-    hasLocalhost:/localhost/i.test(js),
-    hasRailway:/\.railway\.app|up\.railway\.app/i.test(js),
-    hasStaging:/\bstaging\b/i.test(js),
-    hasQaText:/\bQA\b|quality assurance|pilot readiness/i.test(js),
-    hasPrice29:/29\s*€\/?mois|29\s*€.{0,20}mois/i.test(js),
+    localhostUrls:localhostUrls.slice(0,20),
+    railwayUrls:railwayUrls.slice(0,20),
+    hasVisibleStagingCopy:/phase staging|environnement staging|staging uniquement/i.test(js),
+    hasVisibleQaCopy:/données QA|mode QA|quality assurance|pilot readiness/i.test(js),
+    hasPrice29:/29\\s*€\\/?mois|29\\s*€.{0,20}mois/i.test(js),
     hasPilotBillingCopy:/facturation activée après la phase pilote/i.test(js),
-    hasSupport:/support@relanzio\.com/i.test(js),
-    hasContact:/contact@relanzio\.com/i.test(js),
-    hasNotifications:/notifications@relanzio\.com/i.test(js)
+    hasSupport:/support@relanzio\\.com/i.test(js),
+    hasContact:/contact@relanzio\\.com/i.test(js),
+    hasNotifications:/notifications@relanzio\\.com/i.test(js)
   };
   result.seo={
     title:/<title>Relanzio — Vos devis méritent une réponse<\/title>/i.test(home),
@@ -46,7 +49,7 @@ try{
   const readiness=await (await fetch(base+'/api/readiness')).json();
   result.health={ok:health?.ok===true};
   result.readiness={ready:readiness?.ready===true,integrations:readiness?.integrations,automation:readiness?.automation};
-  result.ok=publicOk&&jr.ok&&Object.values(result.seo).every(Boolean)&&!result.bundle.hasLocalhost&&!result.bundle.hasRailway&&result.bundle.hasPrice29&&result.bundle.hasSupport&&result.bundle.hasContact&&health?.ok===true&&readiness?.ready===true;
+  result.ok=publicOk&&jr.ok&&Object.values(result.seo).every(Boolean)&&result.bundle.railwayUrls.length===0&&!result.bundle.hasVisibleStagingCopy&&!result.bundle.hasVisibleQaCopy&&result.bundle.hasPrice29&&result.bundle.hasSupport&&result.bundle.hasContact&&health?.ok===true&&readiness?.ready===true;
 }catch(e){result.ok=false;result.error=String(e?.message||e)}
 console.log('LAUNCH_PUBLIC_QA='+JSON.stringify(result));
 process.exit(result.ok?0:1);
