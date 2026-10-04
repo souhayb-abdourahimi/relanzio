@@ -12,6 +12,11 @@ export async function getProfile(user) {
   if (data) return data;
   const { data: created, error: createError } = await db.from("profiles")
     .insert({ id: user.id, email: user.email, plan: "free" }).select("*").single();
+  if (createError?.code === "23505") {
+    const { data: concurrent, error: concurrentError } = await db.from("profiles").select("*").eq("id", user.id).single();
+    if (concurrentError) throw concurrentError;
+    return concurrent;
+  }
   if (createError) throw createError;
   return created;
 }
