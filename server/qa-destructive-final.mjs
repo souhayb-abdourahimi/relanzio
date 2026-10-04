@@ -228,7 +228,7 @@ async function databaseChecks(){
     db.from('followups').select('id,quote_id,user_id'),
   ]);const qs=orphans[0].data||[],ps=new Set((orphans[1].data||[]).map(x=>x.id)),fs=orphans[2].data||[],qids=new Set(qs.map(x=>x.id));const oq=qs.filter(x=>!ps.has(x.user_id)).length,ofu=fs.filter(x=>!ps.has(x.user_id)).length,ofq=fs.filter(x=>!qids.has(x.quote_id)).length;
   oq===0&&ofu===0&&ofq===0?pass('Database','aucun orphelin','0/0/0'):fail('Database','aucun orphelin',oq+'/'+ofu+'/'+ofq,'P0');
-  const impossible=qs.filter(x=>Number(x.amount)<0||!Number.isFinite(Number(x.amount))||!['open','won','lost','paused'].includes(x.status));impossible.length===0?pass('Database','aucun état devis impossible'):fail('Database','aucun état devis impossible',JSON.stringify(impossible.map(x=>({id:x.id,status:x.status,amount:x.amount}))),'P0');
+  const quoteStates=sqlChecks[1].data||[];const impossible=quoteStates.filter(x=>Number(x.amount)<0||!Number.isFinite(Number(x.amount))||!['open','won','lost','paused'].includes(x.status));impossible.length===0?pass('Database','aucun état devis impossible'):fail('Database','aucun état devis impossible',JSON.stringify(impossible.map(x=>({id:x.id,status:x.status,amount:x.amount}))),'P0');
   const pending=(sqlChecks[4].data||[]).filter(x=>!x.processed_at);pending.length===0?pass('Database','ledger Stripe traité','pending=0'):fail('Database','ledger Stripe traité','pending='+pending.length,'P1')
 }
 
@@ -256,7 +256,7 @@ async function main(){
   nt('Domain','certificat navigateur et alertes UI','pas de navigateur TLS automatisable depuis le runtime; domaine Railway custom est configuré');
   await cleanup();
   const summary={total:tests.length,pass:tests.filter(x=>x.result==='PASS').length,fail:tests.filter(x=>x.result==='FAIL').length,non_testable:tests.filter(x=>x.result==='NON_TESTABLE').length,p0:tests.filter(x=>x.result==='FAIL'&&x.severity==='P0').length,p1:tests.filter(x=>x.result==='FAIL'&&x.severity==='P1').length,p2:tests.filter(x=>x.result==='FAIL'&&x.severity==='P2').length};
-  await db.from('system_events').insert({level:summary.fail?'error':'info',scope:'qa.destructive.2026-10-04.v2',message:summary.fail?'Destructive QA found failures':'Destructive QA passed',metadata:{run_id:runId,summary,tests}});
+  await db.from('system_events').insert({level:summary.fail?'error':'info',scope:'qa.destructive.2026-10-04.v3',message:summary.fail?'Destructive QA found failures':'Destructive QA passed',metadata:{run_id:runId,summary,tests}});
   console.log('DESTRUCTIVE_QA_SUMMARY='+JSON.stringify(summary));
   for(const x of tests.filter(x=>x.result==='FAIL'))console.error('QA_FAIL '+JSON.stringify(x));
   process.exit(17)
