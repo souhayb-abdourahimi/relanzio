@@ -128,8 +128,7 @@ app.get('/api/readiness', (_req,res)=>{const integrations={supabase:Boolean(proc
 app.post('/api/events', rateLimit({windowMs:60_000,max:30}), async (req,res)=>{
   const allowed=['landing_view','signup_started','signup_completed','onboarding_completed','quote_created','checkout_started','support_opened'];
   const event=sanitizeText(req.body.event,60); if(!allowed.includes(event)) return res.status(400).json({error:'Événement invalide.'});
-  const anonymous_id=sanitizeText(req.body.anonymous_id,80); if(!/^[a-zA-Z0-9_-]{8,80}$/.test(anonymous_id)) return res.status(400).json({error:'Identifiant anonyme requis.'});
-  await db.from('product_events').insert({anonymous_id,event,path:sanitizeText(req.body.path,200),metadata:{}});
+  await db.from('product_events').insert({event,path:sanitizeText(req.body.path,200),metadata:{}});
   res.status(202).json({ok:true});
 });
 
@@ -208,6 +207,7 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
 
 app.post('/api/billing/checkout', requireUser, async(req,res)=>{
   try{
+    if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'Facturation non activée pendant la phase pilote.'});
     if(!stripe||!process.env.STRIPE_PRO_PRICE_ID)return res.status(503).json({error:"Stripe n'est pas configuré."});
     const profile=await getProfile(req.user);
     if(profile.plan==='pro')return res.status(409).json({error:'Votre compte est déjà Pro. Utilisez Gérer mon abonnement.'});
@@ -226,7 +226,7 @@ app.post('/api/billing/checkout', requireUser, async(req,res)=>{
   }catch(e){res.status(500).json({error:e.message})}
 });
 app.post('/api/billing/portal', requireUser, async(req,res)=>{
-  try{ if(!stripe)return res.status(503).json({error:'Stripe non configuré.'}); const profile=await getProfile(req.user); if(!profile.stripe_customer_id)return res.status(400).json({error:'Aucun compte de facturation.'}); const session=await stripe.billingPortal.sessions.create({customer:profile.stripe_customer_id,return_url:process.env.APP_URL}); res.json({url:session.url}); }catch(e){res.status(500).json({error:e.message})}
+  try{ if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'Facturation non activée pendant la phase pilote.'}); if(!stripe)return res.status(503).json({error:'Stripe non configuré.'}); const profile=await getProfile(req.user); if(!profile.stripe_customer_id)return res.status(400).json({error:'Aucun compte de facturation.'}); const session=await stripe.billingPortal.sessions.create({customer:profile.stripe_customer_id,return_url:process.env.APP_URL}); res.json({url:session.url}); }catch(e){res.status(500).json({error:e.message})}
 });
 
 app.post('/api/support/ask', requireUser, async(req,res)=>{ try{res.json(await answerSupport(sanitizeText(req.body.question,2000)))}catch(e){res.status(500).json({error:e.message})} });
