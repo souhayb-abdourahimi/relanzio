@@ -109,3 +109,12 @@ test('privacy notice covers targeted B2B prospecting and retention',()=>{
   assert.match(client,/trois ans après leur collecte ou le dernier contact émanant du prospect/);
   assert.match(client,/liste repoussoir pendant au moins trois ans/);
 });
+
+
+test('Docker build exposes every public launch variable used by Vite',()=>{
+  const docker=readFileSync(new URL('../Dockerfile',import.meta.url),'utf8');
+  for(const key of ['VITE_SUPPORT_EMAIL','VITE_CONTACT_EMAIL','VITE_BILLING_ENABLED','VITE_LEGAL_ENTITY_TYPE','VITE_LEGAL_NAME','VITE_LEGAL_FORM','VITE_LEGAL_CAPITAL','VITE_LEGAL_ADDRESS','VITE_LEGAL_EMAIL','VITE_LEGAL_REGISTRATION','VITE_LEGAL_VAT','VITE_LEGAL_PHONE','VITE_PUBLICATION_DIRECTOR']){
+    assert.ok(docker.includes(`ARG ${key}`), `${key} build ARG missing`);
+    assert.ok(docker.includes(`ENV ${key}=$${key}`), `${key} build ENV missing`);
+  }
+});
