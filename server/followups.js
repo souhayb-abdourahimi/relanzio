@@ -22,14 +22,32 @@ async function claimQuote(quote) {
   return data;
 }
 
-export async function sendQuoteFollowup(quote, profile) {
+export async function sendQuoteFollowup(quote, profile, requestKey=null) {
   if (!['active','trialing'].includes(profile.subscription_status) || profile.plan !== 'pro') throw new Error('PRO_SUBSCRIPTION_REQUIRED');
+  if (requestKey) {
+    const {data:prior,error:priorError}=await db.from('followups').select('*').eq('user_id',quote.user_id).eq('request_key',requestKey).maybeSingle();
+    if(priorError)throw priorError;
+    if(prior){
+      if(['sent','delivered','opened','clicked'].includes(prior.status))return {step:prior.step,subject:prior.subject,body:prior.body,provider_message_id:prior.provider_message_id,next_followup_at:quote.next_followup_at,idempotent:true};
+      throw new Error('FOLLOWUP_REQUEST_ALREADY_FAILED');
+    }
+  }
   const claimed = await claimQuote(quote);
   let followupId = null;
   try {
     const preview = await createFollowupPreview(claimed, profile);
-    const {data:draft,error:draftError}=await db.from('followups').insert({quote_id:claimed.id,user_id:claimed.user_id,step:preview.step,subject:preview.subject,body:preview.body,status:'draft'}).select('id').single();
-    if(draftError){if(String(draftError.code)==='23505')throw new Error('FOLLOWUP_ALREADY_RECORDED');throw draftError} followupId=draft.id;
+    const {data:draft,error:draftError}=await db.from('followups').insert({quote_id:claimed.id,user_id:claimed.user_id,step:preview.step,subject:preview.subject,body:preview.body,status:'draft',request_key:requestKey}).select('id').single();
+    if(draftError){
+      if(String(draftError.code)==='23505'&&requestKey){
+        const {data:prior}=await db.from('followups').select('*').eq('user_id',claimed.user_id).eq('request_key',requestKey).maybeSingle();
+        await db.from('quotes').update({send_claimed_at:null}).eq('id',claimed.id).eq('user_id',claimed.user_id);
+        if(prior&&['sent','delivered','opened','clicked'].includes(prior.status))return {step:prior.step,subject:prior.subject,body:prior.body,provider_message_id:prior.provider_message_id,next_followup_at:claimed.next_followup_at,idempotent:true};
+        throw new Error('FOLLOWUP_REQUEST_ALREADY_FAILED');
+      }
+      if(String(draftError.code)==='23505')throw new Error('FOLLOWUP_ALREADY_RECORDED');
+      throw draftError;
+    }
+    followupId=draft.id;
     const sent = await sendEmail({
       to:claimed.client_email, subject:preview.subject, text:preview.body,
       replyTo:profile.email, senderName:`${profile.company_name || 'Votre entreprise'} via Relanzio`, tags:['relanzio-followup']
