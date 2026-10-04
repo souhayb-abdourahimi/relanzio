@@ -47,7 +47,7 @@ test('Vite and release preflight use the same root environment source',()=>{
     assert.ok(preflight.includes(`'${key}'`), `${key} must be a preflight requirement`);
     assert.ok(env.includes(`${key}=`), `${key} must be documented in root env`);
   }
-  for(const key of ['VITE_SUPPORT_EMAIL','VITE_CONTACT_EMAIL','VITE_BILLING_ENABLED','VITE_LEGAL_NAME','VITE_LEGAL_ADDRESS','VITE_LEGAL_EMAIL','VITE_LEGAL_REGISTRATION','VITE_LEGAL_PHONE','VITE_PUBLICATION_DIRECTOR']) {
+  for(const key of ['VITE_SUPPORT_EMAIL','VITE_CONTACT_EMAIL','VITE_BILLING_ENABLED','VITE_LEGAL_ENTITY_TYPE','VITE_LEGAL_NAME','VITE_LEGAL_FORM','VITE_LEGAL_CAPITAL','VITE_LEGAL_ADDRESS','VITE_LEGAL_EMAIL','VITE_LEGAL_REGISTRATION','VITE_LEGAL_VAT','VITE_LEGAL_PHONE','VITE_PUBLICATION_DIRECTOR']) {
     assert.ok(env.includes(`${key}=`), `${key} must be documented in root env`);
   }
 });
@@ -79,6 +79,7 @@ test('pilot launch keeps billing and acquisition disabled by explicit gates',()=
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
   assert.match(server,/BILLING_ENABLED!=='true'/);
   assert.match(server,/ACQUISITION_ENABLED!=='true'/);
+  assert.match(server,/LEGAL_PAGES_APPROVED!=='true'/);
   assert.match(client,/VITE_BILLING_ENABLED==='true'/);
 });
 
@@ -99,4 +100,12 @@ test('SEO release files include canonical, legal page and protected auth routes'
   assert.ok(html.includes('<meta property="og:url" content="https://relanzio.com/" />'));
   assert.match(renderer,/'\/legal'/);
   for(const path of ['/login','/signup','/reset-password'])assert.ok(renderer.includes(`Disallow: ${path}`));
+});
+
+
+test('privacy notice covers targeted B2B prospecting and retention',()=>{
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  assert.match(client,/Prospects professionnels/);
+  assert.match(client,/trois ans après leur collecte ou le dernier contact émanant du prospect/);
+  assert.match(client,/liste repoussoir pendant au moins trois ans/);
 });
