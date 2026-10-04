@@ -19,14 +19,14 @@ create table if not exists public.quotes (
   amount numeric(12,2) not null default 0 check (amount >= 0), sent_at date not null,
   status text not null default 'open' check (status in ('open','won','lost','paused')),
   auto_send boolean not null default false, followup_step integer not null default 0 check (followup_step between 0 and 3),
-  next_followup_at timestamptz, send_claimed_at timestamptz, won_at timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+  next_followup_at timestamptz, send_claimed_at timestamptz, won_at timestamptz, request_key text, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
 create table if not exists public.followups (
   id uuid primary key default gen_random_uuid(), quote_id uuid not null references public.quotes(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade, step integer not null, subject text not null, body text not null default '',
   status text not null check (status in ('sent','delivered','opened','clicked','bounced','failed','draft')),
-  provider_message_id text, error text, sent_at timestamptz, created_at timestamptz not null default now()
+  provider_message_id text, error text, request_key text, sent_at timestamptz, created_at timestamptz not null default now()
 );
 
 create table if not exists public.product_events (
@@ -80,8 +80,10 @@ create table if not exists public.feedback_insights (
 
 create index if not exists quotes_user_id_idx on public.quotes(user_id);
 create index if not exists quotes_due_idx on public.quotes(status, auto_send, next_followup_at);
+create unique index if not exists quotes_user_request_key_unique on public.quotes(user_id, request_key) where request_key is not null;
 create index if not exists followups_quote_id_idx on public.followups(quote_id);
 create unique index if not exists followups_quote_step_unique on public.followups(quote_id, step);
+create unique index if not exists followups_user_request_key_unique on public.followups(user_id, request_key) where request_key is not null;
 create index if not exists product_events_event_idx on public.product_events(event, created_at desc);
 create index if not exists system_events_created_idx on public.system_events(created_at desc);
 create index if not exists support_user_idx on public.support_tickets(user_id, created_at desc);
