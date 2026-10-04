@@ -130,3 +130,29 @@ test('prepared B2B outreach uses commercial identity, source, privacy and opt-ou
   assert.match(server,/https:\/\/relanzio\.com\/privacy/);
   assert.match(server,/répondez STOP ou écrivez à/);
 });
+
+
+test('launch build uses lockfile installs in CI and Docker',()=>{
+  const ci=readFileSync(new URL('../.github/workflows/ci.yml',import.meta.url),'utf8');
+  const docker=readFileSync(new URL('../Dockerfile',import.meta.url),'utf8');
+  assert.match(ci,/npm ci --no-audit --no-fund/);
+  assert.doesNotMatch(ci,/npm install --no-audit --no-fund/);
+  assert.match(docker,/npm ci --no-audit --no-fund/);
+  assert.match(docker,/npm ci --omit=dev --no-audit --no-fund/);
+  assert.doesNotMatch(docker,/npm install --no-audit --no-fund/);
+});
+
+test('public launch copy uses explicit free-account CTA and role-based sensitive contact',()=>{
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  assert.match(client,/Créer un compte gratuit/);
+  assert.doesNotMatch(client,/Essayer gratuitement/);
+  assert.doesNotMatch(client,/Tester gratuitement/);
+  assert.match(client,/Compte, données et facturation/);
+  assert.match(client,/mailto:\$\{support\}/);
+});
+
+test('privacy copy includes direct B2B opposition right',()=>{
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  assert.match(client,/droit d’opposition/);
+  assert.match(client,/l’opposition est simple, gratuite et peut être exercée à tout moment/);
+});
