@@ -12,6 +12,9 @@ const result={signup_redirect:false,recovery_redirect:false,app:APP};
 function safeLocation(value){
   try{const u=new URL(value);return {origin:u.origin,path:u.pathname}}catch{return {origin:'',path:''}}
 }
+function safeRedirectParam(actionLink){
+  try{return safeLocation(new URL(actionLink).searchParams.get('redirect_to')||'')}catch{return {origin:'',path:''}}
+}
 async function checkActionLink(actionLink,expectedPath){
   const r=await fetch(actionLink,{redirect:'manual'});
   const loc=safeLocation(r.headers.get('location')||'');
@@ -22,13 +25,17 @@ try{
   const signup=await db.auth.admin.generateLink({type:'signup',email,password,redirectTo:APP+'/'});
   if(signup.error)throw signup.error;
   userId=signup.data?.user?.id||null;
-  const s=await checkActionLink(signup.data?.properties?.action_link||'', '/');
-  result.signup_redirect=s.ok;result.signup={status:s.status,origin:s.origin,path:s.path};
+  const signupAction=signup.data?.properties?.action_link||'';
+  const signupRequested=safeRedirectParam(signupAction);
+  const s=await checkActionLink(signupAction, '/');
+  result.signup_redirect=s.ok;result.signup={status:s.status,origin:s.origin,path:s.path,requested_origin:signupRequested.origin,requested_path:signupRequested.path};
   if(userId)await db.auth.admin.updateUserById(userId,{email_confirm:true});
   const recovery=await db.auth.admin.generateLink({type:'recovery',email,redirectTo:APP+'/reset-password'});
   if(recovery.error)throw recovery.error;
-  const rec=await checkActionLink(recovery.data?.properties?.action_link||'', '/reset-password');
-  result.recovery_redirect=rec.ok;result.recovery={status:rec.status,origin:rec.origin,path:rec.path};
+  const recoveryAction=recovery.data?.properties?.action_link||'';
+  const recoveryRequested=safeRedirectParam(recoveryAction);
+  const rec=await checkActionLink(recoveryAction, '/reset-password');
+  result.recovery_redirect=rec.ok;result.recovery={status:rec.status,origin:rec.origin,path:rec.path,requested_origin:recoveryRequested.origin,requested_path:recoveryRequested.path};
   result.ok=result.signup_redirect&&result.recovery_redirect;
 }catch(e){
   result.ok=false;result.error=String(e?.message||e).slice(0,120);
