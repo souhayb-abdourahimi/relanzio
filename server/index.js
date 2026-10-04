@@ -35,7 +35,8 @@ const parseSentDate = value => {
   const v = String(value || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
   const d = new Date(v + 'T00:00:00Z');
-  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0,10) !== v || d.getTime() > Date.now() + 86400000) return null;
+  const today = new Date().toISOString().slice(0,10);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0,10) !== v || v > today) return null;
   return v;
 };
 const providerRank = {draft:0,sent:1,delivered:2,opened:3,clicked:4,failed:5,bounced:6};
@@ -206,7 +207,23 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
 });
 
 app.post('/api/billing/checkout', requireUser, async(req,res)=>{
-  try{ if(!stripe||!process.env.STRIPE_PRO_PRICE_ID)return res.status(503).json({error:"Stripe n'est pas configuré."}); const profile=await getProfile(req.user); if(profile.plan==='pro')return res.status(409).json({error:'Votre compte est déjà Pro. Utilisez Gérer mon abonnement.'}); let customer=profile.stripe_customer_id; if(!customer){const c=await stripe.customers.create({email:req.user.email,metadata:{user_id:req.user.id}});customer=c.id;await db.from('profiles').update({stripe_customer_id:customer}).eq('id',req.user.id)} const session=await stripe.checkout.sessions.create({mode:'subscription',customer,line_items:[{price:process.env.STRIPE_PRO_PRICE_ID,quantity:1}],allow_promotion_codes:true,client_reference_id:req.user.id,metadata:{user_id:req.user.id},subscription_data:{metadata:{user_id:req.user.id}},success_url:`${process.env.APP_URL}?billing=success`,cancel_url:`${process.env.APP_URL}?billing=cancel`}); await db.from('product_events').insert({user_id:req.user.id,event:'checkout_started',path:'/app'}); res.json({url:session.url}); }catch(e){res.status(500).json({error:e.message})}
+  try{
+    if(!stripe||!process.env.STRIPE_PRO_PRICE_ID)return res.status(503).json({error:"Stripe n'est pas configuré."});
+    const profile=await getProfile(req.user);
+    if(profile.plan==='pro')return res.status(409).json({error:'Votre compte est déjà Pro. Utilisez Gérer mon abonnement.'});
+    let customer=profile.stripe_customer_id;
+    if(!customer){
+      const c=await stripe.customers.create({email:req.user.email,metadata:{user_id:req.user.id}});
+      customer=c.id;
+      await mustDb(db.from('profiles').update({stripe_customer_id:customer,updated_at:nowIso()}).eq('id',req.user.id));
+    }
+    const openSessions=await stripe.checkout.sessions.list({customer,status:'open',limit:10});
+    const reusable=(openSessions.data||[]).find(s=>s.mode==='subscription'&&s.url);
+    if(reusable)return res.json({url:reusable.url,reused:true});
+    const session=await stripe.checkout.sessions.create({mode:'subscription',customer,line_items:[{price:process.env.STRIPE_PRO_PRICE_ID,quantity:1}],allow_promotion_codes:true,client_reference_id:req.user.id,metadata:{user_id:req.user.id},subscription_data:{metadata:{user_id:req.user.id}},success_url:`${process.env.APP_URL}?billing=success`,cancel_url:`${process.env.APP_URL}?billing=cancel`});
+    await db.from('product_events').insert({user_id:req.user.id,event:'checkout_started',path:'/app'});
+    res.json({url:session.url,reused:false});
+  }catch(e){res.status(500).json({error:e.message})}
 });
 app.post('/api/billing/portal', requireUser, async(req,res)=>{
   try{ if(!stripe)return res.status(503).json({error:'Stripe non configuré.'}); const profile=await getProfile(req.user); if(!profile.stripe_customer_id)return res.status(400).json({error:'Aucun compte de facturation.'}); const session=await stripe.billingPortal.sessions.create({customer:profile.stripe_customer_id,return_url:process.env.APP_URL}); res.json({url:session.url}); }catch(e){res.status(500).json({error:e.message})}
