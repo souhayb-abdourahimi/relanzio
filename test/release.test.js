@@ -95,8 +95,8 @@ test('public site uses role-based Relanzio contact addresses and no persistent a
 test('SEO release files include canonical, legal page and protected auth routes',()=>{
   const html=readFileSync(new URL('../client/index.html',import.meta.url),'utf8');
   const renderer=readFileSync(new URL('../scripts/render-public-files.mjs',import.meta.url),'utf8');
-  assert.match(html,/rel="canonical" href="https:\/\/relanzio\.com\/"\/?>/);
-  assert.match(html,/property="og:url" content="https:\/\/relanzio\.com\/"\/?>/);
+  assert.ok(html.includes('<link rel="canonical" href="https://relanzio.com/" />'));
+  assert.ok(html.includes('<meta property="og:url" content="https://relanzio.com/" />'));
   assert.match(renderer,/'\/legal'/);
   for(const path of ['/login','/signup','/reset-password'])assert.ok(renderer.includes(`Disallow: ${path}`));
 });
