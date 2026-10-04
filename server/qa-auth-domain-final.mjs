@@ -22,7 +22,7 @@ async function checkActionLink(actionLink,expectedPath){
 }
 try{
   if(APP!=='https://relanzio.com')throw new Error('APP_URL_NOT_FINAL');
-  const signup=await db.auth.admin.generateLink({type:'signup',email,password,redirectTo:APP+'/'});
+  const signup=await db.auth.admin.generateLink({type:'signup',email,password,options:{redirectTo:APP+'/'}});
   if(signup.error)throw signup.error;
   userId=signup.data?.user?.id||null;
   const signupAction=signup.data?.properties?.action_link||'';
@@ -30,7 +30,7 @@ try{
   const s=await checkActionLink(signupAction, '/');
   result.signup_redirect=s.ok;result.signup={status:s.status,origin:s.origin,path:s.path,requested_origin:signupRequested.origin,requested_path:signupRequested.path};
   if(userId)await db.auth.admin.updateUserById(userId,{email_confirm:true});
-  const recovery=await db.auth.admin.generateLink({type:'recovery',email,redirectTo:APP+'/reset-password'});
+  const recovery=await db.auth.admin.generateLink({type:'recovery',email,options:{redirectTo:APP+'/reset-password'}});
   if(recovery.error)throw recovery.error;
   const recoveryAction=recovery.data?.properties?.action_link||'';
   const recoveryRequested=safeRedirectParam(recoveryAction);
