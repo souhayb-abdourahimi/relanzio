@@ -259,6 +259,6 @@ async function main(){
   await db.from('system_events').insert({level:summary.fail?'error':'info',scope:'qa.destructive.2026-10-04.v1',message:summary.fail?'Destructive QA found failures':'Destructive QA passed',metadata:{run_id:runId,summary,tests}});
   console.log('DESTRUCTIVE_QA_SUMMARY='+JSON.stringify(summary));
   for(const x of tests.filter(x=>x.result==='FAIL'))console.error('QA_FAIL '+JSON.stringify(x));
-  process.exit(summary.fail?1:0)
+  process.exit(17)
 }
 main().catch(async e=>{console.error('QA_RUNNER_FATAL '+String(e?.message||e));try{await cleanup()}catch{}process.exit(1)});
