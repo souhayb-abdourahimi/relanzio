@@ -13,3 +13,16 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm run build
+      - name: mobile navigation browser DOM
+        run: |
+          npm install --no-save --no-package-lock @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+          npm run dev:client -- --host 127.0.0.1 >/tmp/relanzio-vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill $VITE_PID || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:5173/mobile-fixture.html >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:5173/mobile-fixture.html >/dev/null
+          npx playwright test test/mobile-nav.browser.spec.js --reporter=line
