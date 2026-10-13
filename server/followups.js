@@ -2,6 +2,7 @@ import { db } from './db.js';
 import { generateFollowup, sendEmail } from './email.js';
 import { nextFollowupDate } from './logic.js';
 import { reportError } from './observability.js';
+import { hasProAccess } from './entitlements.js';
 
 export const nextDate = nextFollowupDate;
 
@@ -23,7 +24,7 @@ async function claimQuote(quote) {
 }
 
 export async function sendQuoteFollowup(quote, profile, requestKey=null) {
-  if (!['active','trialing'].includes(profile.subscription_status) || profile.plan !== 'pro') throw new Error('PRO_SUBSCRIPTION_REQUIRED');
+  if (!hasProAccess(profile)) throw new Error('PRO_ACCESS_REQUIRED');
   if (requestKey) {
     const {data:prior,error:priorError}=await db.from('followups').select('*').eq('user_id',quote.user_id).eq('request_key',requestKey).maybeSingle();
     if(priorError)throw priorError;
@@ -77,7 +78,7 @@ export async function runDueFollowups() {
     try {
       const {data:profile,error:profileError}=await db.from('profiles').select('*').eq('id',quote.user_id).maybeSingle();
       if(profileError)throw profileError;if(!profile)throw new Error('PROFILE_NOT_FOUND');
-      if (profile.plan !== 'pro' || profile.email_mode !== 'automatic' || !['active','trialing'].includes(profile.subscription_status)) {
+      if (!hasProAccess(profile) || profile.email_mode !== 'automatic') {
         results.push({ id:quote.id, skipped:'approval_or_subscription_required' }); continue;
       }
       const result = await sendQuoteFollowup(quote, profile);
