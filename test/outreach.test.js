@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldPauseOutreach } from '../server/outreach.js';
+import { shouldPauseOutreach } from '../server/outreach-health.js';
 
 test('outreach deliverability guard pauses on spam',()=>{
   assert.deepEqual(shouldPauseOutreach({sent:1,bounced:1,spam:1,blocked:0}),{pause:true,reason:'spam_complaint'});
