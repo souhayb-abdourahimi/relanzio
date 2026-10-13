@@ -2,6 +2,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --no-audit --no-fund
+RUN apk add --no-cache chromium
 COPY . .
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
@@ -35,7 +36,7 @@ ENV VITE_LEGAL_REGISTRATION=$VITE_LEGAL_REGISTRATION
 ENV VITE_LEGAL_VAT=$VITE_LEGAL_VAT
 ENV VITE_LEGAL_PHONE=$VITE_LEGAL_PHONE
 ENV VITE_PUBLICATION_DIRECTOR=$VITE_PUBLICATION_DIRECTOR
-RUN npm run check && npm run build
+RUN npm run check && npm run build && sh scripts/mobile-dom-check.sh
 
 FROM node:22-alpine
 WORKDIR /app
