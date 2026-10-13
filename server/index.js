@@ -18,6 +18,8 @@ import { buildCeoMetrics, weeklyRecommendations } from './ceo.js';
 import { runLifecycleEmails } from './lifecycle.js';
 import { reportError } from './observability.js';
 import { billingTransition, normalizeSubscriptionStatus, planForSubscriptionStatus } from './billing.js';
+import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntitlements } from './entitlements.js';
+import { grantTrialToEmail, expireTrials } from './trials.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -143,8 +145,8 @@ app.patch('/api/profile', requireUser, async(req,res)=>{
     if ('onboarding_completed' in req.body) patch.onboarding_completed=Boolean(req.body.onboarding_completed);
     if ('marketing_opt_in' in req.body) patch.marketing_opt_in=Boolean(req.body.marketing_opt_in);
     if(req.body.email_mode==='review')patch.email_mode='review';
-    if(req.body.email_mode==='automatic'&&profile.plan==='pro')patch.email_mode='automatic';
-    const {data,error}=await db.from('profiles').update(patch).eq('id',req.user.id).select('*').single(); if(error)throw error; res.json({profile:data});
+    if(req.body.email_mode==='automatic'&&hasProAccess(profile))patch.email_mode='automatic';
+    const {data,error}=await db.from('profiles').update(patch).eq('id',req.user.id).select('*').single(); if(error)throw error; res.json({profile:withEntitlements(data)});
   }catch(e){res.status(500).json({error:e.message})}
 });
 
@@ -159,9 +161,9 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
     if(!sanitizeText(client_name,120)||!isValidEmail(email)||!sanitizeText(title,180)||parsedAmount===null||!parsedDate)return res.status(400).json({error:'Champs invalides.'});
     if(requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).maybeSingle();if(priorError)throw priorError;if(prior)return res.json({quote:prior,idempotent:true});}
     const {count}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',req.user.id).eq('status','open');
-    if(profile.plan!=='pro'&&count>=5)return res.status(403).json({error:'La formule gratuite est limitée à 5 devis actifs.'});
-    if(profile.plan==='pro'&&count>=100)return res.status(403).json({error:'Limite de 100 devis actifs atteinte. Contactez le support.'});
-    const row={user_id:req.user.id,client_name:sanitizeText(client_name,120),client_email:email,title:sanitizeText(title,180),amount:parsedAmount,sent_at:parsedDate,status:'open',request_key:requestKey,auto_send:profile.plan==='pro'&&profile.email_mode==='automatic'&&['active','trialing'].includes(profile.subscription_status)?Boolean(auto_send):false,followup_step:0,next_followup_at:nextDate(parsedDate,0)};
+    if(!hasProAccess(profile)&&count>=5)return res.status(403).json({error:'La formule gratuite est limitée à 5 devis actifs.'});
+    if(hasProAccess(profile)&&count>=100)return res.status(403).json({error:'Limite de 100 devis actifs atteinte. Contactez le support.'});
+    const row={user_id:req.user.id,client_name:sanitizeText(client_name,120),client_email:email,title:sanitizeText(title,180),amount:parsedAmount,sent_at:parsedDate,status:'open',request_key:requestKey,auto_send:hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(auto_send):false,followup_step:0,next_followup_at:nextDate(parsedDate,0)};
     const {data,error}=await db.from('quotes').insert(row).select('*').single();
     if(error?.code==='23505'&&requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).single();if(priorError)throw priorError;return res.json({quote:prior,idempotent:true});}
     if(error)throw error;
@@ -181,7 +183,7 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
     if ('title' in req.body) { const v=sanitizeText(req.body.title,180); if(!v)return res.status(400).json({error:'Objet invalide.'}); patch.title=v; }
     if ('amount' in req.body) { const v=parseQuoteAmount(req.body.amount); if(v===null)return res.status(400).json({error:'Montant invalide.'}); patch.amount=v; }
     if ('sent_at' in req.body) { const v=parseSentDate(req.body.sent_at); if(!v)return res.status(400).json({error:"Date d’envoi invalide."}); patch.sent_at=v; if((patch.status||existing.status)==='open')patch.next_followup_at=nextDate(v,existing.followup_step); }
-    if ('auto_send' in req.body) { const profile=await getProfile(req.user); patch.auto_send=profile.plan==='pro'&&profile.email_mode==='automatic'&&['active','trialing'].includes(profile.subscription_status)?Boolean(req.body.auto_send):false; }
+    if ('auto_send' in req.body) { const profile=await getProfile(req.user); patch.auto_send=hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(req.body.auto_send):false; }
     const {data,error}=await db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id).select('*').single(); if(error)throw error; res.json({quote:data});
   } catch(e) { await reportError('quotes.update',e,{request_id:req.requestId}); res.status(500).json({error:'Impossible de modifier le devis.',request_id:req.requestId}); }
 });
@@ -195,7 +197,7 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
   try {
     const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]);
     if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});
-    if(profile.plan!=='pro'||!['active','trialing'].includes(profile.subscription_status))return res.status(403).json({error:'L’envoi depuis Relanzio nécessite un abonnement Pro actif.'});
+    if(!hasProAccess(profile))return res.status(403).json({error:'L’envoi depuis Relanzio nécessite des droits Pro actifs.'});
     const result=await sendQuoteFollowup(quote,profile,sanitizeText(req.get('Idempotency-Key'),100)||null);
     res.json({sent:true,result});
   } catch(e){
@@ -210,7 +212,7 @@ app.post('/api/billing/checkout', requireUser, async(req,res)=>{
     if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'Facturation non activée pendant la phase pilote.'});
     if(!stripe||!process.env.STRIPE_PRO_PRICE_ID)return res.status(503).json({error:"Stripe n'est pas configuré."});
     const profile=await getProfile(req.user);
-    if(profile.plan==='pro')return res.status(409).json({error:'Votre compte est déjà Pro. Utilisez Gérer mon abonnement.'});
+    if(hasSubscriptionProAccess(profile))return res.status(409).json({error:'Votre compte dispose déjà d’un abonnement Pro. Utilisez Gérer mon abonnement.'});
     let customer=profile.stripe_customer_id;
     if(!customer){
       const c=await stripe.customers.create({email:req.user.email,metadata:{user_id:req.user.id}},{idempotencyKey:`relanzio-customer-${req.user.id}`});
@@ -262,6 +264,18 @@ app.get('/api/admin/tickets', requireUser, async(req,res)=>{if(!isAdmin(req.user
 app.patch('/api/admin/tickets/:id', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const status=sanitizeText(req.body.status,30);if(!['open','in_progress','resolved','closed'].includes(status))return res.status(400).json({error:'Statut invalide.'});const {data,error}=await db.from('support_tickets').update({status,updated_at:nowIso()}).eq('id',req.params.id).select('*').maybeSingle();if(error)return res.status(500).json({error:error.message});if(!data)return res.status(404).json({error:'Ticket introuvable.'});res.json({ticket:data})});
 
 app.get('/api/admin/prospects', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const {data,error}=await db.from('prospects').select('*').order('score',{ascending:false}).limit(500);if(error)return res.status(500).json({error:error.message});res.json({prospects:data})});
+app.post('/api/admin/trials/grant', requireUser, async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{
+    const email=normalizeEmail(req.body.email);
+    if(!isValidEmail(email))return res.status(400).json({error:'Email invalide.'});
+    const profile=await grantTrialToEmail(email,req.user.email||req.user.id);
+    res.status(201).json({trial:{user_id:profile.id,email:profile.email,trial_started_at:profile.trial_started_at,trial_ends_at:profile.trial_ends_at,trial_days_remaining:profile.trial_days_remaining,pro_access:profile.pro_access}});
+  }catch(e){
+    const status=e.code==='PROFILE_NOT_FOUND'?404:e.code==='TRIAL_ALREADY_USED'||e.code==='ALREADY_PRO'?409:500;
+    res.status(status).json({error:e.message,code:e.code||'TRIAL_GRANT_FAILED'});
+  }
+});
 app.post('/api/admin/prospects/import', requireUser, async(req,res)=>{
   if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'}); const rows=Array.isArray(req.body.prospects)?req.body.prospects.slice(0,200):[]; const accepted=[];
   for(const p of rows){const email=normalizeEmail(p.email);if(!p.company_name||!isValidEmail(email))continue;const {data:suppressed}=await db.from('suppressions').select('email').eq('email',email).maybeSingle();if(suppressed)continue;const generic=/^(contact|hello|bonjour|info|commercial|sales)@/i.test(email);if(!generic&&(!p.source||!p.source_url))continue;const q=qualifyProspect({...p,email});accepted.push({company_name:sanitizeText(p.company_name,160),contact_name:sanitizeText(p.contact_name,120),email,role:sanitizeText(p.role,100),website:sanitizeText(p.website,240),source:sanitizeText(p.source,120),source_url:sanitizeText(p.source_url,500),lawful_basis:'professional_relevance',employee_count:Number(p.employee_count)||null,estimated_quotes_per_month:Number(p.estimated_quotes_per_month)||null,uses_digital_tools:Boolean(p.uses_digital_tools),is_service_business:p.is_service_business!==false,score:q.score,score_reasons:q.reasons,status:q.score>=55?'qualified':'new'});}
@@ -280,11 +294,12 @@ app.get('/api/admin/insights', requireUser, async(req,res)=>{if(!isAdmin(req.use
 app.get('/api/admin/system', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const since=new Date(Date.now()-7*86400000).toISOString();const [{data:errors},{data:failed},{data:tickets},{data:pastDue}]=await Promise.all([db.from('system_events').select('*').gte('created_at',since).order('created_at',{ascending:false}).limit(100),db.from('followups').select('id,quote_id,error,created_at').eq('status','failed').gte('created_at',since).limit(100),db.from('support_tickets').select('id,subject,status,priority,created_at').in('priority',['high','urgent']).neq('status','closed').limit(100),db.from('profiles').select('id,email,subscription_status').in('subscription_status',['past_due','unpaid']).limit(100)]);res.json({window_days:7,errors:errors||[],failed_followups:failed||[],sensitive_tickets:tickets||[],billing_attention:pastDue||[]})}catch(e){await reportError('admin.system',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de charger la santé système.',request_id:req.requestId})}});
 
 app.get('/api/admin/ceo', requireUser, async(req,res)=>{
-  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const [{data:events},{data:profiles},{data:prospects},{data:outreach},{data:quotes},{data:insights},{data:followups},{data:systemEvents},{data:tickets}]=await Promise.all([db.from('product_events').select('anonymous_id,user_id,event,created_at').limit(10000),db.from('profiles').select('id,plan,subscription_status,activated_at'),db.from('prospects').select('id,status'),db.from('outreach_events').select('type'),db.from('quotes').select('status'),db.from('feedback_insights').select('requested_feature,confidence'),db.from('followups').select('status,created_at').limit(10000),db.from('system_events').select('level,scope,created_at').gte('created_at',new Date(Date.now()-7*86400000).toISOString()).limit(1000),db.from('support_tickets').select('status,priority').neq('status','closed')]);const visitors=new Set((events||[]).filter(e=>e.event==='landing_view').map(e=>e.anonymous_id).filter(Boolean)).size;const signups=(profiles||[]).length,activated=(profiles||[]).filter(p=>p.activated_at).length,paying=(profiles||[]).filter(p=>p.plan==='pro'&&['active','trialing'].includes(p.subscription_status)).length,canceled=(profiles||[]).filter(p=>p.subscription_status==='canceled').length;const outreachSent=(outreach||[]).filter(x=>x.type==='sent').length,replies=(outreach||[]).filter(x=>x.type==='replied').length,meetings=(outreach||[]).filter(x=>x.type==='meeting').length;const activeSince=Date.now()-30*86400000;const activeUsers=new Set((events||[]).filter(e=>e.user_id&&new Date(e.created_at).getTime()>=activeSince).map(e=>e.user_id)).size;const followupsSent=(followups||[]).filter(x=>['sent','delivered','opened','clicked'].includes(x.status)).length;const openProblems=(systemEvents||[]).length+(tickets||[]).filter(t=>['high','urgent'].includes(t.priority)&&t.status!=='resolved').length;const metrics={...buildCeoMetrics({visitors,signups,activated,paying,canceled,mrr:paying*29,prospects:(prospects||[]).length,outreachSent,replies,meetings,quotes:(quotes||[]).length,wonQuotes:(quotes||[]).filter(q=>q.status==='won').length}),activeUsers,followupsSent,openProblems};res.json({metrics,recommendations:weeklyRecommendations(metrics,insights||[]),mrrNote:'MRR indicatif basé sur 29 € par compte Pro actif; rapprocher Stripe pour la comptabilité.'});}catch(e){res.status(500).json({error:e.message})}
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const [{data:events},{data:profiles},{data:prospects},{data:outreach},{data:quotes},{data:insights},{data:followups},{data:systemEvents},{data:tickets}]=await Promise.all([db.from('product_events').select('anonymous_id,user_id,event,created_at').limit(10000),db.from('profiles').select('id,plan,subscription_status,activated_at,trial_started_at,trial_ends_at,trial_expired_at'),db.from('prospects').select('id,status'),db.from('outreach_events').select('type'),db.from('quotes').select('status'),db.from('feedback_insights').select('requested_feature,confidence'),db.from('followups').select('status,created_at').limit(10000),db.from('system_events').select('level,scope,created_at').gte('created_at',new Date(Date.now()-7*86400000).toISOString()).limit(1000),db.from('support_tickets').select('status,priority').neq('status','closed')]);const visitors=new Set((events||[]).filter(e=>e.event==='landing_view').map(e=>e.anonymous_id).filter(Boolean)).size;const signups=(profiles||[]).length,activated=(profiles||[]).filter(p=>p.activated_at).length,paying=(profiles||[]).filter(p=>p.plan==='pro'&&p.subscription_status==='active').length,trials=(profiles||[]).filter(p=>isManagedTrialActive(p)).length,canceled=(profiles||[]).filter(p=>p.subscription_status==='canceled').length;const outreachSent=(outreach||[]).filter(x=>x.type==='sent').length,replies=(outreach||[]).filter(x=>x.type==='replied').length,meetings=(outreach||[]).filter(x=>x.type==='meeting').length;const activeSince=Date.now()-30*86400000;const activeUsers=new Set((events||[]).filter(e=>e.user_id&&new Date(e.created_at).getTime()>=activeSince).map(e=>e.user_id)).size;const followupsSent=(followups||[]).filter(x=>['sent','delivered','opened','clicked'].includes(x.status)).length;const openProblems=(systemEvents||[]).length+(tickets||[]).filter(t=>['high','urgent'].includes(t.priority)&&t.status!=='resolved').length;const metrics={...buildCeoMetrics({visitors,signups,activated,paying,canceled,mrr:paying*29,prospects:(prospects||[]).length,outreachSent,replies,meetings,quotes:(quotes||[]).length,wonQuotes:(quotes||[]).filter(q=>q.status==='won').length}),trials,activeUsers,followupsSent,openProblems};res.json({metrics,recommendations:weeklyRecommendations(metrics,insights||[]),mrrNote:'MRR indicatif basé uniquement sur les abonnements Stripe actifs à 29 €; les essais ne sont pas comptés.'});}catch(e){res.status(500).json({error:e.message})}
 });
 
 app.post('/api/cron/run', async(req,res)=>{if(!safeEqual(String(req.headers['x-cron-secret']||''),String(process.env.CRON_SECRET||'')))return res.status(401).json({error:'Unauthorized'});try{res.json({results:await runDueFollowups()})}catch(e){res.status(500).json({error:e.message})}});
 cron.schedule('*/15 * * * *',async()=>{try{await runDueFollowups()}catch(e){await reportError('cron.followups',e)}},{noOverlap:true});
+cron.schedule('2,17,32,47 * * * *',async()=>{try{await expireTrials()}catch(e){await reportError('cron.trials',e)}},{noOverlap:true});
 cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
 
 app.use((err,req,res,next)=>{
@@ -294,6 +309,8 @@ app.use((err,req,res,next)=>{
 });
 process.on('unhandledRejection',e=>reportError('process.unhandledRejection',e));
 process.on('uncaughtException',e=>{reportError('process.uncaughtException',e).finally(()=>process.exit(1));});
+
+expireTrials().catch(e=>reportError('startup.trials',e));
 
 if(process.env.NODE_ENV==='production'){app.use(express.static(dist,{maxAge:'1h',etag:true}));app.get('*splat',(_req,res)=>res.sendFile(join(dist,'index.html')))}
 const port=Number(process.env.PORT||3000);if(process.env.NODE_ENV!=='test')app.listen(port,'0.0.0.0',()=>console.log(`Relanzio running on :${port}`));
