@@ -10,7 +10,7 @@
     "build": "vite build --config client/vite.config.js",
     "start": "node server/index.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server/index.js && node --check server/logic.js && node --check server/billing.js && node --check server/prospecting.js && node --check server/followups.js && node --check server/support.js && node --check server/ceo.js && node --check server/lifecycle.js && node --test test/*.test.js",
+    "check": "node --check server/index.js && node --check server/logic.js && node --check server/billing.js && node --check server/entitlements.js && node --check server/trials.js && node --check server/prospecting.js && node --check server/followups.js && node --check server/support.js && node --check server/ceo.js && node --check server/lifecycle.js && node --test test/*.test.js",
     "preflight": "node scripts/preflight.mjs",
     "load": "node test/load.mjs",
     "smoke": "node scripts/smoke.mjs",
