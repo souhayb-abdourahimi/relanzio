@@ -37,3 +37,16 @@ if ! grep -q 'data-mobile-qa="pass"' /tmp/relanzio-mobile-dom.html; then
 fi
 
 echo "Mobile DOM QA PASS: 390x844, menu/billing/logout/close/touch/overflow verified"
+
+
+for size in 390,844 1280,900; do
+  "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=5000     --dump-dom 'http://127.0.0.1:5173/trial-fixture.html?qa=1' >/tmp/relanzio-trial-dom.html 2>/tmp/relanzio-trial-chromium.log
+  if ! grep -q 'data-trial-qa="pass"' /tmp/relanzio-trial-dom.html; then
+    cat /tmp/relanzio-trial-dom.html
+    cat /tmp/relanzio-trial-chromium.log
+    echo "Trial DOM QA failed at $size" >&2
+    exit 1
+  fi
+done
+
+echo "Trial DOM QA PASS: 390x844 and 1280x900, status/CTA/touch/overflow verified"
