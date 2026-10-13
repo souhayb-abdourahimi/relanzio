@@ -20,6 +20,7 @@ import { reportError } from './observability.js';
 import { billingTransition, normalizeSubscriptionStatus, planForSubscriptionStatus } from './billing.js';
 import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntitlements } from './entitlements.js';
 import { grantTrialToEmail, expireTrials } from './trials.js';
+import { processOutreachQueue, outreachHealth } from './outreach.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -255,6 +256,13 @@ app.post('/api/brevo/webhook', async(req,res)=>{
       if(pEvent)await mustDb(db.from('outreach_events').insert({prospect_id:pEvent.prospect_id,type,provider_message_id:messageId,metadata:req.body}));
     }
     if(type==='opt_out'&&email){await mustDb(db.from('suppressions').upsert({email,reason:'provider_unsubscribe'}));await mustDb(db.from('prospects').update({status:'suppressed',updated_at:nowIso()}).eq('email',email))}
+    const rawEvent=String(req.body.event||'').toLowerCase().replace(/[_\s-]/g,'');
+    if(email&&['hardbounce','invalid','spam','blocked'].includes(rawEvent)){
+      await mustDb(db.from('suppressions').upsert({email,reason:`provider_${rawEvent}`}));
+      await mustDb(db.from('prospects').update({status:'suppressed',updated_at:nowIso()}).eq('email',email));
+      const {data:prospect}=await db.from('prospects').select('id').eq('email',email).maybeSingle();
+      if(prospect)await mustDb(db.from('outreach_queue').update({status:'canceled',error:`provider_${rawEvent}`,updated_at:nowIso()}).eq('prospect_id',prospect.id).in('status',['queued','held']));
+    }
     res.json({ok:true});
   }catch(e){res.status(500).json({error:'Webhook processing failed.'})}
 });
@@ -264,6 +272,7 @@ app.get('/api/admin/tickets', requireUser, async(req,res)=>{if(!isAdmin(req.user
 app.patch('/api/admin/tickets/:id', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const status=sanitizeText(req.body.status,30);if(!['open','in_progress','resolved','closed'].includes(status))return res.status(400).json({error:'Statut invalide.'});const {data,error}=await db.from('support_tickets').update({status,updated_at:nowIso()}).eq('id',req.params.id).select('*').maybeSingle();if(error)return res.status(500).json({error:error.message});if(!data)return res.status(404).json({error:'Ticket introuvable.'});res.json({ticket:data})});
 
 app.get('/api/admin/prospects', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const {data,error}=await db.from('prospects').select('*').order('score',{ascending:false}).limit(500);if(error)return res.status(500).json({error:error.message});res.json({prospects:data})});
+app.get('/api/admin/outreach-health', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const health=await outreachHealth();const {data:queue,error}=await db.from('outreach_queue').select('id,prospect_id,sequence_step,scheduled_at,status,sent_at,error').order('scheduled_at',{ascending:true}).limit(200);if(error)throw error;res.json({health,queue:queue||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post('/api/admin/trials/grant', requireUser, async(req,res)=>{
   if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
   try{
@@ -300,6 +309,7 @@ app.get('/api/admin/ceo', requireUser, async(req,res)=>{
 app.post('/api/cron/run', async(req,res)=>{if(!safeEqual(String(req.headers['x-cron-secret']||''),String(process.env.CRON_SECRET||'')))return res.status(401).json({error:'Unauthorized'});try{res.json({results:await runDueFollowups()})}catch(e){res.status(500).json({error:e.message})}});
 cron.schedule('*/15 * * * *',async()=>{try{await runDueFollowups()}catch(e){await reportError('cron.followups',e)}},{noOverlap:true});
 cron.schedule('2,17,32,47 * * * *',async()=>{try{await expireTrials()}catch(e){await reportError('cron.trials',e)}},{noOverlap:true});
+cron.schedule('*/10 * * * *',async()=>{try{const result=await processOutreachQueue();if(result?.error)await reportError('cron.outreach.result',new Error(result.error),{queue_id:result.queue_id})}catch(e){await reportError('cron.outreach',e)}},{noOverlap:true});
 cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
 
 app.use((err,req,res,next)=>{
