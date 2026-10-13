@@ -10,6 +10,7 @@ create table if not exists public.profiles (
   onboarding_completed boolean not null default false,
   marketing_opt_in boolean not null default false,
   activated_at timestamptz, stripe_customer_id text unique, stripe_subscription_id text,
+  trial_started_at timestamptz, trial_ends_at timestamptz, trial_expired_at timestamptz,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
@@ -43,6 +44,15 @@ create table if not exists public.system_events (
 create table if not exists public.lifecycle_messages (
   id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
   type text not null, status text not null default 'sent', sent_at timestamptz, created_at timestamptz not null default now(), unique(user_id,type)
+);
+
+
+create table if not exists public.trial_events (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  type text not null check (type in ('activated','expired')),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists public.support_tickets (
@@ -87,13 +97,14 @@ create unique index if not exists followups_user_request_key_unique on public.fo
 create index if not exists product_events_event_idx on public.product_events(event, created_at desc);
 create index if not exists system_events_created_idx on public.system_events(created_at desc);
 create index if not exists support_user_idx on public.support_tickets(user_id, created_at desc);
+create index if not exists trial_events_user_created_idx on public.trial_events(user_id, created_at desc);
 create index if not exists prospects_status_score_idx on public.prospects(status, score desc);
 create index if not exists outreach_prospect_idx on public.outreach_events(prospect_id, created_at desc);
 create index if not exists feedback_category_idx on public.feedback_insights(category, created_at desc);
 
 alter table public.profiles enable row level security; alter table public.quotes enable row level security;
 alter table public.followups enable row level security; alter table public.product_events enable row level security;
-alter table public.support_tickets enable row level security; alter table public.system_events enable row level security; alter table public.lifecycle_messages enable row level security; alter table public.prospects enable row level security;
+alter table public.support_tickets enable row level security; alter table public.trial_events enable row level security; alter table public.system_events enable row level security; alter table public.lifecycle_messages enable row level security; alter table public.prospects enable row level security;
 alter table public.suppressions enable row level security; alter table public.outreach_events enable row level security;
 alter table public.feedback_insights enable row level security;
 
@@ -106,7 +117,7 @@ drop policy if exists "tickets own read" on public.support_tickets; create polic
 -- v0.4 pilot hardening: the browser uses Supabase only for Auth.
 -- Keep Data API privileges minimal; server-side service_role retains full access and bypasses RLS.
 revoke all on table public.profiles, public.quotes, public.followups, public.product_events,
-  public.system_events, public.lifecycle_messages, public.support_tickets, public.prospects,
+  public.system_events, public.lifecycle_messages, public.support_tickets, public.trial_events, public.prospects,
   public.suppressions, public.outreach_events, public.feedback_insights from anon, authenticated;
 
 grant select on table public.profiles, public.quotes, public.followups, public.support_tickets to authenticated;
