@@ -7,3 +7,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .legal a,.panel a{color:#176b49;text-decoration:underline;text-underline-offset:2px}
 .plan-chip em{display:block;font-size:9px;font-style:normal;color:#7d8b84;margin-top:2px}
 @media(max-width:600px){.demo-label{display:none}}
+
+@media(max-width:900px){.side-nav button{min-width:44px;min-height:44px;padding:10px;display:grid;place-items:center}.side-nav{gap:2px}}
+@media(max-width:600px){.app-shell aside{padding:8px 10px;gap:6px}.app-shell aside .logo{font-size:22px}.dash{padding:18px 12px}.modal{padding:24px 18px}.auth-card{padding:28px 20px}.hero-copy h1{font-size:clamp(40px,13vw,49px);letter-spacing:-2.5px}}
