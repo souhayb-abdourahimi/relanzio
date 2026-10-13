@@ -10,3 +10,23 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 @media(max-width:900px){.side-nav button{min-width:44px;min-height:44px;padding:10px;display:grid;place-items:center}.side-nav{gap:2px}}
 @media(max-width:600px){.app-shell aside{padding:8px 10px;gap:6px}.app-shell aside .logo{font-size:22px}.dash{padding:18px 12px}.modal{padding:24px 18px}.auth-card{padding:28px 20px}.hero-copy h1{font-size:clamp(40px,13vw,49px);letter-spacing:-2.5px}}
+
+
+.mobile-app-header,.mobile-drawer-backdrop{display:none}
+.mobile-menu-toggle,.mobile-drawer-close,.mobile-drawer-nav button{font:inherit}
+@media(max-width:760px){
+  .app-shell{overflow-x:hidden}
+  .app-shell aside{position:sticky;top:0;z-index:40;padding:0;border-right:0;border-bottom:1px solid var(--line);background:white}
+  .desktop-sidebar-logo,.app-shell aside>.side-nav,.app-shell aside>.side-bottom{display:none}
+  .mobile-app-header{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:64px;padding:8px 12px;background:white}
+  .mobile-menu-toggle{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);font-size:24px;line-height:1}
+  .mobile-drawer-backdrop{display:block;position:fixed;inset:0;background:#0d211788;z-index:80}
+  .mobile-drawer{margin-left:auto;width:min(340px,calc(100vw - 24px));height:100%;max-width:100%;overflow-y:auto;background:white;padding:16px;box-shadow:-20px 0 55px #0002}
+  .mobile-drawer-head{display:flex;align-items:center;justify-content:space-between;min-height:48px;margin-bottom:14px}
+  .mobile-drawer-head b{font-size:18px}
+  .mobile-drawer-close{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:white;font-size:28px;line-height:1}
+  .mobile-drawer-nav{display:grid;gap:8px}
+  .mobile-drawer-nav button{width:100%;min-height:48px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);padding:12px 14px;text-align:left;font-weight:800}
+  .mobile-drawer-nav button:hover,.mobile-drawer-nav button:focus-visible{background:#edf6f0}
+  .mobile-drawer-nav .mobile-logout{margin-top:10px;color:#8f2f2a;border-color:#e8c8c5}
+}
