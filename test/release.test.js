@@ -169,3 +169,32 @@ test('compact mobile navigation remains accessible',()=>{
   assert.match(css,/button:focus-visible,a:focus-visible/);
   assert.match(css,/hero-copy h1\{font-size:clamp\(40px,13vw,49px\)/);
 });
+
+
+test('seven-day Pro trial is wired through schema, access and admin controls',()=>{
+  const schema=readFileSync(new URL('../supabase/schema.sql',import.meta.url),'utf8');
+  const migration=readFileSync(new URL('../supabase/migrations/006_pro_trial_7d.sql',import.meta.url),'utf8');
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  const followups=readFileSync(new URL('../server/followups.js',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const trialUi=readFileSync(new URL('../client/src/TrialStatus.jsx',import.meta.url),'utf8');
+  for(const field of ['trial_started_at','trial_ends_at','trial_expired_at']){
+    assert.ok(schema.includes(field),field);
+    assert.ok(migration.includes(field),field);
+  }
+  assert.match(schema,/create table if not exists public\.trial_events/);
+  assert.match(server,/app\.post\('\/api\/admin\/trials\/grant'/);
+  assert.match(server,/expireTrials\(\)/);
+  assert.match(server,/hasProAccess\(profile\)/);
+  assert.match(followups,/hasProAccess\(profile\)/);
+  assert.match(client,/profile\.pro_access/);
+  assert.match(trialUi,/Essai Pro —/);
+  assert.match(trialUi,/Passer à Pro — 29 €\/mois/);
+});
+
+test('trial accounts are excluded from paid MRR metrics',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  assert.match(server,/p\.plan==='pro'&&p\.subscription_status==='active'/);
+  assert.doesNotMatch(server,/paying=.*\['active','trialing'\]/);
+  assert.match(server,/les essais ne sont pas comptés/);
+});
