@@ -1,0 +1,1 @@
+alter table public.prospects add column if not exists sector text;
