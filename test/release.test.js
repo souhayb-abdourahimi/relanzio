@@ -156,3 +156,16 @@ test('privacy copy includes direct B2B opposition right',()=>{
   assert.match(client,/droit d’opposition/);
   assert.match(client,/l’opposition est simple, gratuite et peut être exercée à tout moment/);
 });
+
+
+test('compact mobile navigation remains accessible',()=>{
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const css=readFileSync(new URL('../client/src/styles.css',import.meta.url),'utf8');
+  assert.match(client,/aria-label="Navigation de l’application"/);
+  assert.match(client,/aria-label="Tableau de bord"/);
+  assert.match(client,/aria-label="Aide et support"/);
+  assert.match(client,/aria-label="Paramètres"/);
+  assert.match(css,/min-width:44px;min-height:44px/);
+  assert.match(css,/button:focus-visible,a:focus-visible/);
+  assert.match(css,/hero-copy h1\{font-size:clamp\(40px,13vw,49px\)/);
+});
