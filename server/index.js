@@ -348,7 +348,7 @@ async function runPilotStartupDryRun(){
       const check=await inspectPilotOutreach(prospectId);
       results.push({ok:true,prospect:check.prospect,sender:check.sender,checks:check.checks,queue:{id:check.queue.id,subject:check.queue.subject,status:check.queue.status}});
     }catch(e){
-      results.push({ok:false,prospect_id:prospectId,code:e.code||'PILOT_DRY_RUN_FAILED',error:e.message});
+      results.push({ok:false,prospect_id:prospectId,code:e.code||'PILOT_DRY_RUN_FAILED',error:e.message,details:e.details||null});
     }
   }
   console.log('PILOT_STARTUP_DRY_RUN '+JSON.stringify(results));
