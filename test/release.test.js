@@ -70,7 +70,7 @@ test('billing checkout reuses an open session for the same customer',()=>{
 test('Stripe customer and checkout creation use stable idempotency keys',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
   assert.match(server,/idempotencyKey:`relanzio-customer-\$\{req\.user\.id\}`/);
-  assert.match(server,/idempotencyKey:`relanzio-checkout-\$\{req\.user\.id\}`/);
+  assert.match(server,/idempotencyKey:`relanzio-checkout-card-v2-\$\{req\.user\.id\}`/);
 });
 
 
