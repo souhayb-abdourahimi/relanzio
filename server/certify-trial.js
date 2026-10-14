@@ -4,8 +4,7 @@ import { grantTrialToEmail } from './trials.js';
 import { withEntitlements } from './entitlements.js';
 import { trialDisplay } from '../client/src/trial-display.js';
 
-const email=String(process.env.TRIAL_CERTIFICATION_EMAIL||'').trim().toLowerCase();
-if(!email)throw new Error('TRIAL_CERTIFICATION_EMAIL is required');
+const email=String(process.env.TRIAL_CERTIFICATION_EMAIL||'trial-cert-20261014@relanzio.invalid').trim().toLowerCase();
 
 const assert=(condition,message)=>{if(!condition)throw new Error('CERT_ASSERT: '+message)};
 const findUser=async()=>{
