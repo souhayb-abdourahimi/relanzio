@@ -225,7 +225,7 @@ app.post('/api/billing/checkout', requireUser, async(req,res)=>{
     const openSessions=await stripe.checkout.sessions.list({customer,status:'open',limit:10});
     const reusable=(openSessions.data||[]).find(s=>s.mode==='subscription'&&s.url);
     if(reusable)return res.json({url:reusable.url,reused:true});
-    const session=await stripe.checkout.sessions.create({mode:'subscription',customer,line_items:[{price:process.env.STRIPE_PRO_PRICE_ID,quantity:1}],allow_promotion_codes:true,client_reference_id:req.user.id,metadata:{user_id:req.user.id},subscription_data:{metadata:{user_id:req.user.id}},success_url:`${process.env.APP_URL}?billing=success`,cancel_url:`${process.env.APP_URL}?billing=cancel`},{idempotencyKey:`relanzio-checkout-${req.user.id}`});
+    const session=await stripe.checkout.sessions.create({mode:'subscription',customer,payment_method_types:['card'],line_items:[{price:process.env.STRIPE_PRO_PRICE_ID,quantity:1}],allow_promotion_codes:true,client_reference_id:req.user.id,metadata:{user_id:req.user.id},subscription_data:{metadata:{user_id:req.user.id}},success_url:`${process.env.APP_URL}?billing=success`,cancel_url:`${process.env.APP_URL}?billing=cancel`},{idempotencyKey:`relanzio-checkout-${req.user.id}`});
     await db.from('product_events').insert({user_id:req.user.id,event:'checkout_started',path:'/app'});
     res.json({url:session.url,reused:false});
   }catch(e){res.status(500).json({error:e.message})}
