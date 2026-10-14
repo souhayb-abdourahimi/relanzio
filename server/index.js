@@ -160,22 +160,33 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
     const parsedAmount=parseQuoteAmount(amount), parsedDate=parseSentDate(sent_at), requestKey=sanitizeText(req.get('Idempotency-Key'),100)||null;
     if(!sanitizeText(client_name,120)||!isValidEmail(email)||!sanitizeText(title,180)||parsedAmount===null||!parsedDate)return res.status(400).json({error:'Champs invalides.'});
     if(requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).maybeSingle();if(priorError)throw priorError;if(prior)return res.json({quote:prior,idempotent:true});}
-    const {count,error:countError}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',req.user.id).in('status',['open','paused']);
-    if(countError)throw countError;
     const limit=activeQuoteLimit(hasProAccess(profile));
-    if((count||0)>=limit)return res.status(403).json({error:`Votre formule est limitée à ${limit} devis actifs (en attente ou en pause).`});
     const requestedMode=('followup_schedule_mode' in req.body)?normalizeFollowupScheduleMode(req.body.followup_schedule_mode):(('next_followup_at' in req.body)?'custom':'recommended');
     if(!requestedMode)return res.status(400).json({error:'Mode de prochaine relance invalide.'});
     let nextFollowupAt=null;
     if(requestedMode==='recommended')nextFollowupAt=nextDate(parsedDate,0);
     if(requestedMode==='custom'){nextFollowupAt=parseCustomFollowupAt(req.body.next_followup_at);if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});}
-    const row={user_id:req.user.id,client_name:sanitizeText(client_name,120),client_email:email,title:sanitizeText(title,180),amount:parsedAmount,sent_at:parsedDate,status:'open',request_key:requestKey,auto_send:requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(auto_send):false,followup_step:0,followup_schedule_mode:requestedMode,next_followup_at:nextFollowupAt};
-    const {data,error}=await db.from('quotes').insert(row).select('*').single();
-    if(error?.code==='23505'&&requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).single();if(priorError)throw priorError;return res.json({quote:prior,idempotent:true});}
-    if(error)throw error;
-    if(!profile.activated_at)await db.from('profiles').update({activated_at:nowIso(),updated_at:nowIso()}).eq('id',req.user.id);
-    await db.from('product_events').insert({user_id:req.user.id,event:'quote_created',path:'/app'});
-    res.status(201).json({quote:data});
+    const {data:created,error:createError}=await db.rpc('create_quote_with_quota',{
+      p_user_id:req.user.id,
+      p_limit:limit,
+      p_client_name:sanitizeText(client_name,120),
+      p_client_email:email,
+      p_title:sanitizeText(title,180),
+      p_amount:parsedAmount,
+      p_sent_at:parsedDate,
+      p_request_key:requestKey,
+      p_auto_send:requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(auto_send):false,
+      p_followup_step:0,
+      p_followup_schedule_mode:requestedMode,
+      p_next_followup_at:nextFollowupAt
+    });
+    if(createError?.message?.startsWith('ACTIVE_QUOTE_LIMIT:'))return res.status(403).json({error:`Votre formule est limitée à ${limit} devis actifs (en attente ou en pause).`});
+    if(createError)throw createError;
+    const data=created?.quote;
+    const idempotent=Boolean(created?.idempotent);
+    if(!profile.activated_at&&!idempotent)await db.from('profiles').update({activated_at:nowIso(),updated_at:nowIso()}).eq('id',req.user.id);
+    if(!idempotent)await db.from('product_events').insert({user_id:req.user.id,event:'quote_created',path:'/app'});
+    res.status(idempotent?200:201).json({quote:data,idempotent});
   }catch(e){await reportError('quotes.create',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de créer le devis.',request_id:req.requestId})}
 });
 app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
