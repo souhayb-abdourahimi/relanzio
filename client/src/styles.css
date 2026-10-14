@@ -60,3 +60,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .quote-mobile-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.quote-mobile-actions .mini-btn{min-height:44px;padding:9px 12px}
 @media(max-width:760px){.quote-desktop-table{display:none}.quote-mobile-list{display:grid;gap:10px;padding:12px}.modal{max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain}.settings-actions{display:grid}.settings-actions .btn{width:100%;min-height:48px}.schedule-field input,.schedule-field select{min-height:48px}}
 @media(max-width:360px){.quote-mobile-meta{grid-template-columns:1fr}.quote-mobile-head{display:grid}.quote-mobile-head strong{white-space:normal}}
+
+.legal-check{align-items:flex-start;margin:4px 0;font-weight:500}.legal-check input{margin-top:3px}.legal-check a{color:#176b49;text-decoration:underline;text-underline-offset:2px}.legal-check span{line-height:1.45}
