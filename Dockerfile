@@ -45,5 +45,6 @@ COPY package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
+COPY --from=build /app/client/src/trial-display.js ./client/src/trial-display.js
 EXPOSE 3000
 CMD ["node","server/index.js"]
