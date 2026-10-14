@@ -19,10 +19,12 @@ import { runLifecycleEmails } from './lifecycle.js';
 import { reportError } from './observability.js';
 import { billingTransition, normalizeSubscriptionStatus, planForSubscriptionStatus } from './billing.js';
 import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntitlements } from './entitlements.js';
-import { grantTrialToEmail, expireTrials } from './trials.js';
+import { grantTrialToEmail, grantTrialToUser, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
 import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
+import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt } from './quote-rules.js';
+import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -30,20 +32,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url)); const dist = join(__d
 const admins = () => (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 const isAdmin = user => admins().includes((user?.email || '').toLowerCase());
 const nowIso = () => new Date().toISOString();
-const MAX_QUOTE_AMOUNT = 9_999_999_999.99;
-const parseQuoteAmount = value => {
-  if (value === '' || value === null || value === undefined) return null;
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 && n <= MAX_QUOTE_AMOUNT ? n : null;
-};
-const parseSentDate = value => {
-  const v = String(value || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
-  const d = new Date(v + 'T00:00:00Z');
-  const today = new Date().toISOString().slice(0,10);
-  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0,10) !== v || v > today) return null;
-  return v;
-};
 const providerRank = {draft:0,sent:1,delivered:2,opened:3,clicked:4,failed:5,bounced:6};
 const shouldApplyProviderStatus = (current,next) => {
   if (current === 'bounced') return next === 'bounced';
@@ -140,6 +128,15 @@ app.post('/api/events', rateLimit({windowMs:60_000,max:30}), async (req,res)=>{
 app.post('/api/activity', requireUser, async(req,res)=>{try{await db.from('product_events').insert({user_id:req.user.id,event:'app_active',path:sanitizeText(req.body.path||'/app',200)});res.status(202).json({ok:true})}catch(e){res.status(202).json({ok:false})}});
 
 app.get('/api/profile', requireUser, async(req,res)=>{ try{res.json({profile:await getProfile(req.user)})}catch(e){res.status(500).json({error:e.message})} });
+app.post('/api/trial/start', requireUser, rateLimit({windowMs:60_000,max:5}), async(req,res)=>{
+  try{
+    const profile=await grantTrialToUser(req.user,'self_service');
+    res.status(201).json({profile});
+  }catch(e){
+    const status=e.code==='PROFILE_NOT_FOUND'?404:e.code==='TRIAL_ALREADY_USED'||e.code==='ALREADY_PRO'?409:500;
+    res.status(status).json({error:e.message,code:e.code||'TRIAL_START_FAILED'});
+  }
+});
 app.patch('/api/profile', requireUser, async(req,res)=>{
   try{
     const profile=await getProfile(req.user), patch={updated_at:nowIso()};
@@ -163,31 +160,79 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
     const parsedAmount=parseQuoteAmount(amount), parsedDate=parseSentDate(sent_at), requestKey=sanitizeText(req.get('Idempotency-Key'),100)||null;
     if(!sanitizeText(client_name,120)||!isValidEmail(email)||!sanitizeText(title,180)||parsedAmount===null||!parsedDate)return res.status(400).json({error:'Champs invalides.'});
     if(requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).maybeSingle();if(priorError)throw priorError;if(prior)return res.json({quote:prior,idempotent:true});}
-    const {count}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',req.user.id).eq('status','open');
-    if(!hasProAccess(profile)&&count>=5)return res.status(403).json({error:'La formule gratuite est limitée à 5 devis actifs.'});
-    if(hasProAccess(profile)&&count>=100)return res.status(403).json({error:'Limite de 100 devis actifs atteinte. Contactez le support.'});
-    const row={user_id:req.user.id,client_name:sanitizeText(client_name,120),client_email:email,title:sanitizeText(title,180),amount:parsedAmount,sent_at:parsedDate,status:'open',request_key:requestKey,auto_send:hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(auto_send):false,followup_step:0,next_followup_at:nextDate(parsedDate,0)};
+    const {count,error:countError}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',req.user.id).in('status',['open','paused']);
+    if(countError)throw countError;
+    const limit=activeQuoteLimit(hasProAccess(profile));
+    if((count||0)>=limit)return res.status(403).json({error:`Votre formule est limitée à ${limit} devis actifs (en attente ou en pause).`});
+    const requestedMode=('followup_schedule_mode' in req.body)?normalizeFollowupScheduleMode(req.body.followup_schedule_mode):(('next_followup_at' in req.body)?'custom':'recommended');
+    if(!requestedMode)return res.status(400).json({error:'Mode de prochaine relance invalide.'});
+    let nextFollowupAt=null;
+    if(requestedMode==='recommended')nextFollowupAt=nextDate(parsedDate,0);
+    if(requestedMode==='custom'){nextFollowupAt=parseCustomFollowupAt(req.body.next_followup_at);if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});}
+    const row={user_id:req.user.id,client_name:sanitizeText(client_name,120),client_email:email,title:sanitizeText(title,180),amount:parsedAmount,sent_at:parsedDate,status:'open',request_key:requestKey,auto_send:requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(auto_send):false,followup_step:0,followup_schedule_mode:requestedMode,next_followup_at:nextFollowupAt};
     const {data,error}=await db.from('quotes').insert(row).select('*').single();
     if(error?.code==='23505'&&requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).single();if(priorError)throw priorError;return res.json({quote:prior,idempotent:true});}
     if(error)throw error;
     if(!profile.activated_at)await db.from('profiles').update({activated_at:nowIso(),updated_at:nowIso()}).eq('id',req.user.id);
     await db.from('product_events').insert({user_id:req.user.id,event:'quote_created',path:'/app'});
     res.status(201).json({quote:data});
-  }catch(e){res.status(500).json({error:e.message})}
+  }catch(e){await reportError('quotes.create',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de créer le devis.',request_id:req.requestId})}
 });
 app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
   try {
-    const { data:existing, error:findError } = await db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle();
+    const [{ data:existing, error:findError },profile] = await Promise.all([
+      db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),
+      getProfile(req.user)
+    ]);
     if (findError) throw findError; if (!existing) return res.status(404).json({error:'Devis introuvable.'});
     const patch={updated_at:nowIso()};
-    if ('status' in req.body) { const allowed=['open','won','lost','paused']; if(!allowed.includes(req.body.status))return res.status(400).json({error:'Statut invalide.'}); patch.status=req.body.status; patch.won_at=req.body.status==='won'?nowIso():null; patch.next_followup_at=req.body.status==='open'?(existing.next_followup_at || nextDate(existing.sent_at,existing.followup_step)):null; }
+    const allowedStatuses=['open','won','lost','paused'];
+    const targetStatus='status' in req.body?String(req.body.status):existing.status;
+    if(!allowedStatuses.includes(targetStatus))return res.status(400).json({error:'Statut invalide.'});
+
+    if(isActiveQuoteStatus(targetStatus)&&!isActiveQuoteStatus(existing.status)){
+      const {count,error:countError}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',req.user.id).in('status',['open','paused']);
+      if(countError)throw countError;
+      const limit=activeQuoteLimit(hasProAccess(profile));
+      if((count||0)>=limit)return res.status(403).json({error:`Impossible de réactiver ce devis : votre formule est limitée à ${limit} devis actifs.`});
+    }
+
+    const sentDate='sent_at' in req.body?parseSentDate(req.body.sent_at):existing.sent_at;
+    if(!sentDate)return res.status(400).json({error:"Date d’envoi invalide."});
+    const requestedMode=('followup_schedule_mode' in req.body)
+      ? normalizeFollowupScheduleMode(req.body.followup_schedule_mode)
+      : (('next_followup_at' in req.body)?'custom':(existing.followup_schedule_mode||'recommended'));
+    if(!requestedMode)return res.status(400).json({error:'Mode de prochaine relance invalide.'});
+
+    let nextFollowupAt=existing.next_followup_at;
+    let effectiveMode=requestedMode;
+    if(['won','lost'].includes(targetStatus)){
+      nextFollowupAt=null; effectiveMode='none'; patch.auto_send=false;
+    }else if(requestedMode==='none'){
+      nextFollowupAt=null; patch.auto_send=false;
+    }else if(requestedMode==='recommended'){
+      nextFollowupAt=nextDate(sentDate,existing.followup_step);
+    }else if(requestedMode==='custom'){
+      const candidate=('next_followup_at' in req.body)?req.body.next_followup_at:existing.next_followup_at;
+      nextFollowupAt=parseCustomFollowupAt(candidate);
+      if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});
+    }
+
+    if ('status' in req.body) { patch.status=targetStatus; patch.won_at=targetStatus==='won'?nowIso():null; }
     if ('client_name' in req.body) { const v=sanitizeText(req.body.client_name,120); if(!v)return res.status(400).json({error:'Client invalide.'}); patch.client_name=v; }
     if ('client_email' in req.body) { const v=normalizeEmail(req.body.client_email); if(!isValidEmail(v))return res.status(400).json({error:'Email invalide.'}); patch.client_email=v; }
     if ('title' in req.body) { const v=sanitizeText(req.body.title,180); if(!v)return res.status(400).json({error:'Objet invalide.'}); patch.title=v; }
     if ('amount' in req.body) { const v=parseQuoteAmount(req.body.amount); if(v===null)return res.status(400).json({error:'Montant invalide.'}); patch.amount=v; }
-    if ('sent_at' in req.body) { const v=parseSentDate(req.body.sent_at); if(!v)return res.status(400).json({error:"Date d’envoi invalide."}); patch.sent_at=v; if((patch.status||existing.status)==='open')patch.next_followup_at=nextDate(v,existing.followup_step); }
-    if ('auto_send' in req.body) { const profile=await getProfile(req.user); patch.auto_send=hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(req.body.auto_send):false; }
-    const {data,error}=await db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id).select('*').single(); if(error)throw error; res.json({quote:data});
+    if ('sent_at' in req.body) patch.sent_at=sentDate;
+    if ('followup_schedule_mode' in req.body || 'next_followup_at' in req.body || 'sent_at' in req.body || 'status' in req.body) {
+      patch.followup_schedule_mode=effectiveMode;
+      patch.next_followup_at=nextFollowupAt;
+    }
+    if ('auto_send' in req.body) patch.auto_send=effectiveMode!=='none'&&targetStatus==='open'&&hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(req.body.auto_send):false;
+    if(targetStatus!=='open')patch.auto_send=false;
+
+    const {data,error}=await db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id).select('*').single();
+    if(error)throw error; res.json({quote:data});
   } catch(e) { await reportError('quotes.update',e,{request_id:req.requestId}); res.status(500).json({error:'Impossible de modifier le devis.',request_id:req.requestId}); }
 });
 app.delete('/api/quotes/:id', requireUser, async(req,res)=>{
@@ -210,33 +255,91 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
   }
 });
 
-app.post('/api/billing/checkout', requireUser, async(req,res)=>{
+app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10}), async(req,res)=>{
+  let claimedAt=null;
   try{
-    if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'Facturation non activée pendant la phase pilote.'});
+    if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'La souscription Pro n’est pas disponible pour le moment.'});
     if(!stripe||!process.env.STRIPE_PRO_PRICE_ID)return res.status(503).json({error:"Stripe n'est pas configuré."});
     const profile=await getProfile(req.user);
     if(hasSubscriptionProAccess(profile))return res.status(409).json({error:'Votre compte dispose déjà d’un abonnement Pro. Utilisez Gérer mon abonnement.'});
     let customer=profile.stripe_customer_id;
     if(!customer){
-      const c=await stripe.customers.create({email:req.user.email,metadata:{user_id:req.user.id}},{idempotencyKey:`relanzio-customer-${req.user.id}`});
-      customer=c.id;
+      const created=await stripe.customers.create({email:req.user.email,metadata:{user_id:req.user.id}},{idempotencyKey:`relanzio-customer-${req.user.id}`});
+      customer=created.id;
       await mustDb(db.from('profiles').update({stripe_customer_id:customer,updated_at:nowIso()}).eq('id',req.user.id));
     }
+
+    const fingerprint=checkoutConfigFingerprint({priceId:process.env.STRIPE_PRO_PRICE_ID,appUrl:process.env.APP_URL});
     const openSessions=await stripe.checkout.sessions.list({customer,status:'open',limit:10});
-    const reusable=(openSessions.data||[]).find(s=>s.mode==='subscription'&&s.url&&Array.isArray(s.payment_method_types)&&s.payment_method_types.includes('card'));
+    const reusable=(openSessions.data||[]).find(s=>isReusableCheckoutSession(s,fingerprint));
     if(reusable)return res.json({url:reusable.url,reused:true});
-    const session=await stripe.checkout.sessions.create({mode:'subscription',customer,payment_method_types:['card'],line_items:[{price:process.env.STRIPE_PRO_PRICE_ID,quantity:1}],allow_promotion_codes:true,client_reference_id:req.user.id,metadata:{user_id:req.user.id},subscription_data:{metadata:{user_id:req.user.id}},success_url:`${process.env.APP_URL}?billing=success`,cancel_url:`${process.env.APP_URL}?billing=cancel`},{idempotencyKey:`relanzio-checkout-card-v2-${req.user.id}`});
+
+    claimedAt=nowIso();
+    const stale=new Date(Date.now()-2*60_000).toISOString();
+    const {data:claimed,error:claimError}=await db.from('profiles').update({checkout_claimed_at:claimedAt,updated_at:claimedAt})
+      .eq('id',req.user.id).or(`checkout_claimed_at.is.null,checkout_claimed_at.lt.${stale}`).select('id').maybeSingle();
+    if(claimError)throw claimError;
+    if(!claimed)return res.status(409).json({error:'Une ouverture de paiement est déjà en cours. Réessayez dans quelques instants.'});
+
+    const meta={user_id:req.user.id,...checkoutMetadata({priceId:process.env.STRIPE_PRO_PRICE_ID,appUrl:process.env.APP_URL})};
+    const session=await stripe.checkout.sessions.create({
+      mode:'subscription',customer,payment_method_types:['card'],
+      line_items:[{price:process.env.STRIPE_PRO_PRICE_ID,quantity:1}],
+      allow_promotion_codes:true,client_reference_id:req.user.id,metadata:meta,
+      subscription_data:{metadata:{user_id:req.user.id}},
+      success_url:`${process.env.APP_URL}?billing=success`,
+      cancel_url:`${process.env.APP_URL}?billing=cancel`
+    },{idempotencyKey:checkoutIdempotencyKey({userId:req.user.id,fingerprint,claimedAt})});
     await db.from('product_events').insert({user_id:req.user.id,event:'checkout_started',path:'/app'});
     res.json({url:session.url,reused:false});
-  }catch(e){res.status(500).json({error:e.message})}
+  }catch(e){
+    await reportError('billing.checkout',e,{request_id:req.requestId});
+    res.status(500).json({error:'Impossible d’ouvrir le paiement pour le moment.',request_id:req.requestId});
+  }finally{
+    if(claimedAt)await db.from('profiles').update({checkout_claimed_at:null}).eq('id',req.user.id).eq('checkout_claimed_at',claimedAt);
+  }
 });
-app.post('/api/billing/portal', requireUser, async(req,res)=>{
-  try{ if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'Facturation non activée pendant la phase pilote.'}); if(!stripe)return res.status(503).json({error:'Stripe non configuré.'}); const profile=await getProfile(req.user); if(!profile.stripe_customer_id)return res.status(400).json({error:'Aucun compte de facturation.'}); const session=await stripe.billingPortal.sessions.create({customer:profile.stripe_customer_id,return_url:process.env.APP_URL}); res.json({url:session.url}); }catch(e){res.status(500).json({error:e.message})}
+app.post('/api/billing/portal', requireUser, rateLimit({windowMs:60_000,max:10}), async(req,res)=>{
+  try{
+    if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'La gestion de l’abonnement n’est pas disponible pour le moment.'});
+    if(!stripe)return res.status(503).json({error:'Stripe non configuré.'});
+    const profile=await getProfile(req.user);
+    if(!profile.stripe_customer_id)return res.status(400).json({error:'Aucun compte de facturation.'});
+    const args={customer:profile.stripe_customer_id,return_url:process.env.APP_URL};
+    if(process.env.STRIPE_PORTAL_CONFIGURATION_ID)args.configuration=process.env.STRIPE_PORTAL_CONFIGURATION_ID;
+    const session=await stripe.billingPortal.sessions.create(args);
+    res.json({url:session.url});
+  }catch(e){await reportError('billing.portal',e,{request_id:req.requestId});res.status(500).json({error:'Impossible d’ouvrir la gestion de l’abonnement.',request_id:req.requestId})}
 });
 
 app.post('/api/support/ask', requireUser, async(req,res)=>{ try{res.json(await answerSupport(sanitizeText(req.body.question,2000)))}catch(e){res.status(500).json({error:e.message})} });
 app.get('/api/support/tickets', requireUser, async(req,res)=>{ const {data,error}=await db.from('support_tickets').select('*').eq('user_id',req.user.id).order('created_at',{ascending:false}).limit(50); if(error)return res.status(500).json({error:error.message}); res.json({tickets:data}); });
 app.post('/api/support/tickets', requireUser, async(req,res)=>{ const subject=sanitizeText(req.body.subject,160),message=sanitizeText(req.body.message,5000),topic=sanitizeText(req.body.topic,40)||'product'; if(!subject||!message)return res.status(400).json({error:'Sujet et message requis.'}); const priority=['billing','privacy','security'].includes(topic)?'high':'normal'; const {data,error}=await db.from('support_tickets').insert({user_id:req.user.id,topic,subject,message,priority}).select('*').single(); if(error)return res.status(500).json({error:error.message}); res.status(201).json({ticket:data}); });
+
+app.get('/api/account/export', requireUser, async(req,res)=>{
+  try{
+    const [profileResult,quotesResult,followupsResult,ticketsResult]=await Promise.all([
+      db.from('profiles').select('id,email,company_name,role,plan,subscription_status,email_mode,onboarding_completed,marketing_opt_in,activated_at,trial_started_at,trial_ends_at,trial_expired_at,created_at,updated_at').eq('id',req.user.id).single(),
+      db.from('quotes').select('*').eq('user_id',req.user.id).order('created_at',{ascending:true}),
+      db.from('followups').select('id,quote_id,step,subject,body,status,provider_message_id,sent_at,created_at').eq('user_id',req.user.id).order('created_at',{ascending:true}),
+      db.from('support_tickets').select('id,topic,subject,message,status,priority,created_at,updated_at').eq('user_id',req.user.id).order('created_at',{ascending:true})
+    ]);
+    for(const result of [profileResult,quotesResult,followupsResult,ticketsResult])if(result.error)throw result.error;
+    res.setHeader('Content-Disposition','attachment; filename="relanzio-export.json"');
+    res.json({exported_at:nowIso(),profile:profileResult.data,quotes:quotesResult.data||[],followups:followupsResult.data||[],support_tickets:ticketsResult.data||[]});
+  }catch(e){await reportError('account.export',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de préparer l’export.',request_id:req.requestId})}
+});
+app.get('/api/quotes/export.csv', requireUser, async(req,res)=>{
+  try{
+    const {data,error}=await db.from('quotes').select('client_name,client_email,title,amount,sent_at,status,followup_step,followup_schedule_mode,next_followup_at,created_at,updated_at').eq('user_id',req.user.id).order('created_at',{ascending:true});
+    if(error)throw error;
+    const esc=v=>`"${String(v??'').replaceAll('"','""')}"`;
+    const header=['client_name','client_email','title','amount','sent_at','status','followup_step','followup_schedule_mode','next_followup_at','created_at','updated_at'];
+    const csv=[header.join(';'),...(data||[]).map(row=>header.map(k=>esc(row[k])).join(';'))].join('\n');
+    res.type('text/csv; charset=utf-8').setHeader('Content-Disposition','attachment; filename="relanzio-devis.csv"');
+    res.send('\uFEFF'+csv);
+  }catch(e){await reportError('quotes.export',e,{request_id:req.requestId});res.status(500).json({error:'Impossible d’exporter les devis.',request_id:req.requestId})}
+});
 
 app.delete('/api/account', requireUser, async(req,res)=>{
   try{ if(req.body.confirmation!=='SUPPRIMER')return res.status(400).json({error:'Confirmation invalide.'}); const profile=await getProfile(req.user); if(stripe&&profile.stripe_subscription_id&&['active','trialing','past_due'].includes(profile.subscription_status)){ await stripe.subscriptions.cancel(profile.stripe_subscription_id); } const {error}=await db.auth.admin.deleteUser(req.user.id,false); if(error)throw error; res.json({deleted:true}); }catch(e){res.status(500).json({error:`Suppression impossible: ${e.message}`})}
