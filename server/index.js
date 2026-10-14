@@ -22,6 +22,7 @@ import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntit
 import { grantTrialToEmail, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
 import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
+import { runPilotAdminRunner } from './pilot-admin-runner.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -354,5 +355,6 @@ async function runPilotStartupDryRun(){
   console.log('PILOT_STARTUP_DRY_RUN '+JSON.stringify(results));
 }
 runPilotStartupDryRun().catch(e=>console.error('PILOT_STARTUP_DRY_RUN_FAILED',e.message));
+runPilotAdminRunner().catch(e=>console.error('PILOT_ADMIN_RUNNER_FAILED',e.message));
 
 export default app;
