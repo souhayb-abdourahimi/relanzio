@@ -74,20 +74,43 @@ async function pilotSentLast24h() {
 
 export async function getBrevoPilotSenderStatus() {
   if (!process.env.BREVO_API_KEY) throw pilotError('PILOT_BREVO_NOT_CONFIGURED', 'Brevo n’est pas configuré.', 503);
-  const response = await fetch('https://api.brevo.com/v3/senders', {
-    method:'GET',
-    headers:{ accept:'application/json', 'api-key':process.env.BREVO_API_KEY }
-  });
-  if (!response.ok) throw pilotError('PILOT_BREVO_SENDER_CHECK_FAILED', `Brevo sender check ${response.status}: ${await response.text()}`, 503);
-  const payload = await response.json();
-  const sender = (payload.senders || []).find(x => String(x.email || '').toLowerCase() === PILOT_SENDER.email);
-  if (!sender) throw pilotError('PILOT_SENDER_NOT_REGISTERED', `${PILOT_SENDER.email} n’est pas enregistré comme expéditeur Brevo.`, 503);
-  if (sender.active !== true) throw pilotError('PILOT_SENDER_NOT_ACTIVE', `${PILOT_SENDER.email} n’est pas actif dans Brevo.`, 503);
+  const headers = { accept:'application/json', 'api-key':process.env.BREVO_API_KEY };
+  const [sendersResponse, domainResponse] = await Promise.all([
+    fetch('https://api.brevo.com/v3/senders', { method:'GET', headers }),
+    fetch('https://api.brevo.com/v3/senders/domains/relanzio.com', { method:'GET', headers })
+  ]);
+  if (!sendersResponse.ok) throw pilotError('PILOT_BREVO_SENDER_CHECK_FAILED', `Brevo sender check ${sendersResponse.status}: ${await sendersResponse.text()}`, 503);
+  const payload = await sendersResponse.json();
+  const domainPayload = domainResponse.ok ? await domainResponse.json() : null;
+  const senders = payload.senders || [];
+  const sender = senders.find(x => String(x.email || '').toLowerCase() === PILOT_SENDER.email);
+  const domain = domainPayload?.domain || domainPayload || null;
+  const details = {
+    sender_found:Boolean(sender),
+    sender_active:sender?.active === true,
+    domain_verified:domain?.verified === true,
+    domain_authenticated:domain?.authenticated === true,
+    active_relanzio_senders:senders
+      .filter(x => x.active === true && String(x.email || '').toLowerCase().endsWith('@relanzio.com'))
+      .map(x => String(x.email || '').toLowerCase())
+  };
+  if (!sender) {
+    const error = pilotError('PILOT_SENDER_NOT_REGISTERED', `${PILOT_SENDER.email} n’est pas enregistré comme expéditeur Brevo.`, 503);
+    error.details = details;
+    throw error;
+  }
+  if (sender.active !== true) {
+    const error = pilotError('PILOT_SENDER_NOT_ACTIVE', `${PILOT_SENDER.email} n’est pas actif dans Brevo.`, 503);
+    error.details = details;
+    throw error;
+  }
   return {
     accepted:true,
     id:sender.id ?? null,
     registered_name:sender.name || null,
     active:true,
+    domain_verified:details.domain_verified,
+    domain_authenticated:details.domain_authenticated,
     from:`${PILOT_SENDER.name} <${PILOT_SENDER.email}>`,
     reply_to:PILOT_SENDER.replyTo
   };
