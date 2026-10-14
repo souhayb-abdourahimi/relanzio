@@ -53,34 +53,40 @@ test('Vite and release preflight use the same root environment source',()=>{
 });
 
 
-test('quote sent_at cannot be in the future',()=>{
+test('quote sent_at validation is centralized and rejects future dates',()=>{
+  const rules=readFileSync(new URL('../server/quote-rules.js',import.meta.url),'utf8');
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
-  assert.match(server,/const today = new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
-  assert.match(server,/v > today/);
-  assert.doesNotMatch(server,/Date\.now\(\) \+ 86400000/);
+  assert.match(rules,/parseSentDate/);
+  assert.match(rules,/v>today/);
+  assert.match(server,/parseSentDate\(sent_at\)/);
 });
 
-test('billing checkout reuses an open session for the same customer',()=>{
+test('billing checkout reuses only an open session matching the current configuration',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  const policy=readFileSync(new URL('../server/checkout-policy.js',import.meta.url),'utf8');
   assert.match(server,/checkout\.sessions\.list\(\{customer,status:'open',limit:10\}\)/);
-  assert.match(server,/if\(reusable\)return res\.json\(\{url:reusable\.url,reused:true\}\)/);
+  assert.match(server,/isReusableCheckoutSession\(s,fingerprint\)/);
+  assert.match(policy,/session\?\.metadata\?\.checkout_config===fingerprint/);
 });
 
-
-test('Stripe customer and checkout creation use stable idempotency keys',()=>{
+test('Stripe customer is stable while checkout idempotency is versioned per claimed attempt',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  const policy=readFileSync(new URL('../server/checkout-policy.js',import.meta.url),'utf8');
   assert.match(server,/idempotencyKey:`relanzio-customer-\$\{req\.user\.id\}`/);
-  assert.match(server,/idempotencyKey:`relanzio-checkout-card-v2-\$\{req\.user\.id\}`/);
+  assert.match(server,/checkout_claimed_at/);
+  assert.match(server,/checkoutIdempotencyKey\(\{userId:req\.user\.id,fingerprint,claimedAt\}\)/);
+  assert.match(policy,/CHECKOUT_CONFIG_VERSION='pro-card-v3'/);
 });
 
 
-test('pilot launch keeps billing and acquisition disabled by explicit gates',()=>{
+test('production capabilities remain independently gated',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
   assert.match(server,/BILLING_ENABLED!=='true'/);
   assert.match(server,/ACQUISITION_ENABLED!=='true'/);
   assert.match(server,/LEGAL_PAGES_APPROVED!=='true'/);
   assert.match(client,/VITE_BILLING_ENABLED==='true'/);
+  assert.match(server,/FOLLOWUP_AUTOMATION_ENABLED==='true'/);
 });
 
 test('public site uses role-based Relanzio contact addresses and no persistent audience id',()=>{
@@ -142,11 +148,12 @@ test('launch build uses lockfile installs in CI and Docker',()=>{
   assert.doesNotMatch(docker,/npm install --no-audit --no-fund/);
 });
 
-test('public launch copy uses explicit free-account CTA and role-based sensitive contact',()=>{
+test('public launch copy uses explicit account and trial CTAs without inventing payment',()=>{
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   assert.match(client,/Créer un compte gratuit/);
-  assert.doesNotMatch(client,/Essayer gratuitement/);
-  assert.doesNotMatch(client,/Tester gratuitement/);
+  assert.match(plans,/Essayer Pro gratuitement pendant 7 jours/);
+  assert.match(plans,/Sans carte bancaire et sans débit automatique/);
   assert.match(client,/Compte, données et facturation/);
   assert.match(client,/mailto:\$\{support\}/);
 });
@@ -184,6 +191,7 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
     assert.ok(migration.includes(field),field);
   }
   assert.match(schema,/create table if not exists public\.trial_events/);
+  assert.match(server,/app\.post\('\/api\/trial\/start'/);
   assert.match(server,/app\.post\('\/api\/admin\/trials\/grant'/);
   assert.match(server,/expireTrials\(\)/);
   assert.match(server,/hasProAccess\(profile\)/);
@@ -192,6 +200,8 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   assert.match(trialUi,/trialDisplay\(profile\)/);
   assert.match(trialDisplay,/Essai Pro —/);
   assert.match(trialDisplay,/Passer à Pro — 29 €\/mois/);
+  const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
+  assert.match(plans,/Essayer Pro gratuitement pendant 7 jours/);
 });
 
 test('trial accounts are excluded from paid MRR metrics',()=>{
