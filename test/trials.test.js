@@ -10,6 +10,7 @@ import {
   trialWindow,
   withEntitlements
 } from '../server/entitlements.js';
+import { trialDisplay } from '../client/src/trial-display.js';
 
 const NOW=new Date('2026-10-14T00:00:00.000Z');
 
@@ -44,4 +45,20 @@ test('trial window is exactly seven days',()=>{
   const w=trialWindow(NOW);
   assert.equal(w.trial_started_at,'2026-10-14T00:00:00.000Z');
   assert.equal(w.trial_ends_at,'2026-10-21T00:00:00.000Z');
+});
+
+
+test('trial display exposes exact active state and end date',()=>{
+  const profile=withEntitlements({
+    plan:'pro',
+    subscription_status:'none',
+    trial_started_at:'2026-10-14T00:00:00.000Z',
+    trial_ends_at:'2026-10-21T00:00:00.000Z',
+    trial_expired_at:null
+  },NOW);
+  const display=trialDisplay(profile);
+  assert.equal(display.visible,true);
+  assert.equal(display.label,'Essai Pro — 7 jours restants');
+  assert.match(display.endText,/21\/10\/2026/);
+  assert.equal(display.upgradeLabel,'Passer à Pro — 29 €/mois');
 });
