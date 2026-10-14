@@ -34,6 +34,14 @@ export function trialDaysRemaining(profile={}, now=new Date()) {
   return Math.max(1,Math.ceil((new Date(profile.trial_ends_at).getTime()-current)/DAY_MS));
 }
 
+export function isTrialEligible(profile={}) {
+  return Boolean(!profile.trial_started_at && !profile.stripe_subscription_id && normalizeTrialSubscriptionStatus(profile.subscription_status)==='none');
+}
+
+function normalizeTrialSubscriptionStatus(status=''){
+  return ['none','trialing','active','past_due','unpaid','canceled'].includes(status)?status:'none';
+}
+
 export function withEntitlements(profile={}, now=new Date()) {
   const trialActive=isManagedTrialActive(profile,now);
   const proAccess=hasProAccess(profile,now);
@@ -43,6 +51,7 @@ export function withEntitlements(profile={}, now=new Date()) {
     effective_plan:proAccess?'pro':'free',
     trial_active:trialActive,
     trial_days_remaining:trialDaysRemaining(profile,now),
+    trial_eligible:isTrialEligible(profile),
     is_paid_subscription:isPaidSubscriber(profile)
   };
 }
