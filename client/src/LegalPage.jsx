@@ -17,10 +17,13 @@ export default function LegalPage({page,contactEmail,supportEmail}){
   const identityComplete=Boolean(['individual','company'].includes(legal.entityType)&&companyFieldsOk&&legal.name&&legal.address&&legal.registration&&legal.phone&&legal.publisher);
   const title=notice?'Mentions légales':privacy?'Politique de confidentialité':dpa?'Accord de traitement des données (DPA)':'Conditions générales B2B';
   useEffect(()=>{
+    const description=notice?'Informations relatives à l’éditeur et à l’hébergement de Relanzio.':privacy?'Informations sur les données personnelles traitées par Relanzio.':dpa?'Conditions de sous-traitance des données traitées pour les clients professionnels de Relanzio.':'Conditions d’utilisation et de vente B2B de Relanzio.';
     document.title=title+' — Relanzio';
-    const robots=document.querySelector('meta[name="robots"]')||document.head.appendChild(document.createElement('meta'));
-    robots.setAttribute('name','robots');robots.setAttribute('content','index,follow');
-  },[title]);
+    const meta=(name,value)=>{let el=document.querySelector('meta[name="'+name+'"]');if(!el){el=document.createElement('meta');el.setAttribute('name',name);document.head.appendChild(el)}el.setAttribute('content',value)};
+    meta('robots','index,follow');meta('description',description);
+    let canonical=document.querySelector('link[rel="canonical"]');if(!canonical){canonical=document.createElement('link');canonical.rel='canonical';document.head.appendChild(canonical)}canonical.href=location.origin+location.pathname;
+    let og=document.querySelector('meta[property="og:url"]');if(!og){og=document.createElement('meta');og.setAttribute('property','og:url');document.head.appendChild(og)}og.setAttribute('content',location.origin+location.pathname);
+  },[title,notice,privacy,dpa]);
 
   return <main className="legal container">
     <span className="eyebrow">INFORMATIONS CONTRACTUELLES</span>
