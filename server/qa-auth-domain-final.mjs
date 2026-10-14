@@ -86,6 +86,14 @@ try{
   const recommended=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'recommended'}});
   assert(recommended.status===200&&Boolean(recommended.data.quote.next_followup_at),'resume_recommended_schedule');
 
+  for(let i=0;i<3;i++){
+    const r=await api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Concurrence '+i,client_email:'race+'+i+'@example.com',title:'Préparation quota '+i,amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-race-seed-'+stamp+'-'+i}});
+    assert(r.status===201,'concurrency_seed_'+i,'HTTP '+r.status);
+  }
+  const concurrent=await Promise.all([0,1].map(i=>api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Course '+i,client_email:'race-final+'+i+'@example.com',title:'Création concurrente '+i,amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-race-final-'+stamp+'-'+i}})));
+  const concurrentStatuses=concurrent.map(x=>x.status).sort();
+  assert(concurrentStatuses[0]===201&&concurrentStatuses[1]===403,'atomic_free_quota_under_concurrent_create',JSON.stringify(concurrentStatuses));
+
   const seeded=[];
   for(let i=0;i<5;i++){
     const r=await api(userB.token,'/api/quotes',{method:'POST',body:{client_name:'Client '+i,client_email:'client+'+i+'@example.com',title:'Quota '+i,amount:i===0?'0':'29',sent_at:sentAt,followup_schedule_mode:'recommended'},headers:{'Idempotency-Key':'cert-b-'+stamp+'-'+i}});
