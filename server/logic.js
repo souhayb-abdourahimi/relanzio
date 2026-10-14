@@ -48,16 +48,17 @@ export function classifyReplyFallback(text = '') {
 export function canAutoReply(analysis = {}) { return analysis.category === 'opt_out' && Number(analysis.confidence) >= .95; }
 
 export function quoteMetrics(quotes = []) {
+  const active = quotes.filter(q => ['open','paused'].includes(q.status));
   const open = quotes.filter(q => q.status === 'open');
   const won = quotes.filter(q => q.status === 'won');
   const lost = quotes.filter(q => q.status === 'lost');
   const decided = won.length + lost.length;
-  const today = new Date().toISOString().slice(0, 10);
+  const now = Date.now();
   return {
-    openAmount: open.reduce((s,q)=>s+Number(q.amount||0),0),
+    openAmount: active.reduce((s,q)=>s+Number(q.amount||0),0),
     wonAmount: won.reduce((s,q)=>s+Number(q.amount||0),0),
-    dueToday: open.filter(q => q.next_followup_at && q.next_followup_at.slice(0,10) <= today).length,
-    activeQuotes: open.length,
+    dueToday: open.filter(q => q.next_followup_at && new Date(q.next_followup_at).getTime() <= now).length,
+    activeQuotes: active.length,
     decidedQuotes: decided,
     winRate: decided ? Math.round((won.length / decided) * 100) : null
   };
