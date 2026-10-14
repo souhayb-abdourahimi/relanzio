@@ -12,7 +12,7 @@ export default function PlansView({profile,billingEnabled,checkoutBusy=false,onU
     <header className="plans-head">
       <span className="overline">FORMULES / ABONNEMENT</span>
       <h1 id="plans-title">Choisissez la formule adaptée à votre suivi de devis.</h1>
-      <p>Deux formules simples, avec des limites explicites. Relanzio n’affiche aucune promesse « illimitée ».</p>
+      <p>Deux formules simples, avec des limites explicites et adaptées au volume de suivi.</p>
     </header>
 
     {state.trial.visible&&<section className="plan-trial-status" aria-label="Statut de l’essai Pro">
