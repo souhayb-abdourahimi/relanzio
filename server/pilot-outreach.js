@@ -177,7 +177,7 @@ export async function sendPilotOutreach({ prospectId, requestedBy, dryRun = fals
   const queueId = validation.queue.id;
   const claimedAt = iso();
   const { data:claimed, error:claimError } = await db.from('outreach_queue')
-    .update({ status:'pilot_sending', error:null, updated_at:claimedAt })
+    .update({ status:'sending', error:null, updated_at:claimedAt })
     .eq('id', queueId)
     .eq('status', 'held')
     .select('*')
@@ -264,9 +264,9 @@ export async function sendPilotOutreach({ prospectId, requestedBy, dryRun = fals
     };
   } catch (error) {
     const { data:row } = await db.from('outreach_queue').select('status').eq('id', queueId).maybeSingle();
-    if (row?.status === 'pilot_sending') {
+    if (row?.status === 'sending') {
       await db.from('outreach_queue').update({
-        status:'pilot_failed',
+        status:'failed',
         error:String(error.message || error).slice(0,1000),
         updated_at:iso()
       }).eq('id', queueId);
