@@ -21,6 +21,7 @@ import { billingTransition, normalizeSubscriptionStatus, planForSubscriptionStat
 import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntitlements } from './entitlements.js';
 import { grantTrialToEmail, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
+import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -273,6 +274,19 @@ app.patch('/api/admin/tickets/:id', requireUser, async(req,res)=>{if(!isAdmin(re
 
 app.get('/api/admin/prospects', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const {data,error}=await db.from('prospects').select('*').order('score',{ascending:false}).limit(500);if(error)return res.status(500).json({error:error.message});res.json({prospects:data})});
 app.get('/api/admin/outreach-health', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const health=await outreachHealth();const {data:queue,error}=await db.from('outreach_queue').select('id,prospect_id,sequence_step,scheduled_at,status,sent_at,error').order('scheduled_at',{ascending:true}).limit(200);if(error)throw error;res.json({health,queue:queue||[]})}catch(e){res.status(500).json({error:e.message})}});
+app.post('/api/admin/outreach/send-pilot', requireUser, rateLimit({windowMs:60_000,max:20}), async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{
+    const prospectId=sanitizeText(req.body.prospect_id,100);
+    if(!prospectId)return res.status(400).json({error:'prospect_id requis.'});
+    const dryRun=req.body.dry_run===true;
+    const result=await sendPilotOutreach({prospectId,requestedBy:req.user.email||req.user.id,dryRun});
+    res.json(result);
+  }catch(e){
+    const status=Number(e.status)||500;
+    res.status(status).json({error:e.message,code:e.code||'PILOT_OUTREACH_FAILED'});
+  }
+});
 app.post('/api/admin/trials/grant', requireUser, async(req,res)=>{
   if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
   try{
@@ -324,4 +338,21 @@ expireTrials().catch(e=>reportError('startup.trials',e));
 
 if(process.env.NODE_ENV==='production'){app.use(express.static(dist,{maxAge:'1h',etag:true}));app.get('*splat',(_req,res)=>res.sendFile(join(dist,'index.html')))}
 const port=Number(process.env.PORT||3000);if(process.env.NODE_ENV!=='test')app.listen(port,'0.0.0.0',()=>console.log(`Relanzio running on :${port}`));
+
+async function runPilotStartupDryRun(){
+  if(process.env.PILOT_OUTREACH_STARTUP_DRY_RUN!=='true')return;
+  const ids=String(process.env.PILOT_OUTREACH_STARTUP_DRY_RUN_IDS||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5);
+  const results=[];
+  for(const prospectId of ids){
+    try{
+      const check=await inspectPilotOutreach(prospectId);
+      results.push({ok:true,prospect:check.prospect,sender:check.sender,checks:check.checks,queue:{id:check.queue.id,subject:check.queue.subject,status:check.queue.status}});
+    }catch(e){
+      results.push({ok:false,prospect_id:prospectId,code:e.code||'PILOT_DRY_RUN_FAILED',error:e.message});
+    }
+  }
+  console.log('PILOT_STARTUP_DRY_RUN '+JSON.stringify(results));
+}
+runPilotStartupDryRun().catch(e=>console.error('PILOT_STARTUP_DRY_RUN_FAILED',e.message));
+
 export default app;
