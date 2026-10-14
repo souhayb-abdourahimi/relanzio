@@ -110,10 +110,10 @@ test('SEO release files include canonical, legal page and protected auth routes'
 
 
 test('privacy notice covers targeted B2B prospecting and retention',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
-  assert.match(client,/Prospects professionnels/);
-  assert.match(client,/trois ans après leur collecte ou le dernier contact émanant du prospect/);
-  assert.match(client,/liste repoussoir pendant au moins trois ans/);
+  const legal=readFileSync(new URL('../client/src/LegalPage.jsx',import.meta.url),'utf8');
+  assert.match(legal,/Prospects professionnels/);
+  assert.match(legal,/trois ans après leur collecte ou le dernier contact émanant du prospect/);
+  assert.match(legal,/liste repoussoir/);
 });
 
 
@@ -159,9 +159,9 @@ test('public launch copy uses explicit account and trial CTAs without inventing 
 });
 
 test('privacy copy includes direct B2B opposition right',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
-  assert.match(client,/droit d’opposition/);
-  assert.match(client,/l’opposition est simple, gratuite et peut être exercée à tout moment/);
+  const legal=readFileSync(new URL('../client/src/LegalPage.jsx',import.meta.url),'utf8');
+  assert.match(legal,/droit d’opposition/);
+  assert.match(legal,/opposition est simple, gratuite et peut être exercée à tout moment/);
 });
 
 
