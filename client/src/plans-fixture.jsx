@@ -8,10 +8,12 @@ function Fixture(){
   const qa=params.get('qa')==='1';
   const trial=params.get('trial')==='1';
   const billing=params.get('billing')==='1';
+  const eligible=params.get('eligible')==='1';
   const[upgradeClicks,setUpgradeClicks]=useState(0);
+  const[trialClicks,setTrialClicks]=useState(0);
   const profile=trial
     ?{plan:'pro',subscription_status:'none',pro_access:true,is_paid_subscription:false,trial_active:true,trial_days_remaining:4,trial_ends_at:'2026-10-18T00:00:00.000Z'}
-    :{plan:'free',subscription_status:'none',pro_access:false,is_paid_subscription:false,trial_active:false};
+    :{plan:'free',subscription_status:'none',pro_access:false,is_paid_subscription:false,trial_active:false,trial_eligible:eligible};
 
   useEffect(()=>{
     if(!qa)return;
@@ -29,11 +31,14 @@ function Fixture(){
       const copyOk=text.includes('Découverte / Gratuit')&&text.includes('0 €')&&text.includes('Pro')&&text.includes('29 €')&&text.includes('5 devis actifs')&&text.includes('100 devis actifs')&&!text.toLowerCase().includes('illimité');
       const billingStateOk=billing?!button?.disabled:button?.disabled;
       const trialOk=!trial||(text.includes('Essai Pro — 4 jours restants')&&text.includes('Fin prévue le 18/10/2026'));
-      document.body.dataset.plansQa=cards.length===2&&copyOk&&noOverflow&&touchOk&&oneColumn&&twoColumns&&billingStateOk&&trialOk?'pass':'fail';
+      const trialButton=document.querySelector('.app-trial-btn');
+      const eligibleOk=!eligible||(trialButton&&text.includes('Essayer Pro gratuitement pendant 7 jours')&&text.includes('Sans carte bancaire et sans débit automatique'));
+      if(eligible&&trialButton)trialButton.click();
+      document.body.dataset.plansQa=cards.length===2&&copyOk&&noOverflow&&touchOk&&oneColumn&&twoColumns&&billingStateOk&&trialOk&&eligibleOk?'pass':'fail';
     },100);
   },[qa,billing,trial]);
 
-  useEffect(()=>{document.body.dataset.upgradeClicks=String(upgradeClicks)},[upgradeClicks]);
-  return <main className="dash"><PlansView profile={profile} billingEnabled={billing} checkoutBusy={false} onUpgrade={()=>setUpgradeClicks(x=>x+1)} onPortal={()=>{}}/></main>;
+  useEffect(()=>{document.body.dataset.upgradeClicks=String(upgradeClicks);document.body.dataset.trialClicks=String(trialClicks)},[upgradeClicks,trialClicks]);
+  return <main className="dash"><PlansView profile={profile} billingEnabled={billing} checkoutBusy={false} trialBusy={false} onStartTrial={()=>setTrialClicks(x=>x+1)} onUpgrade={()=>setUpgradeClicks(x=>x+1)} onPortal={()=>{}}/></main>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);
