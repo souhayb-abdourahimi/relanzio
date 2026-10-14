@@ -35,6 +35,7 @@ export function subscriptionDisplay(profile={}, billingEnabled=false, checkoutBu
   const currentPlan=profile?.pro_access?'pro':'free';
   const paid=Boolean(profile?.is_paid_subscription || (profile?.plan==='pro' && profile?.subscription_status==='active'));
   const stripeManaged=Boolean(profile?.stripe_customer_id);
+  const trialEligible=Boolean(profile?.trial_eligible && !trial.visible && !paid);
   const upgradeVisible=currentPlan==='free' || trial.visible;
   const upgradeDisabled=!billingEnabled || checkoutBusy || paid;
   let upgradeHint='';
@@ -45,6 +46,7 @@ export function subscriptionDisplay(profile={}, billingEnabled=false, checkoutBu
     paid,
     stripeManaged,
     trial,
+    trialEligible,
     upgradeVisible,
     upgradeDisabled,
     upgradeHint,
