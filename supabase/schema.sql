@@ -9,7 +9,7 @@ create table if not exists public.profiles (
   email_mode text not null default 'review' check (email_mode in ('review','automatic')),
   onboarding_completed boolean not null default false,
   marketing_opt_in boolean not null default false,
-  activated_at timestamptz, stripe_customer_id text unique, stripe_subscription_id text,
+  activated_at timestamptz, stripe_customer_id text unique, stripe_subscription_id text, checkout_claimed_at timestamptz,
   trial_started_at timestamptz, trial_ends_at timestamptz, trial_expired_at timestamptz,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
@@ -20,6 +20,7 @@ create table if not exists public.quotes (
   amount numeric(12,2) not null default 0 check (amount >= 0), sent_at date not null,
   status text not null default 'open' check (status in ('open','won','lost','paused')),
   auto_send boolean not null default false, followup_step integer not null default 0 check (followup_step between 0 and 3),
+  followup_schedule_mode text not null default 'recommended' check (followup_schedule_mode in ('recommended','custom','none')),
   next_followup_at timestamptz, send_claimed_at timestamptz, won_at timestamptz, request_key text, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
@@ -127,10 +128,10 @@ alter table public.support_tickets enable row level security; alter table public
 alter table public.suppressions enable row level security; alter table public.outreach_events enable row level security;
 alter table public.feedback_insights enable row level security;
 
-drop policy if exists "profiles own read" on public.profiles; create policy "profiles own read" on public.profiles for select using (auth.uid() = id);
-drop policy if exists "quotes own read" on public.quotes; create policy "quotes own read" on public.quotes for select using (auth.uid() = user_id);
-drop policy if exists "followups own read" on public.followups; create policy "followups own read" on public.followups for select using (auth.uid() = user_id);
-drop policy if exists "tickets own read" on public.support_tickets; create policy "tickets own read" on public.support_tickets for select using (auth.uid() = user_id);
+drop policy if exists "profiles own read" on public.profiles; create policy "profiles own read" on public.profiles for select to authenticated using ((select auth.uid()) = id);
+drop policy if exists "quotes own read" on public.quotes; create policy "quotes own read" on public.quotes for select to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "followups own read" on public.followups; create policy "followups own read" on public.followups for select to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "tickets own read" on public.support_tickets; create policy "tickets own read" on public.support_tickets for select to authenticated using ((select auth.uid()) = user_id);
 -- Founder CRM and analytics: no browser policies; service role/admin API only.
 
 -- v0.4 pilot hardening: the browser uses Supabase only for Auth.
