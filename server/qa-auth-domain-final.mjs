@@ -159,9 +159,13 @@ try{
   const oldToken=await api(userB.token,'/api/profile');
   assert(oldToken.status===401,'deleted_account_old_token_rejected');
 
-  console.log('AUTH_DOMAIN_QA='+JSON.stringify({ok:true,count:results.length,results}));
+  const summary={ok:true,count:results.length,results};
+  console.log('AUTH_DOMAIN_QA='+JSON.stringify(summary));
+  await db.from('system_events').insert({level:'info',scope:'certification_predeploy',message:'AUTH_DOMAIN_QA_PASS',metadata:summary});
 }catch(error){
-  console.error('AUTH_DOMAIN_QA='+JSON.stringify({ok:false,error:String(error?.message||error).slice(0,240),count:results.length,results}));
+  const summary={ok:false,error:String(error?.message||error).slice(0,240),count:results.length,results};
+  console.error('AUTH_DOMAIN_QA='+JSON.stringify(summary));
+  try{await db.from('system_events').insert({level:'error',scope:'certification_predeploy',message:'AUTH_DOMAIN_QA_FAIL',metadata:summary})}catch{}
   process.exitCode=1;
 }finally{
   await cleanup(userA);await cleanup(userB);
