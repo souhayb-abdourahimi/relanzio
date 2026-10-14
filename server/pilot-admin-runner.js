@@ -84,7 +84,8 @@ export async function runPilotAdminRunner() {
     const delay = Math.max(0, dueAt - Date.now());
     setTimeout(async () => {
       try {
-        const result = await callPilotEndpoint({ accessToken, prospectId, dryRun:false });
+        const { accessToken:freshAccessToken } = await adminAccessToken();
+        const result = await callPilotEndpoint({ accessToken:freshAccessToken, prospectId, dryRun:false });
         console.log('PILOT_ENDPOINT_SEND '+JSON.stringify({
           ok:true,
           prospect_id:prospectId,
