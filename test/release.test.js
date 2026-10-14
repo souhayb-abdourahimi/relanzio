@@ -198,3 +198,11 @@ test('trial accounts are excluded from paid MRR metrics',()=>{
   assert.doesNotMatch(server,/paying=.*\['active','trialing'\]/);
   assert.match(server,/les essais ne sont pas comptés/);
 });
+
+
+test('prospect import preserves sector and deduplicates by normalized email',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  assert.match(server,/sector:sanitizeText\(p\.sector,160\)/);
+  assert.match(server,/const email=normalizeEmail\(p\.email\)/);
+  assert.match(server,/upsert\(accepted,\{onConflict:'email',ignoreDuplicates:false\}\)/);
+});
