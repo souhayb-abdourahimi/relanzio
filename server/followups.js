@@ -57,8 +57,10 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null) {
     const {error:followupError}=await db.from('followups').update({status:'sent',sent_at:sentAt,provider_message_id:sent?.messageId||null,error:null}).eq('id',followupId);
     if(followupError)throw followupError;
     const nextStep = Number(claimed.followup_step || 0) + 1;
-    const nextAt = nextStep < 3 ? nextFollowupDate(claimed.sent_at, nextStep) : null;
-    const { error:updateError } = await db.from('quotes').update({ followup_step:nextStep, next_followup_at:nextAt, send_claimed_at:null, updated_at:sentAt }).eq('id',claimed.id).eq('user_id',claimed.user_id).eq('followup_step',claimed.followup_step);
+    const mode = claimed.followup_schedule_mode || 'recommended';
+    const nextAt = nextStep < 3 && mode === 'recommended' ? nextFollowupDate(claimed.sent_at, nextStep) : null;
+    const nextMode = nextStep >= 3 ? 'none' : mode === 'recommended' ? 'recommended' : 'none';
+    const { error:updateError } = await db.from('quotes').update({ followup_step:nextStep, followup_schedule_mode:nextMode, next_followup_at:nextAt, send_claimed_at:null, updated_at:sentAt }).eq('id',claimed.id).eq('user_id',claimed.user_id).eq('followup_step',claimed.followup_step);
     if (updateError) throw updateError;
     return { ...preview, provider_message_id:sent?.messageId || null, next_followup_at:nextAt };
   } catch (e) {
