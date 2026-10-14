@@ -178,6 +178,7 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   const followups=readFileSync(new URL('../server/followups.js',import.meta.url),'utf8');
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
   const trialUi=readFileSync(new URL('../client/src/TrialStatus.jsx',import.meta.url),'utf8');
+  const trialDisplay=readFileSync(new URL('../client/src/trial-display.js',import.meta.url),'utf8');
   for(const field of ['trial_started_at','trial_ends_at','trial_expired_at']){
     assert.ok(schema.includes(field),field);
     assert.ok(migration.includes(field),field);
@@ -188,8 +189,9 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   assert.match(server,/hasProAccess\(profile\)/);
   assert.match(followups,/hasProAccess\(profile\)/);
   assert.match(client,/profile\.pro_access/);
-  assert.match(trialUi,/Essai Pro —/);
-  assert.match(trialUi,/Passer à Pro — 29 €\/mois/);
+  assert.match(trialUi,/trialDisplay\(profile\)/);
+  assert.match(trialDisplay,/Essai Pro —/);
+  assert.match(trialDisplay,/Passer à Pro — 29 €\/mois/);
 });
 
 test('trial accounts are excluded from paid MRR metrics',()=>{
