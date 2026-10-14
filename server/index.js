@@ -199,6 +199,7 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
 
     const sentDate='sent_at' in req.body?parseSentDate(req.body.sent_at):existing.sent_at;
     if(!sentDate)return res.status(400).json({error:"Date d’envoi invalide."});
+    const scheduleTouched=('followup_schedule_mode' in req.body)||('next_followup_at' in req.body);
     const requestedMode=('followup_schedule_mode' in req.body)
       ? normalizeFollowupScheduleMode(req.body.followup_schedule_mode)
       : (('next_followup_at' in req.body)?'custom':(existing.followup_schedule_mode||'recommended'));
@@ -212,9 +213,8 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
       nextFollowupAt=null; patch.auto_send=false;
     }else if(requestedMode==='recommended'){
       nextFollowupAt=nextDate(sentDate,existing.followup_step);
-    }else if(requestedMode==='custom'){
-      const candidate=('next_followup_at' in req.body)?req.body.next_followup_at:existing.next_followup_at;
-      nextFollowupAt=parseCustomFollowupAt(candidate);
+    }else if(requestedMode==='custom'&&scheduleTouched){
+      nextFollowupAt=parseCustomFollowupAt(req.body.next_followup_at||existing.next_followup_at);
       if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});
     }
 
