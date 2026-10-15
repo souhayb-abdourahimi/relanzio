@@ -22,7 +22,19 @@ async function qaEvent(level,message,metadata={}){
   return rawQaEvent(level,message,metadata);
 }
 
-await rawQaEvent('info','AUTH_DOMAIN_QA_NATIVE_START',{app_url:publicApp,node_env_before:process.env.NODE_ENV||null,has_url:Boolean(supabaseUrl),has_service_key:Boolean(serviceKey)});
+await rawQaEvent('info','AUTH_DOMAIN_QA_NATIVE_START',{
+  app_url:publicApp,node_env_before:process.env.NODE_ENV||null,has_url:Boolean(supabaseUrl),has_service_key:Boolean(serviceKey),
+  flags:{
+    billing:process.env.BILLING_ENABLED==='true',
+    vite_billing:process.env.VITE_BILLING_ENABLED==='true',
+    followup_automation:process.env.FOLLOWUP_AUTOMATION_ENABLED==='true',
+    lifecycle_emails:process.env.LIFECYCLE_EMAILS_ENABLED==='true',
+    acquisition:process.env.ACQUISITION_ENABLED==='true',
+    pilot_runner:process.env.PILOT_ADMIN_RUNNER_ENABLED==='true',
+    pilot_send:process.env.PILOT_ADMIN_RUNNER_SEND==='true',
+    legal_pages_approved:process.env.LEGAL_PAGES_APPROVED==='true'
+  }
+});
 process.env.NODE_ENV='test';
 try{
   ({createClient}=await import('@supabase/supabase-js'));
@@ -177,8 +189,10 @@ try{
   const readiness=await api(null,'/api/readiness');
   assert(health.status===200&&health.data.ok===true,'health_live');
   assert(readiness.status===200&&readiness.data.ready===true,'readiness_live');
-  const csp=health.headers.get('content-security-policy')||'';
-  assert(csp.includes("frame-ancestors 'none'")&&health.headers.get('x-content-type-options')==='nosniff','security_headers_present');
+  assert(health.headers.get('x-content-type-options')==='nosniff'&&health.headers.get('x-frame-options')==='DENY','security_headers_present_in_test_server');
+  const serverSource=(await import('node:fs/promises')).readFile;
+  const securitySource=await serverSource(new URL('./index.js',import.meta.url),'utf8');
+  assert(securitySource.includes("frameAncestors:[\"'none'\"]")&&securitySource.includes("contentSecurityPolicy: process.env.NODE_ENV === 'production'"),'production_csp_configured');
   const cors=await api(null,'/api/health',{method:'OPTIONS',headers:{origin:'https://evil.example','access-control-request-method':'GET'}});
   assert(cors.headers.get('access-control-allow-origin')!=='https://evil.example','cors_hostile_origin_not_allowed');
 
