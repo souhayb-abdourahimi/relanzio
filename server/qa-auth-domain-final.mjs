@@ -32,7 +32,13 @@ await rawQaEvent('info','AUTH_DOMAIN_QA_NATIVE_START',{
     acquisition:process.env.ACQUISITION_ENABLED==='true',
     pilot_runner:process.env.PILOT_ADMIN_RUNNER_ENABLED==='true',
     pilot_send:process.env.PILOT_ADMIN_RUNNER_SEND==='true',
-    legal_pages_approved:process.env.LEGAL_PAGES_APPROVED==='true'
+    legal_pages_approved:process.env.LEGAL_PAGES_APPROVED==='true',
+    legal_identity_complete:Boolean(
+      ['individual','company'].includes(process.env.VITE_LEGAL_ENTITY_TYPE||'') &&
+      process.env.VITE_LEGAL_NAME && process.env.VITE_LEGAL_ADDRESS && process.env.VITE_LEGAL_REGISTRATION &&
+      process.env.VITE_LEGAL_PHONE && process.env.VITE_PUBLICATION_DIRECTOR &&
+      (process.env.VITE_LEGAL_ENTITY_TYPE!=='company'||(process.env.VITE_LEGAL_FORM&&process.env.VITE_LEGAL_CAPITAL))
+    )
   }
 });
 process.env.NODE_ENV='test';
