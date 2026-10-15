@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+export TZ=Europe/Paris
 
 npm run dev:client -- --host 127.0.0.1 >/tmp/relanzio-mobile-vite.log 2>&1 &
 VITE_PID=$!
