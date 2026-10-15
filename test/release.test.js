@@ -245,3 +245,12 @@ test('production SPA fallback serves only known routes and 404s scanner paths',(
   assert.match(server,/res\.status\(404\)\.type\('text\/plain'\)\.send\('Not found'\)/);
   assert.match(server,/spaRoutes\.has\(req\.path\)/);
 });
+
+
+test('signup pins confirmation redirect and records acceptance metadata',()=>{
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  assert.match(client,/emailRedirectTo:location\.origin\+'\/'/);
+  assert.match(client,/terms_accepted_at:new Date\(\)\.toISOString\(\)/);
+  assert.match(client,/terms_version:'2026-10-15'/);
+  assert.match(client,/privacy_acknowledged_at:new Date\(\)\.toISOString\(\)/);
+});
