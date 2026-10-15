@@ -26,6 +26,15 @@ for size in $MOBILE_SIZES; do
 done
 echo "Mobile navigation QA PASS: 320x568 360x800 375x812 390x844 393x852 412x915 430x932"
 
+for route in login signup; do
+  for size in $MOBILE_SIZES; do
+    "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=4000 \
+      --dump-dom "http://127.0.0.1:5173/$route?qa=1" >/tmp/relanzio-auth-dom.html 2>/tmp/relanzio-auth-chromium.log
+    grep -q 'data-auth-qa="pass"' /tmp/relanzio-auth-dom.html || { cat /tmp/relanzio-auth-dom.html; echo "Auth DOM QA failed for $route at $size" >&2; exit 1; }
+  done
+done
+echo "Auth mobile DOM QA PASS: login/signup across all required mobile widths"
+
 for size in $ALL_SIZES; do
   "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=5000     --dump-dom 'http://127.0.0.1:5173/plans-fixture.html?qa=1' >/tmp/relanzio-plans-dom.html 2>/tmp/relanzio-plans-chromium.log
   grep -q 'data-plans-qa="pass"' /tmp/relanzio-plans-dom.html || { cat /tmp/relanzio-plans-dom.html; echo "Plans DOM QA failed at $size" >&2; exit 1; }
