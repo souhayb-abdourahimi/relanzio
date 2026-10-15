@@ -31,3 +31,9 @@ export function isoToParisLocalDateTime(value){
 }
 
 export const PARIS_TIME_ZONE=PARIS_TZ;
+
+export function formatParisDateTime(value){
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return '';
+  return new Intl.DateTimeFormat('fr-FR',{timeZone:PARIS_TZ,dateStyle:'short',timeStyle:'short'}).format(d);
+}
