@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {activeQuoteLimit,isActiveQuoteStatus,parseQuoteAmount,parseSentDate,normalizeFollowupScheduleMode,parseCustomFollowupAt} from '../server/quote-rules.js';
+import {activeQuoteLimit,isActiveQuoteStatus,parseQuoteAmount,parseSentDate,normalizeFollowupScheduleMode,parseCustomFollowupAt,parisTodayIso} from '../server/quote-rules.js';
 
 test('active quote quota counts open and paused but not decided quotes',()=>{
   assert.equal(isActiveQuoteStatus('open'),true);
@@ -36,4 +36,11 @@ test('follow-up schedule accepts recommended custom none and future ISO values',
   const now=new Date('2026-10-15T08:00:00Z');
   assert.equal(parseCustomFollowupAt('2026-10-16T09:30:00+02:00',now),'2026-10-16T07:30:00.000Z');
   assert.equal(parseCustomFollowupAt('2026-10-14T09:30:00+02:00',now),null);
+});
+
+
+test('sent date uses the Europe/Paris calendar across UTC midnight',()=>{
+  assert.equal(parisTodayIso(new Date('2026-10-14T22:30:00.000Z')),'2026-10-15');
+  assert.equal(parseSentDate('2026-10-15',parisTodayIso(new Date('2026-10-14T22:30:00.000Z'))),'2026-10-15');
+  assert.equal(parseSentDate('2026-10-16',parisTodayIso(new Date('2026-10-14T22:30:00.000Z'))),null);
 });
