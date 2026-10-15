@@ -9,6 +9,7 @@ import { createSingleFlight } from './single-flight.js';
 import { QuoteEditor } from './QuoteEditor.jsx';
 import { QuoteCards } from './QuoteCards.jsx';
 import LegalPage from './LegalPage.jsx';
+import { parisLocalDateTimeToIso, isoToParisLocalDateTime } from './date-time.js';
 const U=import.meta.env.VITE_SUPABASE_URL,K=import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase=U&&K?createClient(U,K):null;
 const SUPPORT_EMAIL=import.meta.env.VITE_SUPPORT_EMAIL||'support@relanzio.com';
@@ -17,8 +18,8 @@ const BILLING_ENABLED=import.meta.env.VITE_BILLING_ENABLED==='true';
 const money=n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €';
 const statusLabel=s=>({open:'En attente',paused:'Pause',won:'Gagné',lost:'Perdu'}[s]||s);
 const scheduleLabel=q=>q?.next_followup_at?new Date(q.next_followup_at).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):(q?.followup_schedule_mode==='none'?'Aucune relance prévue':'—');
-const toLocalDateTime=value=>{if(!value)return'';const d=new Date(value);if(Number.isNaN(d.getTime()))return'';const pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`};
-const toIsoDateTime=value=>{if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d.toISOString()};
+const toLocalDateTime=isoToParisLocalDateTime;
+const toIsoDateTime=parisLocalDateTimeToIso;
 function pageMeta(title,description,path=location.pathname,robots='index,follow'){
   document.title=title;
   const set=(selector,attr,value)=>{let el=document.querySelector(selector);if(!el){el=document.createElement(selector.startsWith('link')?'link':'meta');if(selector.startsWith('link'))el.rel='canonical';else if(selector.includes('property='))el.setAttribute('property',selector.match(/property="([^"]+)/)?.[1]||'');else el.name=selector.match(/name="([^"]+)/)?.[1]||'';document.head.appendChild(el)}el.setAttribute(attr,value)};
