@@ -18,7 +18,15 @@ export function parseQuoteAmount(value){
   return Number.isFinite(n)&&n>=0&&n<=MAX_QUOTE_AMOUNT?n:null;
 }
 
-export function parseSentDate(value,today=new Date().toISOString().slice(0,10)){
+export function parisTodayIso(now=new Date()){
+  const d=now instanceof Date?now:new Date(now);
+  if(Number.isNaN(d.getTime()))return null;
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+  const get=type=>parts.find(x=>x.type===type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+export function parseSentDate(value,today=parisTodayIso()){
   const v=String(value||'');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;
   const d=new Date(v+'T00:00:00Z');
