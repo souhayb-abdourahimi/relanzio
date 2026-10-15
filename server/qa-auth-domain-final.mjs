@@ -91,6 +91,16 @@ async function makeUser(label){
   return{id:created.data.user.id,email,password,client,token:signed.data.session.access_token};
 }
 async function cleanup(u){if(u?.id)try{await db.auth.admin.deleteUser(u.id,false)}catch{}}
+async function cleanupStaleQaUsers(){
+  const {data,error}=await db.from('profiles').select('id,email').like('email','relanzio-cert-%@example.com').limit(200);
+  if(error)throw error;
+  let removed=0;
+  for(const row of data||[]){
+    const result=await db.auth.admin.deleteUser(row.id,false);
+    if(!result.error)removed++;
+  }
+  pass('stale_qa_users_cleaned','removed='+removed);
+}
 async function checkRedirects(){
   const email='relanzio-cert-link-'+stamp+'@example.com',password='Qa!'+randomBytes(16).toString('base64url'),newPassword='Qa!'+randomBytes(18).toString('base64url');
   let id;
@@ -133,6 +143,7 @@ async function checkRedirects(){
 
 try{
   assert(publicApp==='https://relanzio.com','app_url_final');
+  await cleanupStaleQaUsers();
   await checkRedirects();
 
   userA=await makeUser('a');userB=await makeUser('b');
