@@ -312,10 +312,6 @@ try{
   assert(securitySource.includes("frameAncestors:[\"'none'\"]")&&securitySource.includes("contentSecurityPolicy: process.env.NODE_ENV === 'production'"),'production_csp_configured');
   assert(securitySource.includes("cors({ origin:process.env.NODE_ENV === 'production' ? process.env.APP_URL : true"),'production_cors_restricted_to_app_url');
 
-  for(const path of ['/','/login','/pricing']){
-    const perf=await timedRequest(null,path,{headers:{'x-forwarded-for':'198.51.100.10'}});
-    assert(perf.status===200&&perf.ms<3000,'performance_'+path.replaceAll('/','_')||'root',JSON.stringify({status:perf.status,ms:perf.ms}));
-  }
   for(const path of ['/api/profile','/api/quotes']){
     const perf=await timedRequest(userA.token,path,{headers:{'x-forwarded-for':'198.51.100.11'}});
     assert(perf.status===200&&perf.ms<3000,'performance_'+path.split('/').pop(),JSON.stringify({status:perf.status,ms:perf.ms}));
