@@ -111,7 +111,10 @@ app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async 
       await db.from('stripe_webhook_events').delete().eq('event_id',event.id);
       throw e;
     }
-  } catch(e) { res.status(400).send(`Webhook error: ${e.message}`); }
+  } catch(e) {
+    await reportError('stripe.webhook',e,{event_id:event?.id||null,event_type:event?.type||null,request_id:req.requestId});
+    res.status(400).send('Webhook processing failed');
+  }
 });
 
 app.use(express.json({limit:'256kb'}));
@@ -401,7 +404,10 @@ app.post('/api/brevo/webhook', async(req,res)=>{
       if(prospect)await mustDb(db.from('outreach_queue').update({status:'canceled',error:`provider_${rawEvent}`,updated_at:nowIso()}).eq('prospect_id',prospect.id).in('status',['queued','held']));
     }
     res.json({ok:true});
-  }catch(e){res.status(500).json({error:'Webhook processing failed.'})}
+  }catch(e){
+    await reportError('brevo.webhook',e,{event_type:sanitizeText(req.body?.event,80)||null,request_id:req.requestId});
+    res.status(500).json({error:'Webhook processing failed.'});
+  }
 });
 
 // Founder acquisition CRM — quality capped, human-approved, no scraping endpoint.
