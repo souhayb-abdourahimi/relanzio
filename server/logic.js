@@ -1,11 +1,32 @@
 export const FOLLOWUP_DAYS = [2, 5, 10];
 
+function timeZoneOffsetMs(utcDate,timeZone='Europe/Paris'){
+  const parts=new Intl.DateTimeFormat('en-CA',{
+    timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'
+  }).formatToParts(utcDate).reduce((acc,p)=>{if(p.type!=='literal')acc[p.type]=p.value;return acc},{});
+  const represented=Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day),Number(parts.hour),Number(parts.minute),Number(parts.second));
+  return represented-utcDate.getTime();
+}
+
+export function parisLocalDateTimeToIso(date, hour=9, minute=0) {
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))throw new Error('Invalid local date');
+  const [year,month,day]=date.split('-').map(Number);
+  const base=Date.UTC(year,month-1,day,hour,minute,0,0);
+  let guess=new Date(base);
+  let offset=timeZoneOffsetMs(guess);
+  let utc=new Date(base-offset);
+  const secondOffset=timeZoneOffsetMs(utc);
+  if(secondOffset!==offset)utc=new Date(base-secondOffset);
+  return utc.toISOString();
+}
+
 export function nextFollowupDate(sentAt, step = 0) {
   if (step < 0 || step >= FOLLOWUP_DAYS.length) return null;
-  const d = new Date(`${sentAt}T09:00:00.000Z`);
-  if (Number.isNaN(d.getTime())) throw new Error('Invalid sent_at date');
-  d.setUTCDate(d.getUTCDate() + FOLLOWUP_DAYS[step]);
-  return d.toISOString();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(sentAt||'')))throw new Error('Invalid sent_at date');
+  const d=new Date(sentAt+'T00:00:00.000Z');
+  if(Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==sentAt)throw new Error('Invalid sent_at date');
+  d.setUTCDate(d.getUTCDate()+FOLLOWUP_DAYS[step]);
+  return parisLocalDateTimeToIso(d.toISOString().slice(0,10),9,0);
 }
 
 export function normalizeEmail(value = '') { return String(value).trim().toLowerCase(); }
