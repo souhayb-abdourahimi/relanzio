@@ -17,7 +17,7 @@ import { answerSupport } from './support.js';
 import { buildCeoMetrics, weeklyRecommendations } from './ceo.js';
 import { runLifecycleEmails } from './lifecycle.js';
 import { reportError } from './observability.js';
-import { billingTransition, normalizeSubscriptionStatus, planForSubscriptionStatus } from './billing.js';
+import { billingTransition, normalizeSubscriptionStatus, planForSubscriptionStatus, shouldIgnoreBillingEvent } from './billing.js';
 import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntitlements } from './entitlements.js';
 import { grantTrialToEmail, grantTrialToUser, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
@@ -69,6 +69,20 @@ async function mustDb(promise) {
   if (result.error) throw result.error;
   return result.data;
 }
+async function applyStripeBillingEvent(profile,event,obj,extra={}) {
+  if(!profile||shouldIgnoreBillingEvent(profile,event.type,obj,event.created))return {applied:false,ignored:true};
+  const state=await authoritativeBillingTransition(event.type,obj,profile);
+  const eventCreated=Number(event.created||0);
+  const patch={...state.transition,...extra,updated_at:nowIso()};
+  if(eventCreated)patch.stripe_state_event_created=eventCreated;
+  const subscriptionId=state.subscriptionId||extra.stripe_subscription_id;
+  if(subscriptionId!==undefined)patch.stripe_subscription_id=subscriptionId||null;
+  let query=db.from('profiles').update(patch).eq('id',profile.id);
+  if(eventCreated)query=query.lte('stripe_state_event_created',eventCreated);
+  const {data,error}=await query.select('id').maybeSingle();
+  if(error)throw error;
+  return {applied:Boolean(data),ignored:!data};
+}
 
 app.use(helmet({ contentSecurityPolicy: process.env.NODE_ENV === 'production' ? { directives:{ defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'","'unsafe-inline'"],imgSrc:["'self'",'data:'],connectSrc:["'self'",'https://*.supabase.co'],frameAncestors:["'none'"],baseUri:["'self'"],formAction:["'self'"] } } : false, crossOriginEmbedderPolicy:false }));
 app.use(cors({ origin:process.env.NODE_ENV === 'production' ? process.env.APP_URL : true, credentials:false }));
@@ -95,15 +109,18 @@ app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async 
       const obj = event.data.object;
       if (event.type === 'checkout.session.completed') {
         const userId=obj.metadata?.user_id, customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id;
-        if(userId){const profile=await getProfile({id:userId,email:obj.customer_details?.email||''});const state=await authoritativeBillingTransition(event.type,obj,profile);await mustDb(db.from('profiles').update({...state.transition,stripe_customer_id:customerId||null,stripe_subscription_id:state.subscriptionId||null,updated_at:nowIso()}).eq('id',userId));}
+        if(userId){
+          const profile=await getProfile({id:userId,email:obj.customer_details?.email||''});
+          await applyStripeBillingEvent(profile,event,obj,{stripe_customer_id:customerId||profile.stripe_customer_id||null});
+        }
       }
       if (['customer.subscription.updated','customer.subscription.deleted'].includes(event.type)) {
         const customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id, profile=await profileByCustomer(customerId);
-        if(profile){const state=await authoritativeBillingTransition(event.type,obj,profile);await mustDb(db.from('profiles').update({...state.transition,stripe_subscription_id:state.subscriptionId||obj.id,updated_at:nowIso()}).eq('id',profile.id));}
+        if(profile)await applyStripeBillingEvent(profile,event,obj,{stripe_subscription_id:obj.id||profile.stripe_subscription_id});
       }
       if (['invoice.payment_failed','invoice.paid'].includes(event.type)) {
         const customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id, profile=await profileByCustomer(customerId);
-        if(profile){const state=await authoritativeBillingTransition(event.type,obj,profile);await mustDb(db.from('profiles').update({...state.transition,stripe_subscription_id:state.subscriptionId||profile.stripe_subscription_id,updated_at:nowIso()}).eq('id',profile.id));}
+        if(profile)await applyStripeBillingEvent(profile,event,obj,{});
       }
       await mustDb(db.from('stripe_webhook_events').update({processed_at:nowIso()}).eq('event_id',event.id));
       res.json({received:true});
