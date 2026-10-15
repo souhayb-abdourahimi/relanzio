@@ -64,3 +64,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .legal-check{align-items:flex-start;margin:4px 0;font-weight:500}.legal-check input{margin-top:3px}.legal-check a{color:#176b49;text-decoration:underline;text-underline-offset:2px}.legal-check span{line-height:1.45}
 
 .auth-links button{min-height:44px;padding:8px 2px}.auth-card input:not([type=checkbox]),.auth-card select{min-height:44px}
+
+@media(max-width:760px){.nav .btn.small{min-height:44px;padding:10px 13px}.nav{min-height:72px;height:auto}}
