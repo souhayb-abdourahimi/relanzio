@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { billingTransition, planForSubscriptionStatus } from '../server/billing.js';
+import { billingTransition, planForSubscriptionStatus, shouldIgnoreBillingEvent } from '../server/billing.js';
 
 test('billing access is conservative across renewal failure and cancellation',()=>{
   assert.equal(planForSubscriptionStatus('active'),'pro');
@@ -10,6 +10,24 @@ test('billing access is conservative across renewal failure and cancellation',()
   assert.deepEqual(billingTransition('customer.subscription.deleted',{}, {plan:'pro',subscription_status:'active'}),{plan:'free',subscription_status:'canceled'});
   assert.deepEqual(billingTransition('invoice.paid',{}, {plan:'free',subscription_status:'past_due'}),{plan:'pro',subscription_status:'active'});
   assert.deepEqual(billingTransition('invoice.payment_failed',{}, {plan:'pro',subscription_status:'active'}),{plan:'pro',subscription_status:'past_due'});
+});
+
+
+test('Stripe billing event ordering ignores stale or foreign subscription events',()=>{
+  const profile={stripe_subscription_id:'sub_new',stripe_state_event_created:200,plan:'pro',subscription_status:'active'};
+  assert.equal(shouldIgnoreBillingEvent(profile,'customer.subscription.deleted',{id:'sub_old'},250),true);
+  assert.equal(shouldIgnoreBillingEvent(profile,'customer.subscription.updated',{id:'sub_new'},199),true);
+  assert.equal(shouldIgnoreBillingEvent(profile,'customer.subscription.updated',{id:'sub_new'},201),false);
+  assert.equal(shouldIgnoreBillingEvent(profile,'invoice.payment_failed',{subscription:'sub_old'},250),true);
+  assert.equal(shouldIgnoreBillingEvent(profile,'checkout.session.completed',{subscription:'sub_old'},200),true);
+});
+
+test('Stripe webhook idempotency and ordering guards are present in release source',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  assert.match(server,/stripe_webhook_events'\)\.insert\(\{event_id:event\.id,event_type:event\.type\}\)/);
+  assert.match(server,/claimError\?\.code === '23505'/);
+  assert.match(server,/shouldIgnoreBillingEvent/);
+  assert.match(server,/stripe_state_event_created/);
 });
 
 test('email layer never uses a fake development success',()=>{
