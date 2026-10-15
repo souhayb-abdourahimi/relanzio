@@ -2,6 +2,7 @@ import React,{useEffect,useState}from'react';
 import{createRoot}from'react-dom/client';
 import{QuoteEditor}from'./QuoteEditor.jsx';
 import{QuoteCards}from'./QuoteCards.jsx';
+import{parisLocalDateTimeToIso,isoToParisLocalDateTime}from'./date-time.js';
 import'./styles.css';
 
 const initial={
@@ -36,8 +37,9 @@ function Fixture(){
       const touch=[...document.querySelectorAll('button')].every(b=>window.innerWidth>760||b.getBoundingClientRect().height>=44);
       const noOverflow=document.documentElement.scrollWidth<=window.innerWidth+1;
       const mobileCardOk=window.innerWidth>760||Boolean(card&&getComputedStyle(card.parentElement).display!=='none');
+      const timezoneOk=parisLocalDateTimeToIso('2026-10-20T10:30')==='2026-10-20T08:30:00.000Z'&&isoToParisLocalDateTime('2026-10-26T09:30:00.000Z')==='2026-10-26T10:30';
       const modalFits=modal&&modal.getBoundingClientRect().width<=window.innerWidth&&modal.getBoundingClientRect().height<=window.innerHeight;
-      if(!root||!schedule||!touch||!noOverflow||!mobileCardOk||!modalFits){document.body.dataset.quoteQa='fail-layout';return}
+      if(!root||!schedule||!touch||!noOverflow||!mobileCardOk||!modalFits||!timezoneOk){document.body.dataset.quoteQa='fail-layout';return}
       schedule.value='custom';schedule.dispatchEvent(new Event('change',{bubbles:true}));
       later(()=>{
         const dt=document.querySelector('input[type="datetime-local"]');
