@@ -495,7 +495,14 @@ process.on('uncaughtException',e=>{reportError('process.uncaughtException',e).fi
 
 expireTrials().catch(e=>reportError('startup.trials',e));
 
-if(process.env.NODE_ENV==='production'){app.use(express.static(dist,{maxAge:'1h',etag:true}));app.get('*splat',(_req,res)=>res.sendFile(join(dist,'index.html')))}
+if(process.env.NODE_ENV==='production'){
+  app.use(express.static(dist,{maxAge:'1h',etag:true}));
+  const spaRoutes=new Set(['/','/pricing','/docs','/faq','/contact','/login','/signup','/reset-password','/legal','/privacy','/dpa','/terms','/logiciel-relance-devis','/relance-devis-agence','/modele-email-relance-devis']);
+  app.get('*splat',(req,res)=>{
+    if(spaRoutes.has(req.path))return res.sendFile(join(dist,'index.html'));
+    res.status(404).type('text/plain').send('Not found');
+  });
+}
 const port=Number(process.env.PORT||3000);if(process.env.NODE_ENV!=='test')app.listen(port,'0.0.0.0',()=>console.log(`Relanzio running on :${port}`));
 
 async function runPilotStartupDryRun(){
