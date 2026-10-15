@@ -112,18 +112,18 @@ try{
   const duplicate=await api(userA.token,'/api/quotes',{method:'POST',body:quotePayload,headers:{'Idempotency-Key':idem}});
   assert(duplicate.status===200&&duplicate.data.idempotent===true&&duplicate.data.quote?.id===q.id,'quote_idempotency');
 
-  const unrelated=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{title:'Objet modifié sans toucher au planning'}});
+  const unrelated=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{title:'Objet modifié sans toucher au planning'}});
   assert(unrelated.status===200&&unrelated.data.quote.next_followup_at===q.next_followup_at&&unrelated.data.quote.followup_schedule_mode==='custom','custom_date_survives_unrelated_edit');
 
-  const paused=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{status:'paused'}});
+  const paused=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{status:'paused'}});
   assert(paused.status===200&&paused.data.quote.next_followup_at===q.next_followup_at&&paused.data.quote.auto_send===false,'pause_preserves_date_and_stops_auto');
-  const previewPaused=await api(userA.token,'/api/quotes/'+claimedQuote.id+'/followup-preview');
+  const previewPaused=await api(userA.token,'/api/quotes/'+q.id+'/followup-preview');
   assert(previewPaused.status===409,'pause_blocks_followup_preview');
-  const resumed=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{status:'open'}});
+  const resumed=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{status:'open'}});
   assert(resumed.status===200&&resumed.data.quote.next_followup_at===q.next_followup_at,'resume_preserves_custom_date');
-  const none=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{followup_schedule_mode:'none'}});
+  const none=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'none'}});
   assert(none.status===200&&none.data.quote.next_followup_at===null,'none_schedule_clears_next');
-  const recommended=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{followup_schedule_mode:'recommended'}});
+  const recommended=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'recommended'}});
   assert(recommended.status===200&&Boolean(recommended.data.quote.next_followup_at),'resume_recommended_schedule');
 
   for(let i=0;i<3;i++){
@@ -195,7 +195,7 @@ try{
   assert(blockedAfterDowngrade.status===403,'downgrade_over_free_quota_blocks_new_create');
   const closeAfterDowngrade=await api(userA.token,'/api/quotes/'+hundredth.data.quote.id,{method:'PATCH',body:{status:'lost'}});
   assert(closeAfterDowngrade.status===200,'downgrade_allows_close');
-  const deleteAfterDowngrade=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'DELETE'});
+  const deleteAfterDowngrade=await api(userA.token,'/api/quotes/'+q.id,{method:'DELETE'});
   assert(deleteAfterDowngrade.status===200,'downgrade_allows_delete');
   const reopenAfterDowngrade=await api(userA.token,'/api/quotes/'+hundredth.data.quote.id,{method:'PATCH',body:{status:'open'}});
   assert(reopenAfterDowngrade.status===403,'downgrade_blocks_reopen_over_free_quota');
