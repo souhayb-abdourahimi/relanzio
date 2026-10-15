@@ -65,6 +65,21 @@ async function api(token,path,{method='GET',body,headers={}}={}){
   const raw=await r.text();let data;try{data=raw?JSON.parse(raw):{}}catch{data=raw}
   return{status:r.status,data,headers:r.headers};
 }
+async function timedRequest(token,path,options={}){
+  const start=performance.now(),result=await api(token,path,options);
+  return {...result,ms:Math.round((performance.now()-start)*10)/10};
+}
+async function localHealthLoad(total,ip){
+  const times=[],statuses=await Promise.all(Array.from({length:total},async()=>{
+    const start=performance.now();
+    const r=await fetch(local+'/api/health',{headers:{'x-forwarded-for':ip}});
+    times.push(performance.now()-start);
+    return r.status;
+  }));
+  times.sort((a,b)=>a-b);
+  const p95=Math.round((times[Math.min(times.length-1,Math.floor(times.length*.95))]||0)*10)/10;
+  return{total,p95,errors:statuses.filter(x=>x!==200).length};
+}
 async function makeUser(label){
   const email='relanzio-cert-'+label+'-'+stamp+'@example.com';
   const password='Qa!'+randomBytes(18).toString('base64url');
@@ -286,6 +301,19 @@ try{
   assert(securitySource.includes("frameAncestors:[\"'none'\"]")&&securitySource.includes("contentSecurityPolicy: process.env.NODE_ENV === 'production'"),'production_csp_configured');
   const cors=await api(null,'/api/health',{method:'OPTIONS',headers:{origin:'https://evil.example','access-control-request-method':'GET'}});
   assert(cors.headers.get('access-control-allow-origin')!=='https://evil.example','cors_hostile_origin_not_allowed');
+
+  for(const path of ['/','/login','/pricing']){
+    const perf=await timedRequest(null,path,{headers:{'x-forwarded-for':'198.51.100.10'}});
+    assert(perf.status===200&&perf.ms<3000,'performance_'+path.replaceAll('/','_')||'root',JSON.stringify({status:perf.status,ms:perf.ms}));
+  }
+  for(const path of ['/api/profile','/api/quotes']){
+    const perf=await timedRequest(userA.token,path,{headers:{'x-forwarded-for':'198.51.100.11'}});
+    assert(perf.status===200&&perf.ms<3000,'performance_'+path.split('/').pop(),JSON.stringify({status:perf.status,ms:perf.ms}));
+  }
+  for(const [total,ip] of [[10,'198.51.100.20'],[50,'198.51.100.21'],[100,'198.51.100.22']]){
+    const load=await localHealthLoad(total,ip);
+    assert(load.errors===0&&load.p95<2000,'local_load_'+total,JSON.stringify(load));
+  }
 
   const deleted=await api(userB.token,'/api/account',{method:'DELETE',body:{confirmation:'SUPPRIMER'}});
   assert(deleted.status===200&&deleted.data.deleted===true,'account_delete');
