@@ -226,18 +226,22 @@ try{
   const persistedQuote=quotesAfterLogin.data?.quotes?.find(x=>x.id===q.id);
   assert(quotesAfterLogin.status===200&&persistedQuote&&persistedQuote.followup_schedule_mode==='recommended'&&Boolean(persistedQuote.next_followup_at),'quote_persists_refresh_logout_login');
 
-  const terminalSeed=await api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Statut terminal',client_email:'terminal@example.com',title:'Test perdu',amount:'29,50',sent_at:sentAt,followup_schedule_mode:'recommended'},headers:{'Idempotency-Key':'cert-terminal-'+stamp}});
-  assert(terminalSeed.status===403||terminalSeed.status===201,'terminal_seed_respects_current_quota','HTTP '+terminalSeed.status);
-  if(terminalSeed.status===201){
-    const lost=await api(userA.token,'/api/quotes/'+terminalSeed.data.quote.id,{method:'PATCH',body:{status:'lost'}});
-    assert(lost.status===200&&lost.data.quote.next_followup_at===null&&lost.data.quote.auto_send===false,'lost_stops_followup');
-    const lostPreview=await api(userA.token,'/api/quotes/'+terminalSeed.data.quote.id+'/followup-preview');
-    assert(lostPreview.status===409,'lost_blocks_followup_preview');
-    const deletedTerminal=await api(userA.token,'/api/quotes/'+terminalSeed.data.quote.id,{method:'DELETE'});
-    assert(deletedTerminal.status===200,'quote_delete');
-    const afterDelete=await api(userA.token,'/api/quotes');
-    assert(afterDelete.status===200&&!afterDelete.data.quotes.some(x=>x.id===terminalSeed.data.quote.id),'quote_delete_persists');
+  const beforeTerminal=await api(userA.token,'/api/quotes');
+  const expendable=(beforeTerminal.data?.quotes||[]).find(x=>x.id!==q.id&&x.status==='open');
+  if(expendable){
+    const freed=await api(userA.token,'/api/quotes/'+expendable.id,{method:'PATCH',body:{status:'won'}});
+    assert(freed.status===200,'terminal_test_frees_one_active_slot');
   }
+  const terminalSeed=await api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Statut terminal',client_email:'terminal@example.com',title:'Test perdu',amount:'29,50',sent_at:sentAt,followup_schedule_mode:'recommended'},headers:{'Idempotency-Key':'cert-terminal-'+stamp}});
+  assert(terminalSeed.status===201,'terminal_seed_created','HTTP '+terminalSeed.status);
+  const lost=await api(userA.token,'/api/quotes/'+terminalSeed.data.quote.id,{method:'PATCH',body:{status:'lost'}});
+  assert(lost.status===200&&lost.data.quote.next_followup_at===null&&lost.data.quote.auto_send===false,'lost_stops_followup');
+  const lostPreview=await api(userA.token,'/api/quotes/'+terminalSeed.data.quote.id+'/followup-preview');
+  assert(lostPreview.status===409,'lost_blocks_followup_preview');
+  const deletedTerminal=await api(userA.token,'/api/quotes/'+terminalSeed.data.quote.id,{method:'DELETE'});
+  assert(deletedTerminal.status===200,'quote_delete');
+  const afterDelete=await api(userA.token,'/api/quotes');
+  assert(afterDelete.status===200&&!afterDelete.data.quotes.some(x=>x.id===terminalSeed.data.quote.id),'quote_delete_persists');
 
   const {count:activeBeforeProSeed,error:activeBeforeError}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',userA.id).in('status',['open','paused']);
   if(activeBeforeError)throw activeBeforeError;
