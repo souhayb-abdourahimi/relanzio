@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sanitizeLogValue} from '../server/observability.js';
+import {sanitizeLogValue} from '../server/log-redaction.js';
 
 test('observability metadata redacts explicit secret fields and common secret formats',()=>{
   const safe=sanitizeLogValue({
