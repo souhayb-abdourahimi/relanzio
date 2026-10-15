@@ -1,7 +1,8 @@
 import React from 'react';
+import { formatParisDateTime } from './date-time.js';
 
 const euro=n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €';
-const schedule=q=>q?.next_followup_at?new Date(q.next_followup_at).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}):(q?.followup_schedule_mode==='none'?'Aucune relance prévue':'—');
+const schedule=q=>q?.next_followup_at?formatParisDateTime(q.next_followup_at):(q?.followup_schedule_mode==='none'?'Aucune relance prévue':'—');
 
 export function QuoteCards({quotes=[],onStatus,onPrepare,onEdit,onRemove}){
   return <div className="quote-mobile-list">{quotes.map(q=><article className="quote-mobile-card" key={q.id}>
