@@ -1,15 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
 
-process.env.NODE_ENV='test';
-const {default:app}=await import('./index.js');
-const db=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
-const publicApp=(process.env.APP_URL||'https://relanzio.com').replace(/\/$/,'');
-const server=app.listen(0,'127.0.0.1');
-await new Promise(resolve=>server.once('listening',resolve));
-const local='http://127.0.0.1:'+server.address().port;
 const stamp=Date.now(),results=[];
-let userA,userB;
+let userA,userB,server,local,app;
+const publicApp=(process.env.APP_URL||'https://relanzio.com').replace(/\/$/,'');
+const db=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+async function qaEvent(level,message,metadata={}){try{await db.from('system_events').insert({level,scope:'certification_predeploy',message,metadata:{stamp,...metadata}})}catch{}}
+await qaEvent('info','AUTH_DOMAIN_QA_START',{app_url:publicApp,node_env_before:process.env.NODE_ENV||null});
+process.env.NODE_ENV='test';
+try{
+  ({default:app}=await import('./index.js'));
+  await qaEvent('info','AUTH_DOMAIN_QA_IMPORT_OK');
+  server=app.listen(0,'127.0.0.1');
+  await new Promise((resolve,reject)=>{server.once('listening',resolve);server.once('error',reject)});
+  local='http://127.0.0.1:'+server.address().port;
+  await qaEvent('info','AUTH_DOMAIN_QA_SERVER_OK');
+}catch(error){
+  await qaEvent('error','AUTH_DOMAIN_QA_BOOT_FAIL',{error:String(error?.message||error).slice(0,240)});
+  throw error;
+}
 
 function pass(name,detail){results.push({name,ok:true,detail:detail||null})}
 function assert(condition,name,detail){if(!condition)throw new Error(name+(detail?' '+detail:''));pass(name,detail)}
@@ -161,13 +170,13 @@ try{
 
   const summary={ok:true,count:results.length,results};
   console.log('AUTH_DOMAIN_QA='+JSON.stringify(summary));
-  await db.from('system_events').insert({level:'info',scope:'certification_predeploy',message:'AUTH_DOMAIN_QA_PASS',metadata:summary});
+  await qaEvent('info','AUTH_DOMAIN_QA_PASS',summary);
 }catch(error){
   const summary={ok:false,error:String(error?.message||error).slice(0,240),count:results.length,results};
   console.error('AUTH_DOMAIN_QA='+JSON.stringify(summary));
-  try{await db.from('system_events').insert({level:'error',scope:'certification_predeploy',message:'AUTH_DOMAIN_QA_FAIL',metadata:summary})}catch{}
+  await qaEvent('error','AUTH_DOMAIN_QA_FAIL',summary);
   process.exitCode=1;
 }finally{
   await cleanup(userA);await cleanup(userB);
-  await new Promise(resolve=>server.close(resolve));
+  if(server?.listening)await new Promise(resolve=>server.close(resolve));
 }
