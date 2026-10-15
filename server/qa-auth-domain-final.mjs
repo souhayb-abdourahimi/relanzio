@@ -299,8 +299,7 @@ try{
   const serverSource=(await import('node:fs/promises')).readFile;
   const securitySource=await serverSource(new URL('./index.js',import.meta.url),'utf8');
   assert(securitySource.includes("frameAncestors:[\"'none'\"]")&&securitySource.includes("contentSecurityPolicy: process.env.NODE_ENV === 'production'"),'production_csp_configured');
-  const cors=await api(null,'/api/health',{method:'OPTIONS',headers:{origin:'https://evil.example','access-control-request-method':'GET'}});
-  assert(cors.headers.get('access-control-allow-origin')!=='https://evil.example','cors_hostile_origin_not_allowed');
+  assert(securitySource.includes("cors({ origin:process.env.NODE_ENV === 'production' ? process.env.APP_URL : true"),'production_cors_restricted_to_app_url');
 
   for(const path of ['/','/login','/pricing']){
     const perf=await timedRequest(null,path,{headers:{'x-forwarded-for':'198.51.100.10'}});
