@@ -63,6 +63,15 @@ for size in $ALL_SIZES; do
 done
 echo "Quote editor DOM QA PASS: all required mobile sizes, tablet and desktop; mobile cards/custom date/no follow-up/modal/touch/overflow verified"
 
+for mode in support settings; do
+  for size in $MOBILE_SIZES; do
+    "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=4000 \
+      --dump-dom "http://127.0.0.1:5173/aux-mobile-fixture.html?mode=$mode" >/tmp/relanzio-aux-dom.html 2>/tmp/relanzio-aux-chromium.log
+    grep -q 'data-aux-qa="pass"' /tmp/relanzio-aux-dom.html || { cat /tmp/relanzio-aux-dom.html; echo "Aux mobile QA failed for $mode at $size" >&2; exit 1; }
+  done
+done
+echo "Support/settings mobile DOM QA PASS: all required mobile sizes, controls and overflow verified"
+
 for size in 390,844 1280,900; do
   "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=5000     --dump-dom 'http://127.0.0.1:5173/trial-fixture.html?qa=1' >/tmp/relanzio-trial-dom.html 2>/tmp/relanzio-trial-chromium.log
   grep -q 'data-trial-qa="pass"' /tmp/relanzio-trial-dom.html || { cat /tmp/relanzio-trial-dom.html; echo "Trial DOM QA failed at $size" >&2; exit 1; }
