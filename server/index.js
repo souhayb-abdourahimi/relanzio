@@ -198,6 +198,11 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
     ]);
     if (findError) throw findError; if (!existing) return res.status(404).json({error:'Devis introuvable.'});
     const patch={updated_at:nowIso()};
+    const claimTime=existing.send_claimed_at?new Date(existing.send_claimed_at).getTime():NaN;
+    const claimFresh=Number.isFinite(claimTime)&&claimTime>Date.now()-5*60_000;
+    const deliveryControlTouched=['status','followup_schedule_mode','next_followup_at','auto_send'].some(key=>key in req.body);
+    if(claimFresh&&deliveryControlTouched)return res.status(409).json({error:'Une relance est déjà en cours d’envoi. Attendez son résultat avant de modifier le statut ou le planning.'});
+    if(existing.send_claimed_at&&!claimFresh)patch.send_claimed_at=null;
     const allowedStatuses=['open','won','lost','paused'];
     const targetStatus='status' in req.body?String(req.body.status):existing.status;
     if(!allowedStatuses.includes(targetStatus))return res.status(400).json({error:'Statut invalide.'});
@@ -252,7 +257,19 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
   } catch(e) { await reportError('quotes.update',e,{request_id:req.requestId}); res.status(500).json({error:'Impossible de modifier le devis.',request_id:req.requestId}); }
 });
 app.delete('/api/quotes/:id', requireUser, async(req,res)=>{
-  try { const {data,error}=await db.from('quotes').delete().eq('id',req.params.id).eq('user_id',req.user.id).select('id').maybeSingle(); if(error)throw error; if(!data)return res.status(404).json({error:'Devis introuvable.'}); res.json({deleted:true}); } catch(e){await reportError('quotes.delete',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de supprimer le devis.',request_id:req.requestId});}
+  try {
+    const stale=new Date(Date.now()-5*60_000).toISOString();
+    const {data,error}=await db.from('quotes').delete().eq('id',req.params.id).eq('user_id',req.user.id)
+      .or(`send_claimed_at.is.null,send_claimed_at.lt.${stale}`).select('id').maybeSingle();
+    if(error)throw error;
+    if(!data){
+      const {data:existing,error:findError}=await db.from('quotes').select('id,send_claimed_at').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle();
+      if(findError)throw findError;
+      if(existing)return res.status(409).json({error:'Suppression impossible pendant l’envoi d’une relance. Réessayez après son résultat.'});
+      return res.status(404).json({error:'Devis introuvable.'});
+    }
+    res.json({deleted:true});
+  } catch(e){await reportError('quotes.delete',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de supprimer le devis.',request_id:req.requestId});}
 });
 app.get('/api/quotes/:id/followup-preview', requireUser, async(req,res)=>{
   try { const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]); if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});res.json({preview:await createFollowupPreview(quote,profile)}); } catch(e){if(e.message==='SEQUENCE_COMPLETE')return res.status(409).json({error:'Séquence terminée.'});await reportError('followup.preview',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de préparer la relance.',request_id:req.requestId});}
