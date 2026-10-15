@@ -35,6 +35,15 @@ for route in login signup; do
 done
 echo "Auth mobile DOM QA PASS: login/signup across all required mobile widths"
 
+for route in pricing docs faq contact legal privacy dpa terms; do
+  for size in 390,844 1280,900; do
+    "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=5000 \
+      --dump-dom "http://127.0.0.1:5173/$route?qa=1" >/tmp/relanzio-public-dom.html 2>/tmp/relanzio-public-chromium.log
+    grep -q 'data-public-qa="pass"' /tmp/relanzio-public-dom.html || { cat /tmp/relanzio-public-dom.html; echo "Public route QA failed for $route at $size" >&2; exit 1; }
+  done
+done
+echo "Public/legal route DOM QA PASS: pricing docs faq contact legal privacy dpa terms at 390x844 and 1280x900"
+
 for size in $ALL_SIZES; do
   "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=5000     --dump-dom 'http://127.0.0.1:5173/plans-fixture.html?qa=1' >/tmp/relanzio-plans-dom.html 2>/tmp/relanzio-plans-chromium.log
   grep -q 'data-plans-qa="pass"' /tmp/relanzio-plans-dom.html || { cat /tmp/relanzio-plans-dom.html; echo "Plans DOM QA failed at $size" >&2; exit 1; }
