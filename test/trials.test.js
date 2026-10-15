@@ -62,3 +62,16 @@ test('trial display exposes exact active state and end date',()=>{
   assert.match(display.endText,/21\/10\/2026/);
   assert.equal(display.upgradeLabel,'Passer à Pro — 29 €/mois');
 });
+
+
+test('active Stripe Pro takes display precedence over an overlapping managed trial',()=>{
+  const profile=withEntitlements({
+    plan:'pro',subscription_status:'active',
+    trial_started_at:'2026-10-14T00:00:00.000Z',trial_ends_at:'2026-10-21T00:00:00.000Z',trial_expired_at:null
+  },NOW);
+  assert.equal(profile.pro_access,true);
+  assert.equal(profile.is_paid_subscription,true);
+  assert.equal(profile.trial_active,false);
+  assert.equal(profile.trial_days_remaining,0);
+  assert.equal(trialDisplay(profile).visible,false);
+});
