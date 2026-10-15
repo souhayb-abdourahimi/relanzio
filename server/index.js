@@ -25,6 +25,7 @@ import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt } from './quote-rules.js';
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
+import { rowsToSemicolonCsv } from './export.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
@@ -348,11 +349,10 @@ app.get('/api/quotes/export.csv', requireUser, async(req,res)=>{
   try{
     const {data,error}=await db.from('quotes').select('client_name,client_email,title,amount,sent_at,status,followup_step,followup_schedule_mode,next_followup_at,created_at,updated_at').eq('user_id',req.user.id).order('created_at',{ascending:true});
     if(error)throw error;
-    const esc=v=>`"${String(v??'').replaceAll('"','""')}"`;
     const header=['client_name','client_email','title','amount','sent_at','status','followup_step','followup_schedule_mode','next_followup_at','created_at','updated_at'];
-    const csv=[header.join(';'),...(data||[]).map(row=>header.map(k=>esc(row[k])).join(';'))].join('\n');
+    const csv=rowsToSemicolonCsv(data||[],header);
     res.type('text/csv; charset=utf-8').setHeader('Content-Disposition','attachment; filename="relanzio-devis.csv"');
-    res.send('\uFEFF'+csv);
+    res.send(csv);
   }catch(e){await reportError('quotes.export',e,{request_id:req.requestId});res.status(500).json({error:'Impossible d’exporter les devis.',request_id:req.requestId})}
 });
 
