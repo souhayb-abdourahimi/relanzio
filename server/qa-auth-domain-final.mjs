@@ -92,7 +92,8 @@ async function makeUser(label){
 }
 async function cleanup(u){if(u?.id)try{await db.auth.admin.deleteUser(u.id,false)}catch{}}
 async function cleanupStaleQaUsers(){
-  const {data,error}=await db.from('profiles').select('id,email').like('email','relanzio-cert-%@example.com').limit(200);
+  const cutoff=new Date(Date.now()-60*60*1000).toISOString();
+  const {data,error}=await db.from('profiles').select('id,email,created_at').like('email','relanzio-cert-%@example.com').lt('created_at',cutoff).limit(200);
   if(error)throw error;
   let removed=0;
   for(const row of data||[]){
