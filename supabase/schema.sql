@@ -9,7 +9,7 @@ create table if not exists public.profiles (
   email_mode text not null default 'review' check (email_mode in ('review','automatic')),
   onboarding_completed boolean not null default false,
   marketing_opt_in boolean not null default false,
-  activated_at timestamptz, stripe_customer_id text unique, stripe_subscription_id text, checkout_claimed_at timestamptz,
+  activated_at timestamptz, stripe_customer_id text unique, stripe_subscription_id text, stripe_state_event_created bigint not null default 0, checkout_claimed_at timestamptz,
   trial_started_at timestamptz, trial_ends_at timestamptz, trial_expired_at timestamptz,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
