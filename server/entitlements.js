@@ -29,7 +29,7 @@ export function hasProAccess(profile={}, now=new Date()) {
 }
 
 export function trialDaysRemaining(profile={}, now=new Date()) {
-  if(!isManagedTrialActive(profile,now))return 0;
+  if(hasSubscriptionProAccess(profile)||!isManagedTrialActive(profile,now))return 0;
   const current=now instanceof Date?now.getTime():new Date(now).getTime();
   return Math.max(1,Math.ceil((new Date(profile.trial_ends_at).getTime()-current)/DAY_MS));
 }
@@ -43,8 +43,9 @@ function normalizeTrialSubscriptionStatus(status=''){
 }
 
 export function withEntitlements(profile={}, now=new Date()) {
-  const trialActive=isManagedTrialActive(profile,now);
-  const proAccess=hasProAccess(profile,now);
+  const subscriptionPro=hasSubscriptionProAccess(profile);
+  const trialActive=!subscriptionPro&&isManagedTrialActive(profile,now);
+  const proAccess=subscriptionPro||trialActive;
   return {
     ...profile,
     pro_access:proAccess,
