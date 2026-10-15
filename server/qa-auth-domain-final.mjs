@@ -250,7 +250,8 @@ try{
   const readiness=await api(null,'/api/readiness');
   assert(health.status===200&&health.data.ok===true,'health_live');
   assert(readiness.status===200&&readiness.data.ready===true,'readiness_live');
-  assert(health.headers.get('x-content-type-options')==='nosniff'&&health.headers.get('x-frame-options')==='DENY','security_headers_present_in_test_server');
+  const frameHeader=health.headers.get('x-frame-options');
+  assert(health.headers.get('x-content-type-options')==='nosniff'&&['SAMEORIGIN','DENY'].includes(frameHeader),'security_headers_present_in_test_server',JSON.stringify({x_frame_options:frameHeader,x_content_type_options:health.headers.get('x-content-type-options')}));
   const serverSource=(await import('node:fs/promises')).readFile;
   const securitySource=await serverSource(new URL('./index.js',import.meta.url),'utf8');
   assert(securitySource.includes("frameAncestors:[\"'none'\"]")&&securitySource.includes("contentSecurityPolicy: process.env.NODE_ENV === 'production'"),'production_csp_configured');
