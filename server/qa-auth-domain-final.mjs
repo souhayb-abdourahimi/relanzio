@@ -112,18 +112,18 @@ try{
   const duplicate=await api(userA.token,'/api/quotes',{method:'POST',body:quotePayload,headers:{'Idempotency-Key':idem}});
   assert(duplicate.status===200&&duplicate.data.idempotent===true&&duplicate.data.quote?.id===q.id,'quote_idempotency');
 
-  const unrelated=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{title:'Objet modifié sans toucher au planning'}});
+  const unrelated=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{title:'Objet modifié sans toucher au planning'}});
   assert(unrelated.status===200&&unrelated.data.quote.next_followup_at===q.next_followup_at&&unrelated.data.quote.followup_schedule_mode==='custom','custom_date_survives_unrelated_edit');
 
-  const paused=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{status:'paused'}});
+  const paused=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{status:'paused'}});
   assert(paused.status===200&&paused.data.quote.next_followup_at===q.next_followup_at&&paused.data.quote.auto_send===false,'pause_preserves_date_and_stops_auto');
-  const previewPaused=await api(userA.token,'/api/quotes/'+q.id+'/followup-preview');
+  const previewPaused=await api(userA.token,'/api/quotes/'+claimedQuote.id+'/followup-preview');
   assert(previewPaused.status===409,'pause_blocks_followup_preview');
-  const resumed=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{status:'open'}});
+  const resumed=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{status:'open'}});
   assert(resumed.status===200&&resumed.data.quote.next_followup_at===q.next_followup_at,'resume_preserves_custom_date');
-  const none=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'none'}});
+  const none=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{followup_schedule_mode:'none'}});
   assert(none.status===200&&none.data.quote.next_followup_at===null,'none_schedule_clears_next');
-  const recommended=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'recommended'}});
+  const recommended=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{followup_schedule_mode:'recommended'}});
   assert(recommended.status===200&&Boolean(recommended.data.quote.next_followup_at),'resume_recommended_schedule');
 
   for(let i=0;i<3;i++){
@@ -154,19 +154,76 @@ try{
   const trialAgain=await api(userA.token,'/api/trial/start',{method:'POST',body:{}});
   assert(trialAgain.status===409,'trial_one_time_only');
 
-  const own=await userA.client.from('quotes').select('id').eq('id',q.id);
+  const profileRefresh=await api(userA.token,'/api/profile');
+  assert(profileRefresh.status===200&&profileRefresh.data.profile?.trial_active===true&&profileRefresh.data.profile?.trial_days_remaining===7,'trial_survives_refresh');
+
+  const oldSessionToken=userA.token;
+  const signOut=await userA.client.auth.signOut();
+  assert(!signOut.error,'client_logout');
+  const emptySession=await userA.client.auth.getSession();
+  assert(!emptySession.data.session,'client_session_cleared_after_logout');
+  const signBack=await userA.client.auth.signInWithPassword({email:userA.email,password:userA.password});
+  assert(!signBack.error&&Boolean(signBack.data.session),'client_login_after_logout');
+  userA.token=signBack.data.session.access_token;
+  const profileAfterLogin=await api(userA.token,'/api/profile');
+  assert(profileAfterLogin.status===200&&profileAfterLogin.data.profile?.trial_active===true,'trial_survives_logout_login');
+
+  const {count:activeBeforeProSeed,error:activeBeforeError}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',userA.id).in('status',['open','paused']);
+  if(activeBeforeError)throw activeBeforeError;
+  const toSeed=Math.max(0,99-(activeBeforeProSeed||0));
+  if(toSeed){
+    const bulk=Array.from({length:toSeed},(_,i)=>({
+      user_id:userA.id,client_name:'Pro QA '+i,client_email:'proqa+'+i+'@example.com',title:'Quota Pro '+i,amount:29,
+      sent_at:sentAt,status:'open',auto_send:false,followup_step:0,followup_schedule_mode:'none',next_followup_at:null
+    }));
+    const {error:bulkError}=await db.from('quotes').insert(bulk);
+    if(bulkError)throw bulkError;
+  }
+  const hundredth=await api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Centième',client_email:'pro100@example.com',title:'100e devis actif',amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-pro-100-'+stamp}});
+  assert(hundredth.status===201,'pro_quota_allows_100th','HTTP '+hundredth.status);
+  const hundredFirst=await api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Cent unième',client_email:'pro101@example.com',title:'101e devis actif',amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-pro-101-'+stamp}});
+  assert(hundredFirst.status===403,'pro_quota_blocks_101st','HTTP '+hundredFirst.status);
+
+  const {error:expireSeedError}=await db.from('profiles').update({trial_ends_at:new Date(Date.now()-60_000).toISOString(),trial_expired_at:null,plan:'pro'}).eq('id',userA.id);
+  if(expireSeedError)throw expireSeedError;
+  const expiredProfile=await api(userA.token,'/api/profile');
+  assert(expiredProfile.status===200&&expiredProfile.data.profile?.effective_plan==='free'&&expiredProfile.data.profile?.trial_active===false&&expiredProfile.data.profile?.trial_days_remaining===0,'trial_expiration_returns_free');
+  const {count:quotesAfterExpiry,error:quotesAfterExpiryError}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',userA.id);
+  if(quotesAfterExpiryError)throw quotesAfterExpiryError;
+  assert((quotesAfterExpiry||0)>=100,'trial_expiry_keeps_quote_data','count='+quotesAfterExpiry);
+  const blockedAfterDowngrade=await api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Après downgrade',client_email:'blocked@example.com',title:'Doit être bloqué',amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-downgrade-block-'+stamp}});
+  assert(blockedAfterDowngrade.status===403,'downgrade_over_free_quota_blocks_new_create');
+  const closeAfterDowngrade=await api(userA.token,'/api/quotes/'+hundredth.data.quote.id,{method:'PATCH',body:{status:'lost'}});
+  assert(closeAfterDowngrade.status===200,'downgrade_allows_close');
+  const deleteAfterDowngrade=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'DELETE'});
+  assert(deleteAfterDowngrade.status===200,'downgrade_allows_delete');
+  const reopenAfterDowngrade=await api(userA.token,'/api/quotes/'+hundredth.data.quote.id,{method:'PATCH',body:{status:'open'}});
+  assert(reopenAfterDowngrade.status===403,'downgrade_blocks_reopen_over_free_quota');
+  const thirdTrial=await api(userA.token,'/api/trial/start',{method:'POST',body:{}});
+  assert(thirdTrial.status===409,'expired_trial_cannot_restart');
+
+  const claimedQuote=(await db.from('quotes').select('*').eq('user_id',userA.id).eq('status','open').limit(1).single()).data;
+  if(!claimedQuote)throw new Error('claimed quote missing');
+  const {error:claimSeedError}=await db.from('quotes').update({send_claimed_at:new Date().toISOString()}).eq('id',claimedQuote.id);
+  if(claimSeedError)throw claimSeedError;
+  const pauseDuringSend=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{status:'paused'}});
+  const deleteDuringSend=await api(userA.token,'/api/quotes/'+claimedQuote.id,{method:'DELETE'});
+  assert(pauseDuringSend.status===409&&deleteDuringSend.status===409,'inflight_followup_blocks_pause_and_delete');
+  await db.from('quotes').update({send_claimed_at:null}).eq('id',claimedQuote.id);
+
+  const own=await userA.client.from('quotes').select('id').eq('id',claimedQuote.id);
   assert(!own.error&&own.data?.length===1,'rls_owner_reads_own_quote');
-  const cross=await userB.client.from('quotes').select('id').eq('id',q.id);
+  const cross=await userB.client.from('quotes').select('id').eq('id',claimedQuote.id);
   assert(!cross.error&&cross.data?.length===0,'rls_cross_user_quote_read_blocked');
   const crossProfile=await userB.client.from('profiles').select('id').eq('id',userA.id);
   assert(!crossProfile.error&&crossProfile.data?.length===0,'rls_cross_user_profile_read_blocked');
-  const directWrite=await userA.client.from('quotes').update({title:'Direct browser write'}).eq('id',q.id).select('id');
+  const directWrite=await userA.client.from('quotes').update({title:'Direct browser write'}).eq('id',claimedQuote.id).select('id');
   assert(Boolean(directWrite.error)||(directWrite.data||[]).length===0,'browser_direct_quote_write_blocked');
   const adminRead=await userA.client.from('prospects').select('id').limit(1);
   assert(Boolean(adminRead.error)||(adminRead.data||[]).length===0,'browser_admin_table_read_blocked');
 
-  const idorPatch=await api(userB.token,'/api/quotes/'+q.id,{method:'PATCH',body:{title:'Cross user'}});
-  const idorDelete=await api(userB.token,'/api/quotes/'+q.id,{method:'DELETE'});
+  const idorPatch=await api(userB.token,'/api/quotes/'+claimedQuote.id,{method:'PATCH',body:{title:'Cross user'}});
+  const idorDelete=await api(userB.token,'/api/quotes/'+claimedQuote.id,{method:'DELETE'});
   assert(idorPatch.status===404&&idorDelete.status===404,'api_idor_update_delete_blocked');
 
   const adminRoute=await api(userA.token,'/api/admin/prospects');
@@ -175,6 +232,10 @@ try{
   const supportEmpty=await api(userA.token,'/api/support/tickets',{method:'POST',body:{subject:'',message:''}});
   const supportOk=await api(userA.token,'/api/support/tickets',{method:'POST',body:{subject:'Question QA éè',message:'Message de certification avec caractères spéciaux.',topic:'product'}});
   assert(supportEmpty.status===400&&supportOk.status===201,'support_validation_and_create');
+  const crossTicket=await userB.client.from('support_tickets').select('id').eq('id',supportOk.data.ticket.id);
+  assert(!crossTicket.error&&crossTicket.data?.length===0,'rls_cross_user_ticket_read_blocked');
+  const directTicketWrite=await userB.client.from('support_tickets').update({subject:'forbidden'}).eq('id',supportOk.data.ticket.id).select('id');
+  assert(Boolean(directTicketWrite.error)||(directTicketWrite.data||[]).length===0,'browser_cross_user_ticket_write_blocked');
 
   const exp=await api(userA.token,'/api/account/export');
   const csv=await api(userA.token,'/api/quotes/export.csv');
@@ -200,6 +261,13 @@ try{
   assert(deleted.status===200&&deleted.data.deleted===true,'account_delete');
   const oldToken=await api(userB.token,'/api/profile');
   assert(oldToken.status===401,'deleted_account_old_token_rejected');
+  const residue={};
+  for(const table of ['profiles','quotes','followups','product_events','support_tickets','trial_events','lifecycle_messages']){
+    const column=table==='profiles'?'id':'user_id';
+    const {count,error}=await db.from(table).select('*',{count:'exact',head:true}).eq(column,userB.id);
+    if(error)throw error; residue[table]=count||0;
+  }
+  assert(Object.values(residue).every(v=>v===0),'account_delete_cascades_user_data',JSON.stringify(residue));
 
   const summary={ok:true,count:results.length,results};
   console.log('AUTH_DOMAIN_QA='+JSON.stringify(summary));
