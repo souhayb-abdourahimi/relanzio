@@ -241,7 +241,7 @@ test('prospect import preserves sector and deduplicates by normalized email',()=
 test('production SPA fallback serves only known routes and 404s scanner paths',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
   assert.match(server,/const spaRoutes=new Set\(\[/);
-  assert.match(server,/\/wp-admin/)?null:null;
+  assert.doesNotMatch(server,/\/wp-admin/);
   assert.match(server,/res\.status\(404\)\.type\('text\/plain'\)\.send\('Not found'\)/);
   assert.match(server,/spaRoutes\.has\(req\.path\)/);
 });
