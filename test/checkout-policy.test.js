@@ -27,3 +27,21 @@ test('checkout idempotency key is per claimed attempt and configuration',()=>{
   assert.notEqual(a,changed);
   assert.notEqual(a,later);
 });
+
+
+test('regression: Checkout without card payment method is never reusable',()=>{
+  const fp=checkoutConfigFingerprint({priceId:'price_29',appUrl:'https://relanzio.com'});
+  assert.equal(isReusableCheckoutSession({status:'open',mode:'subscription',url:'https://checkout.stripe.test/old',payment_method_types:[],metadata:{checkout_config:fp}},fp),false);
+});
+
+test('regression: old open Checkout session with obsolete configuration is never reused',()=>{
+  const current=checkoutConfigFingerprint({priceId:'price_29',appUrl:'https://relanzio.com'});
+  assert.equal(isReusableCheckoutSession({status:'open',mode:'subscription',url:'https://checkout.stripe.test/old',payment_method_types:['card'],metadata:{checkout_config:'legacy'}},current),false);
+});
+
+test('regression: changed Checkout parameters generate a different idempotency namespace',()=>{
+  const first=checkoutConfigFingerprint({priceId:'price_29',appUrl:'https://relanzio.com'});
+  const changed=checkoutConfigFingerprint({priceId:'price_30',appUrl:'https://relanzio.com'});
+  const when='2026-10-15T10:00:00Z';
+  assert.notEqual(checkoutIdempotencyKey({userId:'u1',fingerprint:first,claimedAt:when}),checkoutIdempotencyKey({userId:'u1',fingerprint:changed,claimedAt:when}));
+});
