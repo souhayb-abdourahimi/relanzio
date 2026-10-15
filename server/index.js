@@ -202,10 +202,14 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
     if(!allowedStatuses.includes(targetStatus))return res.status(400).json({error:'Statut invalide.'});
 
     if(isActiveQuoteStatus(targetStatus)&&!isActiveQuoteStatus(existing.status)){
-      const {count,error:countError}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',req.user.id).in('status',['open','paused']);
-      if(countError)throw countError;
       const limit=activeQuoteLimit(hasProAccess(profile));
-      if((count||0)>=limit)return res.status(403).json({error:`Impossible de réactiver ce devis : votre formule est limitée à ${limit} devis actifs.`});
+      const {data:reopened,error:reopenError}=await db.rpc('reopen_quote_with_quota',{p_user_id:req.user.id,p_quote_id:existing.id,p_limit:limit,p_target_status:targetStatus});
+      if(reopenError?.message?.startsWith('ACTIVE_QUOTE_LIMIT:'))return res.status(403).json({error:`Impossible de réactiver ce devis : votre formule est limitée à ${limit} devis actifs.`});
+      if(reopenError)throw reopenError;
+      if(!reopened?.found)return res.status(404).json({error:'Devis introuvable.'});
+      existing.status=targetStatus;
+      existing.won_at=null;
+      existing.auto_send=false;
     }
 
     const sentDate='sent_at' in req.body?parseSentDate(req.body.sent_at):existing.sent_at;
