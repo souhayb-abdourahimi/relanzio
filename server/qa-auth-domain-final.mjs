@@ -77,7 +77,7 @@ async function makeUser(label){
 }
 async function cleanup(u){if(u?.id)try{await db.auth.admin.deleteUser(u.id,false)}catch{}}
 async function checkRedirects(){
-  const email='relanzio-cert-link-'+stamp+'@example.com',password='Qa!'+randomBytes(16).toString('base64url');
+  const email='relanzio-cert-link-'+stamp+'@example.com',password='Qa!'+randomBytes(16).toString('base64url'),newPassword='Qa!'+randomBytes(18).toString('base64url');
   let id;
   try{
     const signup=await db.auth.admin.generateLink({type:'signup',email,password,options:{redirectTo:publicApp+'/'}});
@@ -85,11 +85,34 @@ async function checkRedirects(){
     const redirect=new URL(signup.data.properties.action_link).searchParams.get('redirect_to')||'';
     const loc=safeLocation(redirect);
     assert(loc.origin===publicApp&&loc.path==='/', 'auth_signup_redirect_final_domain');
-    if(id)await db.auth.admin.updateUserById(id,{email_confirm:true});
+    const signupClient=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+    const confirmed=await signupClient.auth.verifyOtp({token_hash:signup.data.properties.hashed_token,type:'signup'});
+    assert(!confirmed.error&&Boolean(confirmed.data.session),'auth_confirmation_link_works');
+
+    const loginAfterConfirm=await signupClient.auth.signInWithPassword({email,password});
+    assert(!loginAfterConfirm.error&&Boolean(loginAfterConfirm.data.session),'auth_login_after_confirmation');
+
     const recovery=await db.auth.admin.generateLink({type:'recovery',email,options:{redirectTo:publicApp+'/reset-password'}});
     if(recovery.error)throw recovery.error;
     const rloc=safeLocation(new URL(recovery.data.properties.action_link).searchParams.get('redirect_to')||'');
     assert(rloc.origin===publicApp&&rloc.path==='/reset-password','auth_recovery_redirect_final_domain');
+    const recoveryClient=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+    const recovered=await recoveryClient.auth.verifyOtp({token_hash:recovery.data.properties.hashed_token,type:'recovery'});
+    assert(!recovered.error&&Boolean(recovered.data.session),'auth_recovery_link_works');
+    const changed=await recoveryClient.auth.updateUser({password:newPassword});
+    assert(!changed.error,'auth_password_reset_updates_password');
+    await recoveryClient.auth.signOut();
+
+    const oldLogin=await recoveryClient.auth.signInWithPassword({email,password});
+    assert(Boolean(oldLogin.error),'auth_old_password_rejected_after_reset');
+    const newLogin=await recoveryClient.auth.signInWithPassword({email,password:newPassword});
+    assert(!newLogin.error&&Boolean(newLogin.data.session),'auth_new_password_accepted_after_reset');
+
+    const reused=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+    const reuseResult=await reused.auth.verifyOtp({token_hash:recovery.data.properties.hashed_token,type:'recovery'});
+    assert(Boolean(reuseResult.error),'auth_recovery_link_single_use');
+    const invalidResult=await reused.auth.verifyOtp({token_hash:'0'.repeat(64),type:'recovery'});
+    assert(Boolean(invalidResult.error),'auth_invalid_or_expired_recovery_rejected');
   }finally{if(id)try{await db.auth.admin.deleteUser(id,false)}catch{}}
 }
 
