@@ -1,14 +1,33 @@
-import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'node:crypto';
 
 const stamp=Date.now(),results=[];
-let userA,userB,server,local,app;
+let userA,userB,server,local,app,db,createClient;
 const publicApp=(process.env.APP_URL||'https://relanzio.com').replace(/\/$/,'');
-const db=createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
-async function qaEvent(level,message,metadata={}){try{await db.from('system_events').insert({level,scope:'certification_predeploy',message,metadata:{stamp,...metadata}})}catch{}}
-await qaEvent('info','AUTH_DOMAIN_QA_START',{app_url:publicApp,node_env_before:process.env.NODE_ENV||null});
+const supabaseUrl=String(process.env.SUPABASE_URL||'').replace(/\/$/,'');
+const serviceKey=String(process.env.SUPABASE_SERVICE_ROLE_KEY||'');
+
+async function rawQaEvent(level,message,metadata={}){
+  if(!supabaseUrl||!serviceKey)return false;
+  try{
+    const r=await fetch(supabaseUrl+'/rest/v1/system_events',{
+      method:'POST',
+      headers:{apikey:serviceKey,authorization:'Bearer '+serviceKey,'content-type':'application/json',prefer:'return=minimal'},
+      body:JSON.stringify({level,scope:'certification_predeploy',message,metadata:{stamp,...metadata}})
+    });
+    return r.ok;
+  }catch{return false}
+}
+async function qaEvent(level,message,metadata={}){
+  if(db){try{await db.from('system_events').insert({level,scope:'certification_predeploy',message,metadata:{stamp,...metadata}});return true}catch{}}
+  return rawQaEvent(level,message,metadata);
+}
+
+await rawQaEvent('info','AUTH_DOMAIN_QA_NATIVE_START',{app_url:publicApp,node_env_before:process.env.NODE_ENV||null,has_url:Boolean(supabaseUrl),has_service_key:Boolean(serviceKey)});
 process.env.NODE_ENV='test';
 try{
+  ({createClient}=await import('@supabase/supabase-js'));
+  db=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  await qaEvent('info','AUTH_DOMAIN_QA_CLIENT_OK');
   ({default:app}=await import('./index.js'));
   await qaEvent('info','AUTH_DOMAIN_QA_IMPORT_OK');
   server=app.listen(0,'127.0.0.1');
