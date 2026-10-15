@@ -138,7 +138,7 @@ try{
 
   const trial=await api(userA.token,'/api/trial/start',{method:'POST',body:{}});
   const t0=new Date(trial.data?.profile?.trial_started_at||0).getTime(),t1=new Date(trial.data?.profile?.trial_ends_at||0).getTime();
-  assert(trial.status===201&&trial.data.profile?.pro_access===true&&t1-t0===7*24*3600000,'self_service_trial_exact_7d');
+  assert(trial.status===201&&trial.data.profile?.pro_access===true&&t1-t0===7*24*3600000,'self_service_trial_exact_7d',JSON.stringify({status:trial.status,pro_access:trial.data.profile?.pro_access,trial_started_at:trial.data.profile?.trial_started_at,trial_ends_at:trial.data.profile?.trial_ends_at,span_ms:t1-t0,body:trial.data?.error||null}));
   const trialAgain=await api(userA.token,'/api/trial/start',{method:'POST',body:{}});
   assert(trialAgain.status===409,'trial_one_time_only');
 
@@ -198,4 +198,5 @@ try{
 }finally{
   await cleanup(userA);await cleanup(userB);
   if(server?.listening)await new Promise(resolve=>server.close(resolve));
+  process.exit(process.exitCode||0);
 }
