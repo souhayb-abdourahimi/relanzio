@@ -26,6 +26,7 @@ import { safeImportCommercialProspects, prepareCommercialProspect, inspectCommer
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { pollImapReplies } from './imap-replies.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt } from './quote-rules.js';
+import { shouldArmInitialAutoSend } from './followup-policy.js';
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 import { rowsToSemicolonCsv } from './export.js';
 
@@ -203,7 +204,7 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
     if(requestedMode==='recommended')nextFollowupAt=nextDate(parsedDate,0);
     if(requestedMode==='custom'){nextFollowupAt=parseCustomFollowupAt(req.body.next_followup_at);if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});}
     const requestedAutoSend=requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'&&Boolean(auto_send);
-    const safeAutoSend=requestedAutoSend&&Boolean(nextFollowupAt)&&new Date(nextFollowupAt).getTime()>Date.now();
+    const safeAutoSend=shouldArmInitialAutoSend(requestedAutoSend,nextFollowupAt);
     const {data:created,error:createError}=await db.rpc('create_quote_with_quota',{
       p_user_id:req.user.id,
       p_limit:limit,
