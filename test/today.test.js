@@ -12,11 +12,12 @@ test('Today groups overdue, today, future and terminal decisions',()=>{
     q('today','2026-10-16T16:00:00.000Z',1),
     q('future','2026-10-20T07:00:00.000Z',2),
     q('terminal',null,3),
+    q('terminal-later','2026-10-22T07:00:00.000Z',3),
     q('paused','2026-10-14T07:00:00.000Z',0,'paused')
   ],now);
   assert.deepEqual(groups.overdue.map(x=>x.id),['late-2','late-1']);
   assert.deepEqual(groups.today.map(x=>x.id),['terminal','today']);
-  assert.deepEqual(groups.future.map(x=>x.id),['future']);
+  assert.deepEqual(groups.future.map(x=>x.id),['future','terminal-later']);
   assert.equal(groups.overdue[0].action_meta.daysOverdue,2);
   assert.equal(actionStageLabel(groups.today[0]),'Séquence terminée — décision requise');
   assert.equal(actionStageLabel(groups.today[1]),'Relance 2/3');
