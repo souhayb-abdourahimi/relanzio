@@ -1,4 +1,8 @@
 import 'dotenv/config';
+import { createPilotRouter, pilotPageGate } from './maintenance-pilot/routes.js';
+import { pilotConfig } from './maintenance-pilot/config.js';
+import { pilotRepository } from './maintenance-pilot/repository.js';
+import { isPilotEvent } from './maintenance-pilot/billing.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -38,11 +42,17 @@ async function profileByCustomer(customerId) {
   return data;
 }
 
+// Isolated pilot router owns its parsers; disabled by default, no startup DB access.
+const maintenanceConfig = pilotConfig();
+app.use('/api/maintenance-pilot', createPilotRouter({repo:pilotRepository(db),requireUser,config:maintenanceConfig}));
+app.get('/rappel-entretien', pilotPageGate(maintenanceConfig));
+
 // Raw body must come before express.json.
 app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async (req,res)=>{
   if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe not configured');
   try {
     const event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
+    if (isPilotEvent(event)) return res.json({received:true,ignored:'maintenance_pilot'});
     const obj = event.data.object;
     if (event.type === 'checkout.session.completed') {
       const userId = obj.metadata?.user_id; const customerId = typeof obj.customer === 'string' ? obj.customer : obj.customer?.id; const transition=billingTransition(event.type,obj);
