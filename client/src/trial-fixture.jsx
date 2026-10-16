@@ -11,7 +11,7 @@ function Fixture(){
     if(!qa)return;
     setTimeout(()=>{
       const banner=document.querySelector('.trial-banner');
-      const button=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Passer à Pro — 29 €/mois');
+      const button=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Passer à Pro — 29 € / mois');
       const text=banner?.textContent||'';
       const r=button?.getBoundingClientRect();
       const mobile=window.innerWidth<=760;
