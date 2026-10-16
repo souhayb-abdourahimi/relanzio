@@ -24,6 +24,7 @@ import { processOutreachQueue, outreachHealth } from './outreach.js';
 import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
 import { safeImportCommercialProspects, prepareCommercialProspect, inspectCommercialOutreach, sendCommercialJ0, ingestBrevoInbound } from './controlled-outreach.js';
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
+import { pollImapReplies } from './imap-replies.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt } from './quote-rules.js';
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 import { rowsToSemicolonCsv } from './export.js';
@@ -536,6 +537,7 @@ app.post('/api/cron/run', async(req,res)=>{if(!safeEqual(String(req.headers['x-c
 cron.schedule('*/15 * * * *',async()=>{try{await runDueFollowups()}catch(e){await reportError('cron.followups',e)}},{noOverlap:true});
 cron.schedule('2,17,32,47 * * * *',async()=>{try{await expireTrials()}catch(e){await reportError('cron.trials',e)}},{noOverlap:true});
 cron.schedule('*/10 * * * *',async()=>{try{const result=await processOutreachQueue();if(result?.error)await reportError('cron.outreach.result',new Error(result.error),{queue_id:result.queue_id})}catch(e){await reportError('cron.outreach',e)}},{noOverlap:true});
+cron.schedule('*/10 * * * *',async()=>{try{await pollImapReplies()}catch(e){await reportError('cron.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})}},{noOverlap:true});
 cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
 
 app.use((err,req,res,next)=>{
@@ -547,6 +549,7 @@ process.on('unhandledRejection',e=>reportError('process.unhandledRejection',e));
 process.on('uncaughtException',e=>{reportError('process.uncaughtException',e).finally(()=>process.exit(1));});
 
 expireTrials().catch(e=>reportError('startup.trials',e));
+pollImapReplies().catch(e=>reportError('startup.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'}));
 
 if(process.env.NODE_ENV==='production'){
   app.use(express.static(dist,{maxAge:'1h',etag:true}));
