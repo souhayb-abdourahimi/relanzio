@@ -16,7 +16,7 @@ const parisBoundaryDate=day(2);
 const assert=(v,m)=>{if(!v)throw new Error(m)};
 
 async function cleanup(){
-  await db.from('outreach_daily_slots').delete().in('business_date',[concurrencyDate,failureDate,parisBoundaryDate,day(3)]);
+  await db.from('outreach_daily_slots').delete().in('business_date',[concurrencyDate,failureDate,parisBoundaryDate,day(3),'2100-01-15','2100-01-16']);
   const {data:prospects}=await db.from('prospects').select('id,email').like('email','qa.outreach.safety.%@'+qaDomain);
   const ids=(prospects||[]).map(x=>x.id);
   if(ids.length){
@@ -54,8 +54,9 @@ try{
   assert(!twentyOne.error&&twentyOne.data?.allowed===false&&twentyOne.data?.reason==='daily_cap','twenty_first_not_blocked');
 
   // Paris calendar boundary, not rolling 24 hours.
-  const before=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-before-${stamp}`,p_queue_id:null,p_cap:20,p_now:parisBoundaryDate+'T22:59:00+00:00'});
-  const after=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-after-${stamp}`,p_queue_id:null,p_cap:20,p_now:parisBoundaryDate+'T23:01:00+00:00'});
+  const parisWinterDay='2100-01-15';
+  const before=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-before-${stamp}`,p_queue_id:null,p_cap:20,p_now:parisWinterDay+'T22:59:00+00:00'});
+  const after=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-after-${stamp}`,p_queue_id:null,p_cap:20,p_now:parisWinterDay+'T23:01:00+00:00'});
   assert(!before.error&&!after.error&&before.data.business_date!==after.data.business_date,'paris_day_boundary_failed');
 
   // Definite provider failure releases the reservation; ambiguous failure stays conservative.
