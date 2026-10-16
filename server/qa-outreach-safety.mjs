@@ -134,10 +134,12 @@ try{
   const ci=await db.rpc('safe_import_qualified_prospect',{p:{...base,email:contactedEmail,company_name:'QA contacted'}});
   const contactedUpdate=await db.from('prospects').update({status:'contacted',last_contacted_at:new Date().toISOString()}).eq('id',ci.data.id).select('id,last_contacted_at').single();
   assert(!contactedUpdate.error&&Boolean(contactedUpdate.data?.last_contacted_at),'contacted_seed_update_failed');
-  let contactedBlocked=false;
+  const contactedVerify=await db.from('prospects').select('id,status,last_contacted_at').eq('id',ci.data.id).single();
+  assert(!contactedVerify.error&&contactedVerify.data?.status==='contacted'&&Boolean(contactedVerify.data?.last_contacted_at),'contacted_seed_readback_failed');
+  let contactedBlocked=false,caught=null;
   try{await prepareCommercialProspect({prospectId:ci.data.id,personalization:'Votre site propose des demandes de devis.',subject:'Question sur vos devis'});}
-  catch(e){contactedBlocked=e.code==='COMMERCIAL_NOT_QUALIFIED'||e.code==='COMMERCIAL_ALREADY_CONTACTED';}
-  assert(contactedBlocked,'contacted_j0_not_blocked');
+  catch(e){caught={code:e?.code||null,message:e?.message||String(e)};contactedBlocked=e.code==='COMMERCIAL_NOT_QUALIFIED'||e.code==='COMMERCIAL_ALREADY_CONTACTED';}
+  assert(contactedBlocked,'contacted_j0_not_blocked '+JSON.stringify({row:contactedVerify.data,caught}));
 
   console.log('OUTREACH_SAFETY_QA_PASS '+JSON.stringify({
     import_idempotent:true,deleted_never_reimported:true,suppression_priority:true,
