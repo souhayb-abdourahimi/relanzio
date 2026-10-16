@@ -13,3 +13,15 @@ test('safe percentages and CEO funnel metrics',()=>{assert.equal(safePercentage(
 test('Brevo events map to internal events',()=>{assert.equal(mapBrevoEvent('hard_bounce'),'bounced');assert.equal(mapBrevoEvent('uniqueOpened'),'opened');assert.equal(mapBrevoEvent('unsubscribed'),'opt_out');assert.equal(mapBrevoEvent('unknown'),null)});
 test('support escalates sensitive topics',()=>{assert.equal(supportRoute('Je veux supprimer mes données').needs_human,true);assert.equal(supportRoute('Ma carte a été débitée').topic,'billing');assert.equal(supportRoute('Comment marche J+5 ?').needs_human,false)});
 test('product ideas require repeated evidence before CEO recommendation',()=>{const insights=[{requested_feature:'Gmail',confidence:.9},{requested_feature:'gmail',confidence:.8},{requested_feature:'Gmail',confidence:.7},{requested_feature:'SMS',confidence:.9}];const p=prioritizeProductIdeas(insights);assert.equal(p[0].feature,'gmail');assert.equal(p[0].requests,3);const m=buildCeoMetrics({signups:10,activated:3});assert.ok(weeklyRecommendations(m,insights).some(x=>x.includes('Gmail')||x.includes('gmail')))});
+
+test('due KPI follows the Paris Today view and includes terminal decisions',()=>{
+  const now=new Date('2026-10-16T08:00:00.000Z');
+  const m=quoteMetrics([
+    {status:'open',amount:100,followup_step:0,next_followup_at:'2026-10-16T16:00:00.000Z'},
+    {status:'open',amount:200,followup_step:3,next_followup_at:null},
+    {status:'open',amount:300,followup_step:3,next_followup_at:'2026-10-20T08:00:00.000Z'},
+    {status:'open',amount:400,followup_step:1,next_followup_at:'2026-10-15T08:00:00.000Z'},
+    {status:'paused',amount:500,followup_step:0,next_followup_at:'2026-10-15T08:00:00.000Z'}
+  ],now);
+  assert.equal(m.dueToday,3);
+});
