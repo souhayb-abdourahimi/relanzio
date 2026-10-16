@@ -133,6 +133,7 @@ export async function inspectCommercialOutreach(prospectId){
 }
 
 export async function sendCommercialJ0({prospectId,requestedBy}){
+  if(process.env.LEGAL_PAGES_APPROVED!=='true')throw commercialError('COMMERCIAL_LEGAL_GATE','Pages légales non approuvées.',423);
   if(process.env.COMMERCIAL_OUTREACH_SEND_ENABLED!=='true')throw commercialError('COMMERCIAL_SEND_DISABLED','Envoi commercial contrôlé désactivé.',423);
   const audit=await inspectCommercialOutreach(prospectId);
   const queueId=audit.queue.id;
