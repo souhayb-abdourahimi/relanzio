@@ -103,3 +103,79 @@ $$;
 
 revoke all on function public.confirm_manual_followup(uuid,uuid,integer,text,text,text,timestamptz) from public,anon,authenticated;
 grant execute on function public.confirm_manual_followup(uuid,uuid,integer,text,text,text,timestamptz) to service_role;
+
+
+create or replace function public.finalize_relanzio_followup(
+  p_followup_id uuid,
+  p_quote_id uuid,
+  p_user_id uuid,
+  p_expected_previous_step integer,
+  p_sent_at timestamptz,
+  p_provider_message_id text
+) returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_quote public.quotes%rowtype;
+  v_followup public.followups%rowtype;
+  v_next_step integer;
+  v_gap integer;
+  v_action_date date;
+  v_next_at timestamptz;
+  v_next_mode text;
+begin
+  select * into v_quote
+  from public.quotes
+  where id=p_quote_id and user_id=p_user_id
+  for update;
+  if not found then return jsonb_build_object('ok',false,'code','QUOTE_NOT_FOUND'); end if;
+
+  select * into v_followup
+  from public.followups
+  where id=p_followup_id and quote_id=p_quote_id and user_id=p_user_id
+  for update;
+  if not found then return jsonb_build_object('ok',false,'code','FOLLOWUP_NOT_FOUND'); end if;
+
+  if v_followup.status in ('sent','delivered','opened','clicked','bounced') then
+    return jsonb_build_object('ok',true,'idempotent',true,'quote',to_jsonb(v_quote),'followup',to_jsonb(v_followup));
+  end if;
+  if v_followup.status<>'draft' then return jsonb_build_object('ok',false,'code','FOLLOWUP_NOT_FINALIZABLE'); end if;
+  if v_quote.status<>'open' then return jsonb_build_object('ok',false,'code','QUOTE_NOT_OPEN'); end if;
+  if v_quote.followup_step<>p_expected_previous_step then return jsonb_build_object('ok',false,'code','FOLLOWUP_STEP_STALE'); end if;
+  if v_followup.step<>p_expected_previous_step+1 then return jsonb_build_object('ok',false,'code','FOLLOWUP_STEP_MISMATCH'); end if;
+
+  update public.followups
+  set status='sent',sent_at=p_sent_at,provider_message_id=p_provider_message_id,error=null,
+      business_date=(p_sent_at at time zone 'Europe/Paris')::date
+  where id=p_followup_id
+  returning * into v_followup;
+
+  v_next_step:=p_expected_previous_step+1;
+  if v_next_step>=3 then
+    v_next_at:=null; v_next_mode:='none';
+  elsif v_quote.followup_schedule_mode='none' then
+    v_next_at:=null; v_next_mode:='none';
+  else
+    v_gap:=case v_next_step when 1 then 3 when 2 then 5 else null end;
+    v_action_date:=(p_sent_at at time zone 'Europe/Paris')::date;
+    v_next_at:=(((v_action_date+v_gap)::date::timestamp + time '09:00') at time zone 'Europe/Paris');
+    v_next_mode:='recommended';
+  end if;
+
+  update public.quotes
+  set followup_step=v_next_step,
+      followup_schedule_mode=v_next_mode,
+      next_followup_at=v_next_at,
+      send_claimed_at=null,
+      updated_at=p_sent_at
+  where id=p_quote_id and user_id=p_user_id
+  returning * into v_quote;
+
+  return jsonb_build_object('ok',true,'idempotent',false,'quote',to_jsonb(v_quote),'followup',to_jsonb(v_followup));
+end;
+$$;
+
+revoke all on function public.finalize_relanzio_followup(uuid,uuid,uuid,integer,timestamptz,text) from public,anon,authenticated;
+grant execute on function public.finalize_relanzio_followup(uuid,uuid,uuid,integer,timestamptz,text) to service_role;
