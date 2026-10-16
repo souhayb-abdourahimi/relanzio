@@ -17,6 +17,22 @@ function commercialError(code,message,status=409){
   return error;
 }
 
+async function getBrevoInboundReadiness(){
+  if(!process.env.BREVO_API_KEY)return {ready:false,reason:'brevo_not_configured'};
+  const response=await fetch('https://api.brevo.com/v3/webhooks?type=inbound&sort=desc',{headers:{accept:'application/json','api-key':process.env.BREVO_API_KEY}});
+  if(!response.ok)return {ready:false,reason:'brevo_inbound_check_failed',status:response.status};
+  const payload=await response.json();
+  const webhooks=payload.webhooks||[];
+  const configured=webhooks.find(w=>
+    w.type==='inbound' &&
+    String(w.url||'').includes('/api/brevo/inbound') &&
+    Array.isArray(w.events) && w.events.includes('inboundEmailProcessed') &&
+    Array.isArray(w.headers) && w.headers.some(h=>String(h.key||'').toLowerCase()==='x-webhook-secret') &&
+    Boolean(w.domain)
+  );
+  return {ready:Boolean(configured),reason:configured?null:'inbound_webhook_missing',domain:configured?.domain||null,webhook_id:configured?.id||null};
+}
+
 export async function safeImportCommercialProspects(rows=[]){
   const results=[];
   for(const raw of rows.slice(0,1000)){
@@ -125,7 +141,9 @@ export async function inspectCommercialOutreach(prospectId){
   const personalization=nonEmpty[1]||'';
   const validation=validateCommercialJ0({subject:state.queue[0].subject,content,personalization});
   if(!validation.ok)throw commercialError('COMMERCIAL_J0_INVALID',validation.reasons.join(', '));
-  const [sender,health]=await Promise.all([getBrevoPilotSenderStatus(),outreachHealth()]);
+  const [sender,health,inbound]=await Promise.all([getBrevoPilotSenderStatus(),outreachHealth(),getBrevoInboundReadiness()]);
+  if(sender.domain_verified!==true||sender.domain_authenticated!==true)throw commercialError('COMMERCIAL_DOMAIN_NOT_AUTHENTICATED','Domaine Brevo non authentifié.',503);
+  if(!inbound.ready)throw commercialError('COMMERCIAL_INBOUND_NOT_READY','Ingestion des réponses entrantes non certifiée.',503);
   if(health.pause)throw commercialError('COMMERCIAL_DELIVERABILITY_PAUSE',health.reason||'deliverability_guard',503);
   const cap=commercialDailyCap(process.env.OUTREACH_DAILY_CAP);
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
@@ -137,7 +155,7 @@ export async function inspectCommercialOutreach(prospectId){
     ok:true,dry_run:true,
     prospect:{id:prospect.id,company_name:prospect.company_name,email:prospect.email,score:prospect.score,sector:prospect.sector,source_url:prospect.source_url},
     queue:{id:state.queue[0].id,status:state.queue[0].status,subject:state.queue[0].subject,scheduled_at:state.queue[0].scheduled_at},
-    sender,health,
+    sender,health,inbound,
     checks:{qualified:true,suppressed:false,prior_j0:false,prior_reply:false,ready:true,daily_cap:{used:count||0,cap}}
   };
 }
