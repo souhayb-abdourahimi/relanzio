@@ -127,7 +127,7 @@ test('production capabilities remain independently gated',()=>{
   const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
   assert.match(outreach,/ACQUISITION_ENABLED!=='true'/);
   assert.match(controlled,/COMMERCIAL_OUTREACH_SEND_ENABLED!=='true'/);
-  assert.match(server,/LEGAL_PAGES_APPROVED!=='true'/);
+  assert.match(controlled,/LEGAL_PAGES_APPROVED!=='true'/);
   assert.match(client,/VITE_BILLING_ENABLED==='true'/);
   assert.match(server,/FOLLOWUP_AUTOMATION_ENABLED==='true'/);
 });
