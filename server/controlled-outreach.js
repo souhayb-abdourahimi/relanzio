@@ -9,6 +9,14 @@ import { outreachHealth } from './outreach.js';
 
 export { COMMERCIAL_STOP_LINE, COMMERCIAL_SUBJECTS, commercialDailyCap, renderCommercialJ0, validateCommercialJ0 } from './controlled-outreach-policy.js';
 
+const iso=()=>new Date().toISOString();
+function commercialError(code,message,status=409){
+  const error=new Error(message);
+  error.code=code;
+  error.status=status;
+  return error;
+}
+
 export async function safeImportCommercialProspects(rows=[]){
   const results=[];
   for(const raw of rows.slice(0,1000)){
