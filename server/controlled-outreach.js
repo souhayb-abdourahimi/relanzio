@@ -6,7 +6,8 @@ import { analyzeReply, qualifyProspect } from './prospecting.js';
 import { getBrevoPilotSenderStatus } from './pilot-outreach.js';
 import { PILOT_SENDER } from './pilot-outreach-policy.js';
 import { outreachHealth } from './outreach.js';
-import { imapConfiguration } from './imap-replies.js';
+import { imapConfiguration, pollImapReplies } from './imap-replies.js';
+import { log } from './observability.js';
 
 export { COMMERCIAL_STOP_LINE, COMMERCIAL_SUBJECTS, commercialDailyCap, renderCommercialJ0, validateCommercialJ0 } from './controlled-outreach-policy.js';
 
@@ -227,4 +228,62 @@ export async function ingestBrevoInbound(payload={}){
     results.push(data);
   }
   return {processed:items.length,results};
+}
+
+
+function commercialSequenceQueueIds(){
+  return String(process.env.COMMERCIAL_SEQUENCE_QUEUE_IDS||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,20);
+}
+
+async function pauseCommercialSequence(reason){
+  const ids=commercialSequenceQueueIds();
+  if(ids.length){
+    await db.from('outreach_queue').update({status:'held',error:String(reason||'sequence_paused').slice(0,1000),updated_at:iso()})
+      .in('id',ids).eq('status','ready');
+  }
+  log('warn','outreach.commercial-sequence','Commercial sequence paused',{reason:String(reason||'sequence_paused').slice(0,200)});
+  return {paused:true,reason};
+}
+
+export async function runCommercialSequenceTick(){
+  if(process.env.COMMERCIAL_SEQUENCE_ENABLED!=='true')return {skipped:'sequence_disabled'};
+  const ids=commercialSequenceQueueIds();
+  if(!ids.length)return {skipped:'sequence_empty'};
+  const businessDate=String(process.env.COMMERCIAL_SEQUENCE_BUSINESS_DATE||'');
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const get=t=>parts.find(x=>x.type===t)?.value;
+  const parisDay=`${get('year')}-${get('month')}-${get('day')}`;
+  if(businessDate&&parisDay!==businessDate)return await pauseCommercialSequence('sequence_business_date_closed');
+
+  try{
+    const imap=await pollImapReplies();
+    if(imap?.connected!==true)return await pauseCommercialSequence('imap_not_operational');
+  }catch(error){
+    return await pauseCommercialSequence(`imap_error:${error?.code||'IMAP_POLL_FAILED'}`);
+  }
+
+  const startedAt=String(process.env.COMMERCIAL_SEQUENCE_STARTED_AT||'').trim();
+  let bounceQuery=db.from('outreach_events').select('id,created_at').eq('type','bounced').limit(1);
+  if(startedAt)bounceQuery=bounceQuery.gte('created_at',startedAt);
+  const {data:bounces,error:bounceError}=await bounceQuery;
+  if(bounceError)throw bounceError;
+  if((bounces||[]).length)return await pauseCommercialSequence('bounce_detected');
+
+  const health=await outreachHealth();
+  if(health.pause)return await pauseCommercialSequence(`deliverability:${health.reason||'guard'}`);
+
+  const {data:due,error:dueError}=await db.from('outreach_queue').select('id,prospect_id,scheduled_at,status')
+    .in('id',ids).eq('sequence_step',0).eq('status','ready').lte('scheduled_at',iso())
+    .order('scheduled_at',{ascending:true}).limit(1).maybeSingle();
+  if(dueError)throw dueError;
+  if(!due)return {skipped:'nothing_due'};
+
+  try{
+    const result=await sendCommercialJ0({prospectId:due.prospect_id,requestedBy:'commercial_sequence_2026-10-16'});
+    log('info','outreach.commercial-sequence','Commercial J0 sent',{queue_id:due.id,prospect_id:due.prospect_id,sent_at:result.sent_at,provider_message_id:result.provider_message_id});
+    return result;
+  }catch(error){
+    await pauseCommercialSequence(`send_error:${error?.code||'COMMERCIAL_SEND_FAILED'}`);
+    throw error;
+  }
 }
