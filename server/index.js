@@ -419,13 +419,13 @@ app.post('/api/brevo/webhook', async(req,res)=>{
       const {data:pEvent,error:pEventError}=await db.from('outreach_events').select('prospect_id').eq('provider_message_id',messageId).order('created_at',{ascending:false}).limit(1).maybeSingle();if(pEventError)throw pEventError;
       if(pEvent)await mustDb(db.from('outreach_events').insert({prospect_id:pEvent.prospect_id,type,provider_message_id:messageId,metadata:req.body}));
     }
-    if(type==='opt_out'&&email){await mustDb(db.from('suppressions').upsert({email,reason:'provider_unsubscribe'}));await mustDb(db.from('prospects').update({status:'suppressed',updated_at:nowIso()}).eq('email',email))}
+    if(type==='opt_out'&&email){await mustDb(db.from('suppressions').upsert({email,reason:'provider_unsubscribe'}));await mustDb(db.from('prospects').update({status:'suppressed',updated_at:nowIso()}).eq('email',email));const {data:prospect}=await db.from('prospects').select('id').eq('email',email).maybeSingle();if(prospect)await mustDb(db.from('outreach_queue').update({status:'canceled',error:'provider_unsubscribe',updated_at:nowIso()}).eq('prospect_id',prospect.id).in('status',['queued','held','ready']))}
     const rawEvent=String(req.body.event||'').toLowerCase().replace(/[_\s-]/g,'');
     if(email&&['hardbounce','invalid','spam','blocked'].includes(rawEvent)){
       await mustDb(db.from('suppressions').upsert({email,reason:`provider_${rawEvent}`}));
       await mustDb(db.from('prospects').update({status:'suppressed',updated_at:nowIso()}).eq('email',email));
       const {data:prospect}=await db.from('prospects').select('id').eq('email',email).maybeSingle();
-      if(prospect)await mustDb(db.from('outreach_queue').update({status:'canceled',error:`provider_${rawEvent}`,updated_at:nowIso()}).eq('prospect_id',prospect.id).in('status',['queued','held']));
+      if(prospect)await mustDb(db.from('outreach_queue').update({status:'canceled',error:`provider_${rawEvent}`,updated_at:nowIso()}).eq('prospect_id',prospect.id).in('status',['queued','held','ready']));
     }
     res.json({ok:true});
   }catch(e){
