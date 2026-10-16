@@ -6,6 +6,7 @@ import { analyzeReply, qualifyProspect } from './prospecting.js';
 import { getBrevoPilotSenderStatus } from './pilot-outreach.js';
 import { PILOT_SENDER } from './pilot-outreach-policy.js';
 import { outreachHealth } from './outreach.js';
+import { imapConfiguration } from './imap-replies.js';
 
 export { COMMERCIAL_STOP_LINE, COMMERCIAL_SUBJECTS, commercialDailyCap, renderCommercialJ0, validateCommercialJ0 } from './controlled-outreach-policy.js';
 
@@ -17,20 +18,16 @@ function commercialError(code,message,status=409){
   return error;
 }
 
-async function getBrevoInboundReadiness(){
-  if(!process.env.BREVO_API_KEY)return {ready:false,reason:'brevo_not_configured'};
-  const response=await fetch('https://api.brevo.com/v3/webhooks?type=inbound&sort=desc',{headers:{accept:'application/json','api-key':process.env.BREVO_API_KEY}});
-  if(!response.ok)return {ready:false,reason:'brevo_inbound_check_failed',status:response.status};
-  const payload=await response.json();
-  const webhooks=payload.webhooks||[];
-  const configured=webhooks.find(w=>
-    w.type==='inbound' &&
-    String(w.url||'').includes('/api/brevo/inbound') &&
-    Array.isArray(w.events) && w.events.includes('inboundEmailProcessed') &&
-    Array.isArray(w.headers) && w.headers.some(h=>String(h.key||'').toLowerCase()==='x-webhook-secret') &&
-    Boolean(w.domain)
-  );
-  return {ready:Boolean(configured),reason:configured?null:'inbound_webhook_missing',domain:configured?.domain||null,webhook_id:configured?.id||null};
+async function getImapInboundReadiness(){
+  const cfg=imapConfiguration();
+  const certified=process.env.IMAP_E2E_CERTIFIED==='true';
+  return {
+    ready:Boolean(cfg.configured&&cfg.secure&&cfg.port===993&&certified),
+    reason:!cfg.configured?'imap_not_configured':!cfg.secure||cfg.port!==993?'imap_tls_required':!certified?'imap_e2e_not_certified':null,
+    transport:'imap_ovh',
+    tls:Boolean(cfg.secure&&cfg.port===993),
+    certified
+  };
 }
 
 export async function safeImportCommercialProspects(rows=[]){
@@ -141,7 +138,7 @@ export async function inspectCommercialOutreach(prospectId){
   const personalization=nonEmpty[1]||'';
   const validation=validateCommercialJ0({subject:state.queue[0].subject,content,personalization});
   if(!validation.ok)throw commercialError('COMMERCIAL_J0_INVALID',validation.reasons.join(', '));
-  const [sender,health,inbound]=await Promise.all([getBrevoPilotSenderStatus(),outreachHealth(),getBrevoInboundReadiness()]);
+  const [sender,health,inbound]=await Promise.all([getBrevoPilotSenderStatus(),outreachHealth(),getImapInboundReadiness()]);
   if(sender.domain_verified!==true||sender.domain_authenticated!==true)throw commercialError('COMMERCIAL_DOMAIN_NOT_AUTHENTICATED','Domaine Brevo non authentifié.',503);
   if(!inbound.ready)throw commercialError('COMMERCIAL_INBOUND_NOT_READY','Ingestion des réponses entrantes non certifiée.',503);
   if(health.pause)throw commercialError('COMMERCIAL_DELIVERABILITY_PAUSE',health.reason||'deliverability_guard',503);
