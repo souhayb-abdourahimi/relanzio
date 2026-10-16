@@ -2,7 +2,8 @@ import { db } from './db.js';
 import { sendEmail } from './email.js';
 import { normalizeEmail, isValidEmail, sanitizeText } from './logic.js';
 import { analyzeReply, qualifyProspect } from './prospecting.js';
-import { getBrevoPilotSenderStatus, PILOT_SENDER } from './pilot-outreach.js';
+import { getBrevoPilotSenderStatus } from './pilot-outreach.js';
+import { PILOT_SENDER } from './pilot-outreach-policy.js';
 import { outreachHealth } from './outreach.js';
 
 export const COMMERCIAL_STOP_LINE='Si vous préférez ne plus recevoir de message de ma part, dites simplement STOP.';
