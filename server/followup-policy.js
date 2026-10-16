@@ -52,3 +52,9 @@ export function providerFailureDisposition(error){
   }
   return 'ambiguous';
 }
+
+export function shouldArmInitialAutoSend(wantsAuto,nextFollowupAt,now=new Date()){
+  if(!wantsAuto||!nextFollowupAt)return false;
+  const target=new Date(nextFollowupAt).getTime(),current=now instanceof Date?now.getTime():new Date(now).getTime();
+  return Number.isFinite(target)&&Number.isFinite(current)&&target>current;
+}
