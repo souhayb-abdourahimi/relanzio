@@ -8,12 +8,15 @@ const db=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false
 const stamp=Date.now();
 const qaDomain='example.invalid';
 const prefix='qa.outreach.safety.'+stamp;
-const concurrencyDate='2099-12-29';
-const failureDate='2099-12-28';
+const baseFuture=new Date(Date.UTC(2100,0,1+(stamp%20000)));
+const day=n=>new Date(baseFuture.getTime()+n*86400000).toISOString().slice(0,10);
+const concurrencyDate=day(0);
+const failureDate=day(1);
+const parisBoundaryDate=day(2);
 const assert=(v,m)=>{if(!v)throw new Error(m)};
 
 async function cleanup(){
-  await db.from('outreach_daily_slots').delete().in('business_date',[concurrencyDate,failureDate,'2099-12-27','2099-12-26']);
+  await db.from('outreach_daily_slots').delete().in('business_date',[concurrencyDate,failureDate,parisBoundaryDate,day(3)]);
   const {data:prospects}=await db.from('prospects').select('id,email').like('email','qa.outreach.safety.%@'+qaDomain);
   const ids=(prospects||[]).map(x=>x.id);
   if(ids.length){
@@ -51,8 +54,8 @@ try{
   assert(!twentyOne.error&&twentyOne.data?.allowed===false&&twentyOne.data?.reason==='daily_cap','twenty_first_not_blocked');
 
   // Paris calendar boundary, not rolling 24 hours.
-  const before=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-before-${stamp}`,p_queue_id:null,p_cap:20,p_now:'2099-12-26T22:59:00+00:00'});
-  const after=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-after-${stamp}`,p_queue_id:null,p_cap:20,p_now:'2099-12-26T23:01:00+00:00'});
+  const before=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-before-${stamp}`,p_queue_id:null,p_cap:20,p_now:parisBoundaryDate+'T22:59:00+00:00'});
+  const after=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-after-${stamp}`,p_queue_id:null,p_cap:20,p_now:parisBoundaryDate+'T23:01:00+00:00'});
   assert(!before.error&&!after.error&&before.data.business_date!==after.data.business_date,'paris_day_boundary_failed');
 
   // Definite provider failure releases the reservation; ambiguous failure stays conservative.
