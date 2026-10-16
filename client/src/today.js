@@ -24,14 +24,15 @@ export function addParisDaysIso(days,now=new Date(),hour=9,minute=0){
 
 export function actionMeta(quote,now=new Date()){
   if(!quote||quote.status!=='open')return null;
-  const step=Number(quote.followup_step||0);
-  if(step>=3)return {bucket:'today',terminal:true,step,daysOverdue:0,sortTime:-Infinity};
-  if(!quote.next_followup_at)return null;
+  const step=Number(quote.followup_step||0),terminal=step>=3;
+  if(!quote.next_followup_at){
+    return terminal?{bucket:'today',terminal:true,step,daysOverdue:0,sortTime:-Infinity}:null;
+  }
   const targetKey=parisDateKey(quote.next_followup_at),todayKey=parisDateKey(now);
   const diff=Math.round((dateNumber(targetKey)-dateNumber(todayKey))/86400000);
   return {
     bucket:diff<0?'overdue':diff===0?'today':'future',
-    terminal:false,
+    terminal,
     step,
     daysOverdue:Math.max(0,-diff),
     sortTime:new Date(quote.next_followup_at).getTime()
