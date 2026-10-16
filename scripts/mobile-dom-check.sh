@@ -80,3 +80,18 @@ echo "Trial DOM QA PASS: 390x844 and 1280x900"
 
 "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --window-size=390,844 --virtual-time-budget=2500   --screenshot=/tmp/relanzio-quotes-390.png 'http://127.0.0.1:5173/quote-fixture.html' >/tmp/relanzio-quote-shot.log 2>&1
 echo "Quote mobile visual proof: sha256=$(sha256sum /tmp/relanzio-quotes-390.png | cut -d' ' -f1)"
+
+for size in 1280,900 390,844 412,915; do
+  "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=7000 \
+    --dump-dom 'http://127.0.0.1:5173/p0-fixture.html?qa=1&count=100' >/tmp/relanzio-p0-dom.html 2>/tmp/relanzio-p0-chromium.log
+  grep -q 'data-p0-qa="pass"' /tmp/relanzio-p0-dom.html || { cat /tmp/relanzio-p0-dom.html; echo "P0 Today browser QA failed at $size" >&2; exit 1; }
+  RENDER_MS="$(sed -n 's/.*data-render-ms="\([0-9][0-9]*\)".*/\1/p' /tmp/relanzio-p0-dom.html | head -1)"
+  echo "P0 Today browser QA PASS at $size; fixture100_render_ms=$RENDER_MS"
+done
+
+for size in 390,844 412,915; do
+  "$CHROME" --headless --no-sandbox --disable-gpu --window-size="$size" --virtual-time-budget=5000 \
+    --dump-dom 'http://127.0.0.1:5173/?qa=1' >/tmp/relanzio-landing-mobile-dom.html 2>/tmp/relanzio-landing-mobile-chromium.log
+  grep -q 'data-public-qa="pass"' /tmp/relanzio-landing-mobile-dom.html || { cat /tmp/relanzio-landing-mobile-dom.html; echo "Landing mobile connection QA failed at $size" >&2; exit 1; }
+done
+echo "P0 landing mobile Connexion QA PASS: 390x844 412x915"
