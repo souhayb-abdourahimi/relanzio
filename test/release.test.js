@@ -42,7 +42,7 @@ test('release source contains required self-service routes and safety gates',()=
   for(const route of ["app.patch('/api/quotes/:id'","app.delete('/api/quotes/:id'","/followup-preview'","/send-followup'","app.post('/api/billing/portal'","app.delete('/api/account'","app.post('/api/activity'"])assert.ok(server.includes(route),route);
   const outreach=readFileSync(new URL('../server/outreach.js',import.meta.url),'utf8');
   const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
-  assert.match(outreach,/ACQUISITION_ENABLED !== 'true'/);
+  assert.match(outreach,/ACQUISITION_ENABLED!=='true'/);
   assert.match(controlled,/COMMERCIAL_OUTREACH_SEND_ENABLED!=='true'/);
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
   for(const path of ['/pricing','/docs','/faq','/contact','/reset-password'])assert.ok(client.includes(path),path);
@@ -125,7 +125,7 @@ test('production capabilities remain independently gated',()=>{
   assert.match(server,/BILLING_ENABLED!=='true'/);
   const outreach=readFileSync(new URL('../server/outreach.js',import.meta.url),'utf8');
   const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
-  assert.match(outreach,/ACQUISITION_ENABLED !== 'true'/);
+  assert.match(outreach,/ACQUISITION_ENABLED!=='true'/);
   assert.match(controlled,/COMMERCIAL_OUTREACH_SEND_ENABLED!=='true'/);
   assert.match(server,/LEGAL_PAGES_APPROVED!=='true'/);
   assert.match(client,/VITE_BILLING_ENABLED==='true'/);
