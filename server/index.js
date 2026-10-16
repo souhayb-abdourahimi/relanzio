@@ -22,6 +22,7 @@ import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntit
 import { grantTrialToEmail, grantTrialToUser, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
 import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
+import { safeImportCommercialProspects, prepareCommercialProspect, inspectCommercialOutreach, sendCommercialJ0, ingestBrevoInbound } from './controlled-outreach.js';
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt } from './quote-rules.js';
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
@@ -433,6 +434,19 @@ app.post('/api/brevo/webhook', async(req,res)=>{
   }
 });
 
+
+// Brevo Inbound Parsing. This route is inert until an inbound domain/webhook is configured at Brevo.
+app.post('/api/brevo/inbound', async(req,res)=>{
+  if(!safeEqual(String(req.headers['x-webhook-secret']||''),String(process.env.BREVO_WEBHOOK_SECRET||'')))return res.status(401).json({error:'Unauthorized'});
+  try{
+    const result=await ingestBrevoInbound(req.body||{});
+    res.json(result);
+  }catch(e){
+    await reportError('brevo.inbound',e,{request_id:req.requestId});
+    res.status(500).json({error:'Inbound email processing failed.'});
+  }
+});
+
 // Founder acquisition CRM — quality capped, human-approved, no scraping endpoint.
 app.get('/api/admin/tickets', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const {data,error}=await db.from('support_tickets').select('*').order('created_at',{ascending:false}).limit(200);if(error)return res.status(500).json({error:error.message});res.json({tickets:data})});
 app.patch('/api/admin/tickets/:id', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const status=sanitizeText(req.body.status,30);if(!['open','in_progress','resolved','closed'].includes(status))return res.status(400).json({error:'Statut invalide.'});const {data,error}=await db.from('support_tickets').update({status,updated_at:nowIso()}).eq('id',req.params.id).select('*').maybeSingle();if(error)return res.status(500).json({error:error.message});if(!data)return res.status(404).json({error:'Ticket introuvable.'});res.json({ticket:data})});
@@ -464,16 +478,49 @@ app.post('/api/admin/trials/grant', requireUser, async(req,res)=>{
     res.status(status).json({error:e.message,code:e.code||'TRIAL_GRANT_FAILED'});
   }
 });
-app.post('/api/admin/prospects/import', requireUser, async(req,res)=>{
-  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'}); const rows=Array.isArray(req.body.prospects)?req.body.prospects.slice(0,200):[]; const accepted=[];
-  for(const p of rows){const email=normalizeEmail(p.email);if(!p.company_name||!isValidEmail(email))continue;const {data:suppressed}=await db.from('suppressions').select('email').eq('email',email).maybeSingle();if(suppressed)continue;const generic=/^(contact|hello|bonjour|info|commercial|sales)@/i.test(email);if(!generic&&(!p.source||!p.source_url))continue;const q=qualifyProspect({...p,email});accepted.push({company_name:sanitizeText(p.company_name,160),contact_name:sanitizeText(p.contact_name,120),email,role:sanitizeText(p.role,100),website:sanitizeText(p.website,240),sector:sanitizeText(p.sector,160),source:sanitizeText(p.source,120),source_url:sanitizeText(p.source_url,500),lawful_basis:'professional_relevance',employee_count:Number(p.employee_count)||null,estimated_quotes_per_month:Number(p.estimated_quotes_per_month)||null,uses_digital_tools:Boolean(p.uses_digital_tools),is_service_business:p.is_service_business!==false,score:q.score,score_reasons:q.reasons,status:q.score>=55?'qualified':'new'});}
-  if(!accepted.length)return res.json({imported:0});const {data,error}=await db.from('prospects').upsert(accepted,{onConflict:'email',ignoreDuplicates:false}).select('id');if(error)return res.status(500).json({error:error.message});res.json({imported:data.length});
+app.post('/api/admin/prospects/import', requireUser, rateLimit({windowMs:60_000,max:5}), async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{
+    const rows=Array.isArray(req.body.prospects)?req.body.prospects:[];
+    res.json(await safeImportCommercialProspects(rows));
+  }catch(e){await reportError('outreach.import',e,{request_id:req.requestId});res.status(500).json({error:'Import impossible.',request_id:req.requestId})}
+});
+app.delete('/api/admin/prospects/:id', requireUser, async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{
+    const {data,error}=await db.rpc('delete_prospect_with_tombstone',{p_id:req.params.id,p_reason:sanitizeText(req.body?.reason||'deleted_by_admin',120)});
+    if(error)throw error;
+    res.json(data);
+  }catch(e){res.status(500).json({error:'Suppression prospect impossible.'})}
 });
 app.post('/api/admin/prospects/:id/send', requireUser, async(req,res)=>{
-  if(process.env.ACQUISITION_ENABLED!=='true')return res.status(423).json({error:'Acquisition désactivée avant GO LIVE.'});
-  if(process.env.LEGAL_PAGES_APPROVED!=='true')return res.status(423).json({error:'Prospection bloquée tant que les mentions légales ne sont pas approuvées.'});
-  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const {data:p,error}=await db.from('prospects').select('*').eq('id',req.params.id).single();if(error)throw error;if(p.score<55)return res.status(409).json({error:'Prospect insuffisamment qualifié.'});const {data:suppressed}=await db.from('suppressions').select('email').eq('email',p.email).maybeSingle();if(suppressed)return res.status(409).json({error:'Adresse sur la liste d’opposition.'});if(p.last_contacted_at&&Date.now()-new Date(p.last_contacted_at).getTime()<7*86400000)return res.status(429).json({error:'Délai minimum de 7 jours entre deux sollicitations.'});const since=new Date(Date.now()-86400000).toISOString();const {count}=await db.from('outreach_events').select('*',{count:'exact',head:true}).eq('type','sent').gte('created_at',since);const cap=Number(process.env.OUTREACH_DAILY_CAP||20);if(count>=cap)return res.status(429).json({error:`Plafond quotidien de ${cap} emails atteint.`});const subject=sanitizeText(req.body.subject||'Suivi de vos devis',140),content=sanitizeText(req.body.content,5000);if(!content)return res.status(400).json({error:'Message vide.'});const commercialEmail=process.env.CONTACT_EMAIL||'contact@relanzio.com';const source=p.source_url||p.source||'une source professionnelle publique';const footer=`\n\n— Relanzio\nContact : ${commercialEmail}\nPourquoi ce message : votre activité professionnelle semble correspondre au problème étudié. Source : ${source}. Politique de confidentialité : https://relanzio.com/privacy\nPour ne plus être contacté, répondez STOP ou écrivez à ${commercialEmail}.`;const sent=await sendEmail({to:p.email,subject,text:content+footer,replyTo:commercialEmail,senderEmail:commercialEmail,senderName:'Relanzio'});await db.from('outreach_events').insert({prospect_id:p.id,type:'sent',subject,content,provider_message_id:sent?.messageId||null});await db.from('prospects').update({status:'contacted',last_contacted_at:nowIso(),updated_at:nowIso()}).eq('id',p.id);res.json({sent:true});}catch(e){res.status(500).json({error:e.message})}
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  res.status(410).json({error:'Ancien chemin d’envoi désactivé. Utilisez le parcours commercial contrôlé.'});
 });
+
+app.post('/api/admin/outreach/prepare-commercial', requireUser, rateLimit({windowMs:60_000,max:30}), async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{
+    const result=await prepareCommercialProspect({
+      prospectId:sanitizeText(req.body.prospect_id,100),
+      personalization:sanitizeText(req.body.personalization,320),
+      subject:sanitizeText(req.body.subject,140),
+      scheduledAt:req.body.scheduled_at||null
+    });
+    res.json({ready:true,prospect:{id:result.prospect.id,company_name:result.prospect.company_name,email:result.prospect.email},queue:{id:result.queue.id,status:result.queue.status,subject:result.queue.subject,scheduled_at:result.queue.scheduled_at}});
+  }catch(e){res.status(Number(e.status)||409).json({error:e.message,code:e.code||'COMMERCIAL_PREPARE_FAILED'})}
+});
+app.post('/api/admin/outreach/dry-run-commercial', requireUser, rateLimit({windowMs:60_000,max:40}), async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{res.json(await inspectCommercialOutreach(sanitizeText(req.body.prospect_id,100)))}
+  catch(e){res.status(Number(e.status)||409).json({error:e.message,code:e.code||'COMMERCIAL_DRY_RUN_FAILED'})}
+});
+app.post('/api/admin/outreach/send-commercial', requireUser, rateLimit({windowMs:60_000,max:5}), async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{res.json(await sendCommercialJ0({prospectId:sanitizeText(req.body.prospect_id,100),requestedBy:req.user.email||req.user.id}))}
+  catch(e){res.status(Number(e.status)||500).json({error:e.message,code:e.code||'COMMERCIAL_SEND_FAILED'})}
+});
+
 app.post('/api/admin/prospects/:id/reply', requireUser, async(req,res)=>{
   if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const text=sanitizeText(req.body.text,5000);if(!text)return res.status(400).json({error:'Réponse vide.'});const {data:p,error}=await db.from('prospects').select('*').eq('id',req.params.id).single();if(error)throw error;const analysis=await analyzeReply(text);await db.from('outreach_events').insert({prospect_id:p.id,type:analysis.category==='opt_out'?'opt_out':'replied',content:text,metadata:analysis});await db.from('feedback_insights').insert({prospect_id:p.id,category:analysis.category,sentiment:analysis.sentiment,confidence:analysis.confidence,summary:analysis.summary,objection:analysis.objection||'',requested_feature:analysis.requested_feature||'',needs_human:analysis.needs_human!==false,raw_text:text});const status=analysis.category==='opt_out'?'suppressed':analysis.category==='not_interested'?'not_interested':analysis.category==='not_now'?'not_now':'replied';await db.from('prospects').update({status,updated_at:nowIso()}).eq('id',p.id);if(analysis.category==='opt_out')await db.from('suppressions').upsert({email:p.email,reason:'opt_out'});res.json({analysis});}catch(e){res.status(500).json({error:e.message})}
 });
