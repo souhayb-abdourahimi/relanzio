@@ -6,7 +6,7 @@ import {
   commercialDailyCap,
   renderCommercialJ0,
   validateCommercialJ0
-} from '../server/controlled-outreach.js';
+} from '../server/controlled-outreach-policy.js';
 
 test('commercial daily cap is hard-clamped to twenty',()=>{
   assert.equal(commercialDailyCap(20),20);
