@@ -51,6 +51,8 @@ export default function PlansView({profile,billingEnabled,checkoutBusy=false,tri
           {proCurrent&&<span className="current-plan-badge">{state.trial.visible?'Essai Pro actif':'Formule actuelle'}</span>}
         </div>
         <div className="app-plan-price"><strong>{PRO_PLAN.price}</strong><span>{PRO_PLAN.period}</span></div>
+        <small className="app-plan-help">{PRO_PLAN.vatNote}</small>
+        <p className="app-plan-help">Abonnement mensuel récurrent, sans engagement de durée minimale. Résiliation depuis le portail client.</p>
         <p className="app-plan-summary">Pour envoyer depuis Relanzio et automatiser progressivement le suivi, avec contrôle devis par devis.</p>
         <PlanFeatures items={PRO_PLAN.features}/>
         <div className="app-plan-actions">

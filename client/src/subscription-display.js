@@ -18,7 +18,8 @@ export const PRO_PLAN = Object.freeze({
   id:'pro',
   name:'Pro',
   price:'29 €',
-  period:'/mois',
+  period:'/ mois',
+  vatNote:'TVA non applicable, art. 293 B du CGI',
   limit:100,
   features:[
     '100 devis actifs',
@@ -50,6 +51,6 @@ export function subscriptionDisplay(profile={}, billingEnabled=false, checkoutBu
     upgradeVisible,
     upgradeDisabled,
     upgradeHint,
-    upgradeLabel:'Passer à Pro — 29 €/mois'
+    upgradeLabel:'Passer à Pro — 29 € / mois'
   };
 }
