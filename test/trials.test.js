@@ -60,7 +60,7 @@ test('trial display exposes exact active state and end date',()=>{
   assert.equal(display.visible,true);
   assert.equal(display.label,'Essai Pro — 7 jours restants');
   assert.match(display.endText,/21\/10\/2026/);
-  assert.equal(display.upgradeLabel,'Passer à Pro — 29 €/mois');
+  assert.equal(display.upgradeLabel,'Passer à Pro — 29 € / mois');
 });
 
 
