@@ -47,6 +47,9 @@ begin
   limit 1;
 
   if found then
+    if v_followup.quote_id<>p_quote_id then
+      return jsonb_build_object('ok',false,'code','REQUEST_KEY_CONFLICT');
+    end if;
     select * into v_quote from public.quotes where id=v_followup.quote_id and user_id=p_user_id;
     return jsonb_build_object('ok',true,'idempotent',true,'quote',to_jsonb(v_quote),'followup',to_jsonb(v_followup));
   end if;
