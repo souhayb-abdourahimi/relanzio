@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { requireUser } from './auth.js';
 import { db, getProfile } from './db.js';
-import { nextDate, runDueFollowups, createFollowupPreview, sendQuoteFollowup } from './followups.js';
+import { nextDate, runDueFollowups, createFollowupPreview, sendQuoteFollowup, confirmManualFollowup } from './followups.js';
 import { analyzeReply, qualifyProspect } from './prospecting.js';
 import { isValidEmail, normalizeEmail, sanitizeText, quoteMetrics, mapBrevoEvent, prioritizeProductIdeas } from './logic.js';
 import { rateLimit, safeEqual } from './security.js';
@@ -176,7 +176,18 @@ app.patch('/api/profile', requireUser, async(req,res)=>{
 });
 
 app.get('/api/quotes', requireUser, async(req,res)=>{
-  try{ await getProfile(req.user); const {data:quotes,error}=await db.from('quotes').select('*').eq('user_id',req.user.id).order('created_at',{ascending:false}); if(error)throw error; res.json({quotes,metrics:quoteMetrics(quotes||[])}); }catch(e){res.status(500).json({error:e.message})}
+  try{
+    await getProfile(req.user);
+    const [{data:quotes,error},{data:followups,error:followupError}]=await Promise.all([
+      db.from('quotes').select('*').eq('user_id',req.user.id).order('created_at',{ascending:false}),
+      db.from('followups').select('id,quote_id,step,status,channel,sent_at,created_at').eq('user_id',req.user.id).order('created_at',{ascending:true}).limit(500)
+    ]);
+    if(error)throw error;if(followupError)throw followupError;
+    const history=new Map();
+    for(const item of followups||[]){const list=history.get(item.quote_id)||[];list.push(item);history.set(item.quote_id,list)}
+    const hydrated=(quotes||[]).map(q=>({...q,followups:history.get(q.id)||[]}));
+    res.json({quotes:hydrated,metrics:quoteMetrics(quotes||[])});
+  }catch(e){res.status(500).json({error:e.message})}
 });
 app.post('/api/quotes', requireUser, async(req,res)=>{
   try{
@@ -191,6 +202,8 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
     let nextFollowupAt=null;
     if(requestedMode==='recommended')nextFollowupAt=nextDate(parsedDate,0);
     if(requestedMode==='custom'){nextFollowupAt=parseCustomFollowupAt(req.body.next_followup_at);if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});}
+    const requestedAutoSend=requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'&&Boolean(auto_send);
+    const safeAutoSend=requestedAutoSend&&Boolean(nextFollowupAt)&&new Date(nextFollowupAt).getTime()>Date.now();
     const {data:created,error:createError}=await db.rpc('create_quote_with_quota',{
       p_user_id:req.user.id,
       p_limit:limit,
@@ -200,7 +213,7 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
       p_amount:parsedAmount,
       p_sent_at:parsedDate,
       p_request_key:requestKey,
-      p_auto_send:requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(auto_send):false,
+      p_auto_send:safeAutoSend,
       p_followup_step:0,
       p_followup_schedule_mode:requestedMode,
       p_next_followup_at:nextFollowupAt
@@ -273,7 +286,14 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
       patch.followup_schedule_mode=effectiveMode;
       patch.next_followup_at=nextFollowupAt;
     }
-    if ('auto_send' in req.body) patch.auto_send=effectiveMode!=='none'&&targetStatus==='open'&&hasProAccess(profile)&&profile.email_mode==='automatic'?Boolean(req.body.auto_send):false;
+    if ('auto_send' in req.body) {
+      const autoEligible=effectiveMode!=='none'&&targetStatus==='open'&&hasProAccess(profile)&&profile.email_mode==='automatic';
+      const wantsAuto=autoEligible&&Boolean(req.body.auto_send);
+      if(wantsAuto&&nextFollowupAt&&new Date(nextFollowupAt).getTime()<=Date.now()){
+        return res.status(409).json({error:'Ce devis est déjà à relancer. Traitez-le ou repoussez sa prochaine date avant d’activer l’automatisation.'});
+      }
+      patch.auto_send=wantsAuto;
+    }
     if(targetStatus!=='open')patch.auto_send=false;
 
     const {data,error}=await db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id).select('*').single();
@@ -303,12 +323,28 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
     const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]);
     if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});
     if(!hasProAccess(profile))return res.status(403).json({error:'L’envoi depuis Relanzio nécessite des droits Pro actifs.'});
-    const result=await sendQuoteFollowup(quote,profile,sanitizeText(req.get('Idempotency-Key'),100)||null);
+    const subject=sanitizeText(req.body?.subject,200),body=sanitizeText(req.body?.body,10000);
+    const result=await sendQuoteFollowup(quote,profile,sanitizeText(req.get('Idempotency-Key'),100)||null,{subject:subject||null,body:body||null});
     res.json({sent:true,result});
   } catch(e){
-    if(['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_REQUEST_ALREADY_FAILED','EMAIL_RECIPIENT_SUPPRESSED'].includes(e.message))return res.status(409).json({error:e.message==='EMAIL_RECIPIENT_SUPPRESSED'?'Cette adresse ne peut plus recevoir de relances.':'Cette relance est déjà en cours ou a déjà été traitée.'});
+    if(['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_REQUEST_ALREADY_FAILED','FOLLOWUP_DAILY_LIMIT','EMAIL_RECIPIENT_SUPPRESSED'].includes(e.message))return res.status(409).json({error:e.message==='EMAIL_RECIPIENT_SUPPRESSED'?'Cette adresse ne peut plus recevoir de relances.':'Cette relance est déjà en cours, déjà traitée ou bloquée par la limite quotidienne.'});
     await reportError('followup.manual_send',e,{request_id:req.requestId});
     res.status(500).json({error:'La relance n’a pas été envoyée. Aucun succès n’a été enregistré.',request_id:req.requestId});
+  }
+});
+
+app.post('/api/quotes/:id/confirm-manual-followup', requireUser, rateLimit({windowMs:60_000,max:30}), async(req,res)=>{
+  try{
+    const step=Number(req.body?.step),requestKey=sanitizeText(req.get('Idempotency-Key'),100);
+    const subject=sanitizeText(req.body?.subject,200),body=sanitizeText(req.body?.body,10000);
+    if(!Number.isInteger(step)||step<1||step>3||!requestKey)return res.status(400).json({error:'Confirmation de relance invalide.'});
+    const result=await confirmManualFollowup({quoteId:req.params.id,userId:req.user.id,expectedStep:step,subject,body,requestKey});
+    res.json({confirmed:true,idempotent:Boolean(result.idempotent),quote:result.quote,followup:result.followup});
+  }catch(e){
+    if(e.code==='QUOTE_NOT_FOUND')return res.status(404).json({error:'Devis introuvable.'});
+    if(['QUOTE_NOT_OPEN','SEQUENCE_COMPLETE','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_STEP_STALE'].includes(e.code||e.message))return res.status(409).json({error:'Cette relance a déjà été traitée ou le devis n’est plus éligible.'});
+    await reportError('followup.manual_confirm',e,{request_id:req.requestId,quote_id:req.params.id});
+    res.status(500).json({error:'Impossible d’enregistrer la relance manuelle.',request_id:req.requestId});
   }
 });
 
