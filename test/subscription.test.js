@@ -5,6 +5,9 @@ import { FREE_PLAN,PRO_PLAN,subscriptionDisplay } from '../client/src/subscripti
 test('subscription plans expose the real product limits and never unlimited',()=>{
   assert.equal(FREE_PLAN.limit,5);
   assert.equal(PRO_PLAN.limit,100);
+  assert.equal(PRO_PLAN.price,'29 €');
+  assert.equal(PRO_PLAN.period,'/ mois');
+  assert.equal(PRO_PLAN.vatNote,'TVA non applicable, art. 293 B du CGI');
   const all=[...FREE_PLAN.features,...PRO_PLAN.features].join(' ').toLowerCase();
   assert.match(all,/5 devis actifs/);
   assert.match(all,/100 devis actifs/);
@@ -16,7 +19,7 @@ test('free user gets a disabled Pro conversion when billing is off',()=>{
   assert.equal(state.currentPlan,'free');
   assert.equal(state.upgradeVisible,true);
   assert.equal(state.upgradeDisabled,true);
-  assert.equal(state.upgradeLabel,'Passer à Pro — 29 €/mois');
+  assert.equal(state.upgradeLabel,'Passer à Pro — 29 € / mois');
   assert.match(state.upgradeHint,/n’est pas disponible/);
 });
 

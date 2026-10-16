@@ -93,9 +93,28 @@ test('Stripe customer is stable while checkout idempotency is versioned per clai
   assert.match(server,/idempotencyKey:`relanzio-customer-\$\{req\.user\.id\}`/);
   assert.match(server,/checkout_claimed_at/);
   assert.match(server,/checkoutIdempotencyKey\(\{userId:req\.user\.id,fingerprint,claimedAt\}\)/);
-  assert.match(policy,/CHECKOUT_CONFIG_VERSION='pro-card-v3'/);
+  assert.match(policy,/CHECKOUT_CONFIG_VERSION='pro-card-v4-vat293b'/);
 });
 
+
+test('pricing and Stripe checkout stay aligned with VAT-exempt micro-enterprise configuration',()=>{
+  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
+  const subscription=readFileSync(new URL('../client/src/subscription-display.js',import.meta.url),'utf8');
+  const legal=readFileSync(new URL('../client/src/LegalPage.jsx',import.meta.url),'utf8');
+  assert.match(server,/VAT non applicable, art\. 293 B du CGI/);
+  assert.match(server,/automatic_tax:\{enabled:false\}/);
+  assert.match(server,/invoice_settings:\{footer:VAT_NOTICE\}/);
+  assert.match(server,/custom_text:\{submit:\{message:PRO_PRICE_LABEL\}\}/);
+  assert.match(client,/TVA non applicable, art\. 293 B du CGI/);
+  assert.match(subscription,/vatNote:'TVA non applicable, art\. 293 B du CGI'/);
+  assert.match(plans,/PRO_PLAN\.vatNote/);
+  assert.match(legal,/29 € \/ mois, sans engagement de durée minimale/);
+  assert.match(legal,/Escompte pour paiement anticipé : néant/);
+  assert.match(legal,/indemnité forfaitaire de 40 €/);
+  assert.doesNotMatch([client,plans,subscription,legal].join('\n'),/29 € \+ TVA|TVA à 20 %|TVA 20 %/i);
+});
 
 test('production capabilities remain independently gated',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');

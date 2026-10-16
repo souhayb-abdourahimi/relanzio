@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const CHECKOUT_CONFIG_VERSION='pro-card-v3';
+export const CHECKOUT_CONFIG_VERSION='pro-card-v4-vat293b';
 
 export function checkoutConfigFingerprint({priceId='',appUrl=''}) {
   const raw=[CHECKOUT_CONFIG_VERSION,String(priceId),String(appUrl),'subscription','card'].join('|');
@@ -25,5 +25,5 @@ export function isReusableCheckoutSession(session,fingerprint) {
 export function checkoutIdempotencyKey({userId,fingerprint,claimedAt}) {
   const stamp=new Date(claimedAt).getTime();
   if(!userId||!fingerprint||!Number.isFinite(stamp))throw new Error('INVALID_CHECKOUT_ATTEMPT');
-  return `relanzio-checkout-v3-${userId}-${fingerprint}-${stamp}`;
+  return `relanzio-checkout-v4-${userId}-${fingerprint}-${stamp}`;
 }

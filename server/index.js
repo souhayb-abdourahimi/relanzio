@@ -29,6 +29,8 @@ import { rowsToSemicolonCsv } from './export.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const VAT_NOTICE='TVA non applicable, art. 293 B du CGI';
+const PRO_PRICE_LABEL=`29 € / mois. ${VAT_NOTICE}`;
 const __dirname = dirname(fileURLToPath(import.meta.url)); const dist = join(__dirname, '..', 'dist');
 const admins = () => (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 const isAdmin = user => admins().includes((user?.email || '').toLowerCase());
@@ -317,10 +319,12 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
     if(hasSubscriptionProAccess(profile))return res.status(409).json({error:'Votre compte dispose déjà d’un abonnement Pro. Utilisez Gérer mon abonnement.'});
     let customer=profile.stripe_customer_id;
     if(!customer){
-      const created=await stripe.customers.create({email:req.user.email,metadata:{user_id:req.user.id}},{idempotencyKey:`relanzio-customer-${req.user.id}`});
+      const created=await stripe.customers.create({email:req.user.email,metadata:{user_id:req.user.id},invoice_settings:{footer:VAT_NOTICE}},{idempotencyKey:`relanzio-customer-${req.user.id}`});
       customer=created.id;
       await mustDb(db.from('profiles').update({stripe_customer_id:customer,updated_at:nowIso()}).eq('id',req.user.id));
     }
+
+    await stripe.customers.update(customer,{invoice_settings:{footer:VAT_NOTICE}});
 
     const fingerprint=checkoutConfigFingerprint({priceId:process.env.STRIPE_PRO_PRICE_ID,appUrl:process.env.APP_URL});
     const openSessions=await stripe.checkout.sessions.list({customer,status:'open',limit:10});
@@ -336,10 +340,12 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
 
     const meta={user_id:req.user.id,...checkoutMetadata({priceId:process.env.STRIPE_PRO_PRICE_ID,appUrl:process.env.APP_URL})};
     const session=await stripe.checkout.sessions.create({
-      mode:'subscription',customer,payment_method_types:['card'],
+      mode:'subscription',customer,payment_method_types:['card'],locale:'fr',
+      automatic_tax:{enabled:false},
       line_items:[{price:process.env.STRIPE_PRO_PRICE_ID,quantity:1}],
       allow_promotion_codes:true,client_reference_id:req.user.id,metadata:meta,
-      subscription_data:{metadata:{user_id:req.user.id}},
+      custom_text:{submit:{message:PRO_PRICE_LABEL}},
+      subscription_data:{description:`Relanzio Pro — ${PRO_PRICE_LABEL}`,metadata:{user_id:req.user.id}},
       success_url:`${process.env.APP_URL}?billing=success`,
       cancel_url:`${process.env.APP_URL}?billing=cancel`
     },{idempotencyKey:checkoutIdempotencyKey({userId:req.user.id,fingerprint,claimedAt})});
