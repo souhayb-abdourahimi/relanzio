@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parisBusinessDate,addDaysToDateKey,nextRecommendedAfterAction,isAutomaticSendWindow,providerFailureDisposition
+  parisBusinessDate,addDaysToDateKey,nextRecommendedAfterAction,isAutomaticSendWindow,providerFailureDisposition,shouldArmInitialAutoSend
 } from '../server/followup-policy.js';
 
 test('recommended follow-up gaps restart from the real action',()=>{
@@ -32,4 +32,11 @@ test('provider failures distinguish certain rejection from ambiguous delivery',(
   assert.equal(providerFailureDisposition(new Error('Brevo 400: invalid recipient')),'certain');
   assert.equal(providerFailureDisposition(new Error('Brevo 503: upstream timeout')),'ambiguous');
   assert.equal(providerFailureDisposition(new Error('fetch failed')),'ambiguous');
+});
+
+test('an old overdue quote is never armed for automatic catch-up on creation',()=>{
+  const now=new Date('2026-10-16T10:00:00.000Z');
+  assert.equal(shouldArmInitialAutoSend(true,'2026-09-03T07:00:00.000Z',now),false);
+  assert.equal(shouldArmInitialAutoSend(true,'2026-10-19T07:00:00.000Z',now),true);
+  assert.equal(shouldArmInitialAutoSend(false,'2026-10-19T07:00:00.000Z',now),false);
 });
