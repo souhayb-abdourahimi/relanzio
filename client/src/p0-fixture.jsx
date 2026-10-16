@@ -16,7 +16,7 @@ function makeQuotes(count){
 }
 
 function Fixture(){
-  const params=new URLSearchParams(location.search),qa=params.get('qa')==='1',count=Math.max(4,Math.min(100,Number(params.get('count')||15)));
+  const params=new URLSearchParams(location.search),qa=params.get('qa')==='1',count=Math.max(3,Math.min(100,Number(params.get('count')||15)));
   const[quotes,setQuotes]=useState(()=>makeQuotes(count));
   const[preview,setPreview]=useState(null);
   const renderStarted=useMemo(()=>performance.now(),[]);
@@ -33,7 +33,7 @@ function Fixture(){
     later(()=>{
       const text=document.body.textContent||'',cards=[...document.querySelectorAll('.today-card')],noOverflow=document.documentElement.scrollWidth<=window.innerWidth+1;
       const touch=window.innerWidth>760||[...document.querySelectorAll('.today-view button')].filter(visible).every(b=>b.getBoundingClientRect().height>=44);
-      if(!text.includes('EN RETARD')||!text.includes('AUJOURD’HUI')||!text.includes('À VENIR')||!text.includes('Séquence terminée — décision requise')||!cards.length||!noOverflow||!touch){document.body.dataset.p0Qa='fail-layout';return}
+      const terminalOk=count<4||text.includes('Séquence terminée — décision requise');if(!text.includes('EN RETARD')||!text.includes('AUJOURD’HUI')||!text.includes('À VENIR')||!terminalOk||!cards.length||!noOverflow||!touch){document.body.dataset.p0Qa='fail-layout';return}
       const relancer=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Relancer');relancer?.click();
       later(()=>{
         const modal=document.querySelector('.preview-modal'),ta=modal?.querySelector('textarea'),copy=[...modal?.querySelectorAll('button')||[]].find(x=>x.textContent.trim()==='Copier');
