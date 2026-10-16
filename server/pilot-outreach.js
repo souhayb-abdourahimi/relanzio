@@ -84,7 +84,7 @@ export async function getBrevoPilotSenderStatus() {
   const domainPayload = domainResponse.ok ? await domainResponse.json() : null;
   const senders = payload.senders || [];
   const sender = senders.find(x => String(x.email || '').toLowerCase() === PILOT_SENDER.email);
-  const domain = domainPayload?.domain || domainPayload || null;
+  const domain = domainPayload && typeof domainPayload.domain === 'object' ? domainPayload.domain : domainPayload;
   const details = {
     sender_found:Boolean(sender),
     sender_active:sender?.active === true,
