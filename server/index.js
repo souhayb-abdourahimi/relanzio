@@ -22,7 +22,7 @@ import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntit
 import { grantTrialToEmail, grantTrialToUser, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
 import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
-import { safeImportCommercialProspects, prepareCommercialProspect, inspectCommercialOutreach, sendCommercialJ0, ingestBrevoInbound } from './controlled-outreach.js';
+import { safeImportCommercialProspects, prepareCommercialProspect, inspectCommercialOutreach, sendCommercialJ0, ingestBrevoInbound, runCommercialSequenceTick } from './controlled-outreach.js';
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { pollImapReplies } from './imap-replies.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt } from './quote-rules.js';
@@ -538,6 +538,7 @@ cron.schedule('*/15 * * * *',async()=>{try{await runDueFollowups()}catch(e){awai
 cron.schedule('2,17,32,47 * * * *',async()=>{try{await expireTrials()}catch(e){await reportError('cron.trials',e)}},{noOverlap:true});
 cron.schedule('*/10 * * * *',async()=>{try{const result=await processOutreachQueue();if(result?.error)await reportError('cron.outreach.result',new Error(result.error),{queue_id:result.queue_id})}catch(e){await reportError('cron.outreach',e)}},{noOverlap:true});
 cron.schedule('*/10 * * * *',async()=>{try{await pollImapReplies()}catch(e){await reportError('cron.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})}},{noOverlap:true});
+cron.schedule('*/5 * * * *',async()=>{try{await runCommercialSequenceTick()}catch(e){await reportError('cron.commercial-sequence',e,{code:e?.code||'COMMERCIAL_SEQUENCE_FAILED'})}},{noOverlap:true});
 cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
 
 app.use((err,req,res,next)=>{
