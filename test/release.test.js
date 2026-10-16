@@ -40,7 +40,10 @@ test('email layer never uses a fake development success',()=>{
 test('release source contains required self-service routes and safety gates',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
   for(const route of ["app.patch('/api/quotes/:id'","app.delete('/api/quotes/:id'","/followup-preview'","/send-followup'","app.post('/api/billing/portal'","app.delete('/api/account'","app.post('/api/activity'"])assert.ok(server.includes(route),route);
-  assert.match(server,/ACQUISITION_ENABLED!=='true'/);
+  const outreach=readFileSync(new URL('../server/outreach.js',import.meta.url),'utf8');
+  const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
+  assert.match(outreach,/ACQUISITION_ENABLED !== 'true'/);
+  assert.match(controlled,/COMMERCIAL_OUTREACH_SEND_ENABLED!=='true'/);
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
   for(const path of ['/pricing','/docs','/faq','/contact','/reset-password'])assert.ok(client.includes(path),path);
   assert.match(client,/updateUser\(\{password:p1\}\)/);
@@ -120,7 +123,10 @@ test('production capabilities remain independently gated',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
   assert.match(server,/BILLING_ENABLED!=='true'/);
-  assert.match(server,/ACQUISITION_ENABLED!=='true'/);
+  const outreach=readFileSync(new URL('../server/outreach.js',import.meta.url),'utf8');
+  const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
+  assert.match(outreach,/ACQUISITION_ENABLED !== 'true'/);
+  assert.match(controlled,/COMMERCIAL_OUTREACH_SEND_ENABLED!=='true'/);
   assert.match(server,/LEGAL_PAGES_APPROVED!=='true'/);
   assert.match(client,/VITE_BILLING_ENABLED==='true'/);
   assert.match(server,/FOLLOWUP_AUTOMATION_ENABLED==='true'/);
@@ -163,15 +169,16 @@ test('Docker build exposes every public launch variable used by Vite',()=>{
 });
 
 
-test('prepared B2B outreach uses commercial identity, source, privacy and opt-out',()=>{
-  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+test('controlled B2B outreach uses Relanzio sender, reply-to and explicit STOP',()=>{
+  const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
+  const policy=readFileSync(new URL('../server/controlled-outreach-policy.js',import.meta.url),'utf8');
   const email=readFileSync(new URL('../server/email.js',import.meta.url),'utf8');
   assert.match(email,/senderEmail \|\| process\.env\.EMAIL_FROM_ADDRESS/);
-  assert.match(server,/senderEmail:commercialEmail/);
-  assert.match(server,/replyTo:commercialEmail/);
-  assert.match(server,/Source : \$\{source\}/);
-  assert.match(server,/https:\/\/relanzio\.com\/privacy/);
-  assert.match(server,/répondez STOP ou écrivez à/);
+  assert.match(controlled,/replyTo:PILOT_SENDER\.replyTo/);
+  assert.match(controlled,/senderEmail:PILOT_SENDER\.email/);
+  assert.match(policy,/dites simplement STOP/);
+  assert.match(policy,/29 € \/ mois/);
+  assert.match(policy,/7 jours/);
 });
 
 
@@ -249,11 +256,15 @@ test('trial accounts are excluded from paid MRR metrics',()=>{
 });
 
 
-test('prospect import preserves sector and deduplicates by normalized email',()=>{
+test('prospect import is delegated to the safe qualified importer with tombstones',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
-  assert.match(server,/sector:sanitizeText\(p\.sector,160\)/);
-  assert.match(server,/const email=normalizeEmail\(p\.email\)/);
-  assert.match(server,/upsert\(accepted,\{onConflict:'email',ignoreDuplicates:false\}\)/);
+  const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
+  const migration=readFileSync(new URL('../supabase/migrations/20261016081002_controlled_outreach_20_safety.sql',import.meta.url),'utf8');
+  assert.match(server,/safeImportCommercialProspects\(rows\)/);
+  assert.match(controlled,/sector:sanitizeText\(raw\.sector,160\)/);
+  assert.match(controlled,/const email=normalizeEmail\(raw\?\.email\)/);
+  assert.match(migration,/prospect_tombstones/);
+  assert.match(migration,/safe_import_qualified_prospect/);
 });
 
 
