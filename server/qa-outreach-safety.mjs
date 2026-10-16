@@ -129,7 +129,8 @@ try{
   // A contacted prospect is never prepared for another J0.
   const contactedEmail=`${prefix}.contacted@${qaDomain}`;
   const ci=await db.rpc('safe_import_qualified_prospect',{p:{...base,email:contactedEmail,company_name:'QA contacted'}});
-  await db.from('prospects').update({status:'contacted',last_contacted_at:new Date().toISOString()}).eq('id',ci.data.id);
+  const contactedUpdate=await db.from('prospects').update({status:'contacted',last_contacted_at:new Date().toISOString()}).eq('id',ci.data.id).select('id,last_contacted_at').single();
+  assert(!contactedUpdate.error&&Boolean(contactedUpdate.data?.last_contacted_at),'contacted_seed_update_failed');
   let contactedBlocked=false;
   try{await prepareCommercialProspect({prospectId:ci.data.id,personalization:'Votre site propose des demandes de devis.',subject:'Question sur vos devis'});}
   catch(e){contactedBlocked=e.code==='COMMERCIAL_NOT_QUALIFIED'||e.code==='COMMERCIAL_ALREADY_CONTACTED';}
