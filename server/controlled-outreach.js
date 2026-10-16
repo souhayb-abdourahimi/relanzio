@@ -72,6 +72,7 @@ async function blockers(prospect){
 
 export async function prepareCommercialProspect({prospectId,personalization,subject,scheduledAt}){
   const prospect=await getProspect(prospectId);
+  if(prospect.last_contacted_at)throw commercialError('COMMERCIAL_ALREADY_CONTACTED','Ce prospect a déjà été contacté.');
   if(prospect.status!=='qualified')throw commercialError('COMMERCIAL_NOT_QUALIFIED','Prospect non qualifié.');
   if(prospect.lawful_basis!=='professional_relevance')throw commercialError('COMMERCIAL_BASIS_INVALID','Base de prospection invalide.');
   if(Number(prospect.score||0)<55)throw commercialError('COMMERCIAL_SCORE_LOW','Score insuffisant.');
@@ -105,6 +106,7 @@ export async function prepareCommercialProspect({prospectId,personalization,subj
 export async function inspectCommercialOutreach(prospectId){
   const prospect=await getProspect(prospectId);
   const state=await blockers(prospect);
+  if(prospect.last_contacted_at)throw commercialError('COMMERCIAL_ALREADY_CONTACTED','Ce prospect a déjà été contacté.');
   if(prospect.status!=='qualified')throw commercialError('COMMERCIAL_NOT_QUALIFIED','Prospect non qualifié.');
   if(state.suppressed)throw commercialError('COMMERCIAL_SUPPRESSED','Adresse supprimée.');
   if(state.history.some(x=>x.type==='sent'))throw commercialError('COMMERCIAL_ALREADY_CONTACTED','J0 déjà envoyé.');
