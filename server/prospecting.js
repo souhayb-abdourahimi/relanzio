@@ -6,7 +6,7 @@ export function qualifyProspect(prospect) { return scoreProspect(prospect); }
 const schema = {
   type:'object', additionalProperties:false,
   properties:{
-    category:{type:'string',enum:['interested','not_now','pricing','feature_request','not_interested','opt_out','other']},
+    category:{type:'string',enum:['interested','auto_reply','not_now','pricing','feature_request','not_interested','opt_out','other']},
     sentiment:{type:'string',enum:['positive','neutral','negative']},
     confidence:{type:'number',minimum:0,maximum:1}, needs_human:{type:'boolean'},
     summary:{type:'string'}, objection:{type:'string'}, requested_feature:{type:'string'}
@@ -20,7 +20,7 @@ export async function analyzeReply(text) {
   try {
     const response = await openai.responses.create({
       model:process.env.OPENAI_MODEL || 'gpt-5.6-luna', reasoning:{effort:'none'}, max_output_tokens:300, store:false,
-      input:`Analyse cette réponse à une prospection B2B pour Relanzio. N'infère rien qui n'est pas dans le texte. Une demande d'arrêt est toujours opt_out. Texte: ${String(text).slice(0,4000)}`,
+      input:`Analyse cette réponse à une prospection B2B pour Relanzio. N'infère rien qui n'est pas dans le texte. Une demande d'arrêt est toujours opt_out. Une réponse d'absence/automatique est auto_reply et n'est jamais un intérêt commercial. Une question de prix est pricing; une demande de démo, test, rendez-vous, rappel ou informations commerciales est interested. Texte: ${String(text).slice(0,4000)}`,
       text:{ format:{ type:'json_schema', name:'reply_analysis', strict:true, schema } }
     });
     const parsed = JSON.parse(response.output_text);
