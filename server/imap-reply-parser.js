@@ -144,11 +144,9 @@ export function deterministicReplyCategory(text='') {
 }
 
 export function normalizeReplyCategory(analysis={}) {
-  if(analysis.category==='interested')return 'interested';
-  if(analysis.category==='opt_out')return 'opt_out';
-  if(analysis.category==='not_interested')return 'not_interested';
-  if(['neutral','not_now','pricing','feature_request'].includes(analysis.category))return 'neutral';
-  return 'unknown';
+  if(['interested','auto_reply','opt_out','not_interested','not_now','pricing','feature_request','other'].includes(analysis.category))return analysis.category;
+  if(analysis.category==='neutral')return 'neutral';
+  return 'other';
 }
 
 export function resolveProspectIdentity(parsed,{prospectByEmail=new Map(),providerToProspect=new Map()}={}) {
