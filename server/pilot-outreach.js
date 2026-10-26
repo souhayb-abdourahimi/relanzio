@@ -1,3 +1,4 @@
+import { resolveTxt } from 'node:dns/promises';
 import { db } from './db.js';
 import { sendEmail } from './email.js';
 import {
@@ -75,42 +76,95 @@ async function pilotSentLast24h() {
 export async function getBrevoPilotSenderStatus() {
   if (!process.env.BREVO_API_KEY) throw pilotError('PILOT_BREVO_NOT_CONFIGURED', 'Brevo n’est pas configuré.', 503);
   const headers = { accept:'application/json', 'api-key':process.env.BREVO_API_KEY };
-  const [sendersResponse, domainResponse] = await Promise.all([
+  const [sendersResponse, domainResponse, accountResponse, webhooksResponse, spfRows, dmarcRows] = await Promise.all([
     fetch('https://api.brevo.com/v3/senders', { method:'GET', headers }),
-    fetch('https://api.brevo.com/v3/senders/domains/relanzio.com', { method:'GET', headers })
+    fetch('https://api.brevo.com/v3/senders/domains/relanzio.com', { method:'GET', headers }),
+    fetch('https://api.brevo.com/v3/account', { method:'GET', headers }),
+    fetch('https://api.brevo.com/v3/webhooks?type=transactional&sort=desc', { method:'GET', headers }),
+    resolveTxt('relanzio.com').catch(()=>[]),
+    resolveTxt('_dmarc.relanzio.com').catch(()=>[])
   ]);
   if (!sendersResponse.ok) throw pilotError('PILOT_BREVO_SENDER_CHECK_FAILED', `Brevo sender check ${sendersResponse.status}: ${await sendersResponse.text()}`, 503);
+  if (!domainResponse.ok) throw pilotError('PILOT_BREVO_DOMAIN_CHECK_FAILED', `Brevo domain check ${domainResponse.status}: ${await domainResponse.text()}`, 503);
+  if (!accountResponse.ok) throw pilotError('PILOT_BREVO_ACCOUNT_CHECK_FAILED', `Brevo account check ${accountResponse.status}: ${await accountResponse.text()}`, 503);
+  if (!webhooksResponse.ok) throw pilotError('PILOT_BREVO_WEBHOOK_CHECK_FAILED', `Brevo webhook check ${webhooksResponse.status}: ${await webhooksResponse.text()}`, 503);
+
   const payload = await sendersResponse.json();
-  const domainPayload = domainResponse.ok ? await domainResponse.json() : null;
+  const account = await accountResponse.json();
+  const domainPayload = await domainResponse.json();
+  const webhookPayload = await webhooksResponse.json();
   const senders = payload.senders || [];
   const sender = senders.find(x => String(x.email || '').toLowerCase() === PILOT_SENDER.email);
   const domain = domainPayload && typeof domainPayload.domain === 'object' ? domainPayload.domain : domainPayload;
+  const dnsRecords=domain?.dns_records||domainPayload?.dns_records||{};
+  const spf=spfRows.map(parts=>parts.join('')).find(x=>/^v=spf1\b/i.test(x))||null;
+  const dmarc=dmarcRows.map(parts=>parts.join('')).find(x=>/^v=DMARC1\b/i.test(x))||null;
+  const spfOk=Boolean(spf&&/(brevo|sendinblue)/i.test(spf));
+  const dkimOk=dnsRecords?.dkim_record?.status===true;
+  const dmarcOk=Boolean(dmarc)&&dnsRecords?.dmarc_record?.status===true;
+  const webhooks=webhookPayload?.webhooks||[];
+  const transactionalWebhook=webhooks.find(w=>{
+    const events=(w.events||[]).map(x=>String(x).toLowerCase());
+    return String(w.type||'').toLowerCase()==='transactional'
+      &&/\/api\/brevo\/webhook\/?$/i.test(String(w.url||''))
+      &&['hardbounce','softbounce','delivered','unsubscribed'].every(x=>events.includes(x.toLowerCase()));
+  });
+
+  const sendCreditPlans=(account.plan||[])
+    .filter(x=>String(x?.creditsType||'').toLowerCase()==='sendlimit'&&String(x?.type||'').toLowerCase()!=='sms')
+    .map(x=>({type:String(x?.type||''),credits:Number(x?.credits)}))
+    .filter(x=>Number.isFinite(x.credits)&&x.credits>0);
+  const providerAvailableCredits=sendCreditPlans.length?Math.max(...sendCreditPlans.map(x=>x.credits)):0;
   const details = {
     sender_found:Boolean(sender),
     sender_active:sender?.active === true,
     domain_verified:domain?.verified === true,
     domain_authenticated:domain?.authenticated === true,
+    spf_ok:spfOk,
+    dkim_ok:dkimOk,
+    dmarc_ok:dmarcOk,
+    webhook_ok:Boolean(transactionalWebhook),
+    provider_available_credits:providerAvailableCredits,
+    provider_plan_types:sendCreditPlans.map(x=>x.type),
+    relay_enabled:account?.relay?.enabled===true,
     active_relanzio_senders:senders
       .filter(x => x.active === true && String(x.email || '').toLowerCase().endsWith('@relanzio.com'))
       .map(x => String(x.email || '').toLowerCase())
   };
   if (!sender) {
     const error = pilotError('PILOT_SENDER_NOT_REGISTERED', `${PILOT_SENDER.email} n’est pas enregistré comme expéditeur Brevo.`, 503);
-    error.details = details;
-    throw error;
+    error.details = details; throw error;
   }
   if (sender.active !== true) {
     const error = pilotError('PILOT_SENDER_NOT_ACTIVE', `${PILOT_SENDER.email} n’est pas actif dans Brevo.`, 503);
-    error.details = details;
-    throw error;
+    error.details = details; throw error;
+  }
+  if (domain?.verified !== true || domain?.authenticated !== true || !spfOk || !dkimOk || !dmarcOk) {
+    const error = pilotError('PILOT_DOMAIN_NOT_AUTHENTICATED', 'SPF, DKIM, DMARC ou authentification Brevo invalide.', 503);
+    error.details = details; throw error;
+  }
+  if (!transactionalWebhook) {
+    const error=pilotError('PILOT_BREVO_WEBHOOK_NOT_READY','Webhook Brevo transactionnel incomplet ou indisponible.',503);
+    error.details=details; throw error;
+  }
+  if (!providerAvailableCredits) {
+    const error = pilotError('PILOT_BREVO_NO_SEND_CAPACITY', 'Aucun crédit d’envoi Brevo disponible ou lisible.', 429);
+    error.details = details; throw error;
   }
   return {
     accepted:true,
     id:sender.id ?? null,
     registered_name:sender.name || null,
     active:true,
-    domain_verified:details.domain_verified,
-    domain_authenticated:details.domain_authenticated,
+    domain_verified:true,
+    domain_authenticated:true,
+    spf_ok:true,
+    dkim_ok:true,
+    dmarc_ok:true,
+    webhook_ok:true,
+    provider_available_credits:providerAvailableCredits,
+    provider_plan_types:details.provider_plan_types,
+    relay_enabled:details.relay_enabled,
     from:`${PILOT_SENDER.name} <${PILOT_SENDER.email}>`,
     reply_to:PILOT_SENDER.replyTo
   };
