@@ -121,12 +121,18 @@ async function verifyPublishedEvidence(candidate){
   const email=normalizeEmail(candidate.email);
   const emailSource=candidate.source_url;
   const workflowSource=candidate.workflow_url||candidate.source_url||candidate.website;
-  const emailPage=await safeFetchText(emailSource);
-  const emailText=normalizedPageText(emailPage.text);
+  let emailPage=await safeFetchText(emailSource);
+  let emailText=normalizedPageText(emailPage.text);
+  if(!emailText.includes(email)&&candidate.website&&String(candidate.website)!==String(emailSource)){
+    const websitePage=await safeFetchText(candidate.website);
+    const websiteText=normalizedPageText(websitePage.text);
+    if(websiteText.includes(email)){emailPage=websitePage;emailText=websiteText}
+  }
   if(!emailText.includes(email))throw new Error('public_email_not_found');
 
   let workflowPage=emailPage;
-  if(workflowSource&&String(workflowSource)!==String(emailSource))workflowPage=await safeFetchText(workflowSource);
+  if(workflowSource&&String(workflowSource)!==String(emailPage.url)&&String(workflowSource)!==String(emailSource))workflowPage=await safeFetchText(workflowSource);
+  else if(workflowSource&&String(workflowSource)!==String(emailPage.url)&&String(workflowSource)===String(emailSource))workflowPage=await safeFetchText(workflowSource);
   const workflowText=normalizedPageText(workflowPage.text);
   if(!QUOTE_WORKFLOW_RE.test(workflowText))throw new Error('quote_workflow_not_confirmed');
   return {
@@ -252,6 +258,8 @@ async function prepareExistingQualified(limit){
   for(const prospect of data||[]){
     if(prepared.length>=limit)break;
     if(await queueExists(prospect.id))continue;
+    const lastCheck=Date.parse(prospect.verification_metadata?.auto_feeder_checked_at||'');
+    if(prospect.verification_metadata?.auto_feeder_status==='manual_review'&&Number.isFinite(lastCheck)&&Date.now()-lastCheck<24*60*60*1000)continue;
     try{
       const protections=await exactProtections(prospect.email,{excludeProspectId:prospect.id});
       if(protections.suppression)throw new Error('suppressed');
