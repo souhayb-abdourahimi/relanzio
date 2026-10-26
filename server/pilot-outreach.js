@@ -1,4 +1,5 @@
 import { resolveCname, resolveTxt } from 'node:dns/promises';
+import { evaluateBrevoDomainAuth } from './brevo-domain-auth.js';
 import { db } from './db.js';
 import { sendEmail } from './email.js';
 import {
@@ -80,20 +81,26 @@ function dnsName(host,domain='relanzio.com'){
   return `${raw}.${domain}`;
 }
 
+function normalizeDnsTarget(value=''){
+  return String(value||'').trim().replace(/\.$/,'').toLowerCase();
+}
+
 async function verifyPublicDkim(record,domain='relanzio.com'){
-  if(record?.status===true)return true;
   const host=dnsName(record?.host_name,domain);
   if(!host)return false;
   const type=String(record?.type||'TXT').toUpperCase();
   try{
     if(type==='CNAME'){
       const rows=await resolveCname(host);
-      return Array.isArray(rows)&&rows.length>0;
+      if(!Array.isArray(rows)||!rows.length)return false;
+      const expected=normalizeDnsTarget(record?.value);
+      if(!expected)return true;
+      return rows.map(normalizeDnsTarget).includes(expected);
     }
     const rows=await resolveTxt(host);
     const values=rows.map(parts=>parts.join('').replace(/\s+/g,'')).filter(Boolean);
     const expected=String(record?.value||'').replace(/\s+/g,'');
-    if(expected&&values.some(v=>v===expected||v.includes(expected)||expected.includes(v)))return true;
+    if(expected)return values.some(v=>v===expected||v.includes(expected)||expected.includes(v));
     return values.some(v=>/p=[A-Za-z0-9+/=]+/i.test(v)||/^v=DKIM1;/i.test(v));
   }catch{return false}
 }
@@ -120,13 +127,19 @@ export async function getBrevoPilotSenderStatus() {
   const webhookPayload = await webhooksResponse.json();
   const senders = payload.senders || [];
   const sender = senders.find(x => String(x.email || '').toLowerCase() === PILOT_SENDER.email);
-  const domain = domainPayload && typeof domainPayload.domain === 'object' ? domainPayload.domain : domainPayload;
-  const dnsRecords=domain?.dns_records||domainPayload?.dns_records||{};
+  const domainAuth=evaluateBrevoDomainAuth(domainPayload);
   const spf=spfRows.map(parts=>parts.join('')).find(x=>/^v=spf1\b/i.test(x))||null;
   const dmarc=dmarcRows.map(parts=>parts.join('')).find(x=>/^v=DMARC1\b/i.test(x))||null;
   const spfOk=Boolean(spf&&/(brevo|sendinblue)/i.test(spf));
-  const dkimOk=await verifyPublicDkim(dnsRecords?.dkim_record,'relanzio.com');
-  const dmarcOk=Boolean(dmarc)&&dnsRecords?.dmarc_record?.status===true;
+  const dkimDnsChecks=await Promise.all(domainAuth.dkim_records.map(async record=>({
+    key:record.key,
+    status:record.status,
+    type:record.type,
+    host_name:record.host_name,
+    dns_ok:await verifyPublicDkim(record,'relanzio.com')
+  })));
+  const dkimOk=domainAuth.dkim_ok&&dkimDnsChecks.length>0&&dkimDnsChecks.every(x=>x.dns_ok===true);
+  const dmarcOk=Boolean(dmarc)&&domainAuth.dmarc_ok;
   const webhooks=webhookPayload?.webhooks||[];
   const transactionalWebhook=webhooks.find(w=>{
     const events=(w.events||[]).map(x=>String(x).toLowerCase());
@@ -143,10 +156,12 @@ export async function getBrevoPilotSenderStatus() {
   const details = {
     sender_found:Boolean(sender),
     sender_active:sender?.active === true,
-    domain_verified:domain?.verified === true,
-    domain_authenticated:domain?.authenticated === true,
+    domain_verified:domainAuth.verified,
+    domain_authenticated:domainAuth.authenticated,
     spf_ok:spfOk,
     dkim_ok:dkimOk,
+    dkim_records:dkimDnsChecks,
+    brevo_code_ok:domainAuth.brevo_code_ok,
     dmarc_ok:dmarcOk,
     webhook_ok:Boolean(transactionalWebhook),
     provider_available_credits:providerAvailableCredits,
@@ -164,7 +179,7 @@ export async function getBrevoPilotSenderStatus() {
     const error = pilotError('PILOT_SENDER_NOT_ACTIVE', `${PILOT_SENDER.email} n’est pas actif dans Brevo.`, 503);
     error.details = details; throw error;
   }
-  if (domain?.verified !== true || domain?.authenticated !== true || !spfOk || !dkimOk || !dmarcOk) {
+  if (!domainAuth.verified || !domainAuth.authenticated || !spfOk || !dkimOk || !dmarcOk) {
     const error = pilotError('PILOT_DOMAIN_NOT_AUTHENTICATED', 'SPF, DKIM, DMARC ou authentification Brevo invalide.', 503);
     error.details = details; throw error;
   }
@@ -185,6 +200,8 @@ export async function getBrevoPilotSenderStatus() {
     domain_authenticated:true,
     spf_ok:true,
     dkim_ok:true,
+    dkim_records:dkimDnsChecks,
+    brevo_code_ok:domainAuth.brevo_code_ok,
     dmarc_ok:true,
     webhook_ok:true,
     provider_available_credits:providerAvailableCredits,
