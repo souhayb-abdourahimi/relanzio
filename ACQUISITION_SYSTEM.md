@@ -4,7 +4,7 @@
 Agences web/marketing/design et petites entreprises de service : 1–10 personnes, 5+ devis/propositions par mois, panier moyen > 500 €, décideur accessible, outils numériques déjà utilisés.
 
 ## Pipeline
-Source professionnelle → import documenté → score → revue humaine → message → cooldown 7 jours → réponse → analyse IA → insight → rendez-vous/pilote.
+Backlog vérifié → staging documenté → revalidation → import sécurisé → D0 → J+3 unique → END → réponse → analyse → suivi humain → essai/client.
 
 ## Règles
 - pas de scraping caché dans Relanzio ;
@@ -42,3 +42,11 @@ La formule visée est 29 €/mois. Avant de vous demander de payer, je préfère
 
 ## Fonction manquante
 Merci. Aujourd'hui cette fonction n'existe pas. Je note la demande et je ne vous promets pas de date tant que plusieurs utilisateurs ne confirment pas le même besoin.
+
+
+## Prospection continue
+
+Le runner commercial maintient un stock limité de D0 prêts à partir d'un staging `outreach_candidates`.
+Le staging n'est jamais assimilé directement à la queue d'envoi : un candidat PASS/WARN doit encore passer les contrôles runtime (source publique, email toujours publié, workflow de devis, MX, suppression, tombstone, historique, doublons).
+Les réponses humaines annulent les relances futures. Les réponses automatiques sont enregistrées mais ne bloquent pas une J+3 légitime.
+Les catégories `interested`, `pricing` et `feature_request` sont des réponses positives et créent un suivi humain ouvert.
