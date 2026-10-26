@@ -13,10 +13,11 @@ const day=n=>new Date(baseFuture.getTime()+n*86400000).toISOString().slice(0,10)
 const concurrencyDate=day(0);
 const failureDate=day(1);
 const parisBoundaryDate=day(2);
+const highCapDate=day(3);
 const assert=(v,m)=>{if(!v)throw new Error(m)};
 
 async function cleanup(){
-  await db.from('outreach_daily_slots').delete().in('business_date',[concurrencyDate,failureDate,parisBoundaryDate,day(3),'2100-01-15','2100-01-16']);
+  await db.from('outreach_daily_slots').delete().in('business_date',[concurrencyDate,failureDate,parisBoundaryDate,highCapDate,'2100-01-15','2100-01-16']);
   const {data:prospects}=await db.from('prospects').select('id,email').like('email','qa.outreach.safety.%@'+qaDomain);
   const ids=(prospects||[]).map(x=>x.id);
   if(ids.length){
@@ -32,39 +33,45 @@ try{
   await cleanup();
 
   // True concurrent RPC calls against the production database, using an isolated future business date.
-  const claims=await Promise.all(Array.from({length:50},(_,i)=>
+  const testCap=25;
+  const claims=await Promise.all(Array.from({length:30},(_,i)=>
     db.rpc('claim_outreach_daily_slot',{
       p_reservation_key:`qa-concurrency-${stamp}-${i}`,
-      p_queue_id:null,p_cap:20,p_now:concurrencyDate+'T12:00:00+01:00'
+      p_queue_id:null,p_cap:testCap,p_now:concurrencyDate+'T12:00:00+01:00'
     })
   ));
   const errors=claims.filter(x=>x.error);
   assert(errors.length===0,'concurrency_rpc_errors');
   const allowed=claims.filter(x=>x.data?.allowed===true);
   const denied=claims.filter(x=>x.data?.allowed===false);
-  assert(allowed.length===20,'concurrency_allowed_'+allowed.length);
-  assert(denied.length===30,'concurrency_denied_'+denied.length);
+  assert(allowed.length===testCap,'concurrency_allowed_'+allowed.length);
+  assert(denied.length===5,'concurrency_denied_'+denied.length);
   const slots=new Set(allowed.map(x=>x.data.slot));
-  assert(slots.size===20,'concurrency_duplicate_slots');
+  assert(slots.size===testCap,'concurrency_duplicate_slots');
 
-  const twentyOne=await db.rpc('claim_outreach_daily_slot',{
-    p_reservation_key:`qa-concurrency-${stamp}-21-check`,
-    p_queue_id:null,p_cap:20,p_now:concurrencyDate+'T12:00:00+01:00'
+  const nextDenied=await db.rpc('claim_outreach_daily_slot',{
+    p_reservation_key:`qa-concurrency-${stamp}-cap-check`,
+    p_queue_id:null,p_cap:testCap,p_now:concurrencyDate+'T12:00:00+01:00'
   });
-  assert(!twentyOne.error&&twentyOne.data?.allowed===false&&twentyOne.data?.reason==='daily_cap','twenty_first_not_blocked');
+  assert(!nextDenied.error&&nextDenied.data?.allowed===false&&nextDenied.data?.reason==='daily_cap','configured_cap_not_enforced');
+
+  const highCap=await db.rpc('claim_outreach_daily_slot',{
+    p_reservation_key:`qa-high-cap-${stamp}`,p_queue_id:null,p_cap:300,p_now:highCapDate+'T12:00:00+01:00'
+  });
+  assert(!highCap.error&&highCap.data?.allowed===true&&highCap.data?.cap===300,'provider_cap_300_not_supported');
 
   // Paris calendar boundary, not rolling 24 hours.
   const parisWinterDay='2100-01-15';
-  const before=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-before-${stamp}`,p_queue_id:null,p_cap:20,p_now:parisWinterDay+'T22:59:00+00:00'});
-  const after=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-after-${stamp}`,p_queue_id:null,p_cap:20,p_now:parisWinterDay+'T23:01:00+00:00'});
+  const before=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-before-${stamp}`,p_queue_id:null,p_cap:300,p_now:parisWinterDay+'T22:59:00+00:00'});
+  const after=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-paris-after-${stamp}`,p_queue_id:null,p_cap:300,p_now:parisWinterDay+'T23:01:00+00:00'});
   assert(!before.error&&!after.error&&before.data.business_date!==after.data.business_date,'paris_day_boundary_failed');
 
   // Definite provider failure releases the reservation; ambiguous failure stays conservative.
-  const failClaim=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-provider-fail-${stamp}`,p_queue_id:null,p_cap:20,p_now:failureDate+'T12:00:00+01:00'});
+  const failClaim=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-provider-fail-${stamp}`,p_queue_id:null,p_cap:300,p_now:failureDate+'T12:00:00+01:00'});
   assert(failClaim.data?.allowed===true,'failure_claim_failed');
   const released=await db.rpc('finalize_outreach_daily_slot',{p_reservation_key:`qa-provider-fail-${stamp}`,p_outcome:'definite_failure'});
   assert(released.data?.status==='released','definite_failure_not_released');
-  const unknownClaim=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-provider-unknown-${stamp}`,p_queue_id:null,p_cap:20,p_now:failureDate+'T12:00:00+01:00'});
+  const unknownClaim=await db.rpc('claim_outreach_daily_slot',{p_reservation_key:`qa-provider-unknown-${stamp}`,p_queue_id:null,p_cap:300,p_now:failureDate+'T12:00:00+01:00'});
   await db.rpc('finalize_outreach_daily_slot',{p_reservation_key:`qa-provider-unknown-${stamp}`,p_outcome:'unknown'});
   const {count:unknownCount}=await db.from('outreach_daily_slots').select('*',{count:'exact',head:true}).eq('business_date',failureDate);
   assert(unknownClaim.data?.allowed===true&&unknownCount===1,'unknown_failure_should_count');
@@ -107,7 +114,18 @@ try{
   assert(rp.data?.matched===true&&rp.data?.prospect_id===positive.id&&!rp.data?.suppressed,'positive_reply_link_failed');
   const {data:positiveRow}=await db.from('prospects').select('status,last_reply_at,reply_category').eq('id',positive.id).single();
   const {data:positiveQueue}=await db.from('outreach_queue').select('status').eq('prospect_id',positive.id).eq('sequence_step',1).single();
-  assert(positiveRow.status==='replied'&&positiveRow.reply_category==='interested'&&positiveQueue.status==='canceled','positive_reply_state_failed');
+  assert(positiveRow.status==='interested'&&positiveRow.reply_category==='interested'&&positiveQueue.status==='canceled','positive_reply_state_failed');
+  const {data:positiveFollowup}=await db.from('sales_followups').select('status,category').eq('prospect_id',positive.id).maybeSingle();
+  assert(positiveFollowup?.status==='open'&&positiveFollowup?.category==='interested','positive_human_followup_missing');
+
+  const auto=await seedReply('auto');
+  const ra=await db.rpc('apply_outreach_reply',{
+    p_from_email:auto.email,p_category:'auto_reply',p_sentiment:'neutral',p_content:'Réponse automatique : absent du bureau.',
+    p_received_at:new Date().toISOString(),p_dedupe_key:`qa-reply-auto-${stamp}`,p_in_reply_to:auto.messageId,p_metadata:{qa:true}
+  });
+  const {data:autoRow}=await db.from('prospects').select('status,last_reply_at').eq('id',auto.id).single();
+  const {data:autoQueue}=await db.from('outreach_queue').select('status').eq('prospect_id',auto.id).eq('sequence_step',1).single();
+  assert(ra.data?.matched===true&&ra.data?.human===false&&autoRow.status==='qualified'&&autoRow.last_reply_at===null&&autoQueue.status==='held','auto_reply_should_not_stop_sequence');
 
   const refusal=await seedReply('refusal');
   const rr=await db.rpc('apply_outreach_reply',{
@@ -144,8 +162,8 @@ try{
 
   console.log('OUTREACH_SAFETY_QA_PASS '+JSON.stringify({
     import_idempotent:true,deleted_never_reimported:true,suppression_priority:true,
-    cap:{value:20,concurrent_allowed:allowed.length,concurrent_denied:denied.length,twenty_first_blocked:true,paris_calendar_day:true},
-    replies:{positive:true,refusal:true,stop:true,dedupe:true,followup_canceled:true},
+    cap:{configured:testCap,provider_cap_300:true,concurrent_allowed:allowed.length,concurrent_denied:denied.length,configured_cap_enforced:true,paris_calendar_day:true},
+    replies:{positive:true,auto_reply_non_blocking:true,refusal:true,stop:true,dedupe:true,followup_canceled:true,human_followup_created:true},
     provider_failure:{definite_released:true,unknown_counts:true},commercial_emails_sent:0
   }));
 }finally{
