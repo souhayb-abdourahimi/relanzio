@@ -540,7 +540,7 @@ app.post('/api/admin/prospects/:id/send', requireUser, async(req,res)=>{
 app.post('/api/admin/outreach/candidates/import', requireUser, rateLimit({windowMs:60_000,max:10}), async(req,res)=>{
   if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
   try{
-    const rows=Array.isArray(req.body.candidates)?req.body.candidates:[];
+    const rows=Array.isArray(req.body.candidates)?req.body.candidates:Array.isArray(req.body.prospects)?req.body.prospects:[];
     res.json(await stageCommercialCandidates(rows));
   }catch(e){
     await reportError('outreach.candidates.import',e,{request_id:req.requestId});
