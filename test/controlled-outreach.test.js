@@ -4,15 +4,24 @@ import {
   COMMERCIAL_STOP_LINE,
   COMMERCIAL_SUBJECTS,
   commercialDailyCap,
+  isCommercialBusinessWindow,
   renderCommercialJ0,
-  validateCommercialJ0
+  renderCommercialJ3,
+  validateCommercialJ0,
+  validateCommercialJ3
 } from '../server/controlled-outreach-policy.js';
 
-test('commercial daily cap is hard-clamped to twenty',()=>{
-  assert.equal(commercialDailyCap(20),20);
-  assert.equal(commercialDailyCap(99),20);
-  assert.equal(commercialDailyCap(7),7);
-  assert.equal(commercialDailyCap('bad'),20);
+test('commercial daily cap follows provider capacity and ignores legacy 20 sentinel',()=>{
+  assert.equal(commercialDailyCap(20,300),300);
+  assert.equal(commercialDailyCap(99,300),99);
+  assert.equal(commercialDailyCap(999,300),300);
+  assert.equal(commercialDailyCap('bad',250),250);
+});
+
+test('commercial business window uses French weekdays and daytime',()=>{
+  assert.equal(isCommercialBusinessWindow(new Date('2026-10-26T11:00:00Z')),true);
+  assert.equal(isCommercialBusinessWindow(new Date('2026-10-26T06:00:00Z')),false);
+  assert.equal(isCommercialBusinessWindow(new Date('2026-10-25T11:00:00Z')),false);
 });
 
 test('commercial J0 contains required trial price and opt-out with no forbidden claims',()=>{
@@ -22,6 +31,14 @@ test('commercial J0 contains required trial price and opt-out with no forbidden 
   assert.match(content,/7 jours/);
   assert.match(content,/29 € \/ mois/);
   assert.ok(content.includes(COMMERCIAL_STOP_LINE));
+});
+
+test('commercial J3 is the only follow-up and retains STOP',()=>{
+  const content=renderCommercialJ3({companyName:'Entreprise Test',sector:'Rénovation'});
+  const result=validateCommercialJ3({subject:'Re: Question sur vos devis',content,companyName:'Entreprise Test',sector:'Rénovation'});
+  assert.deepEqual(result,{ok:true,reasons:[]});
+  assert.match(content,/7 jours/);
+  assert.match(content,/STOP/);
 });
 
 test('commercial J0 rejects unsupported subject and stale sales claims',()=>{
