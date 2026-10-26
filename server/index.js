@@ -23,6 +23,7 @@ import { grantTrialToEmail, grantTrialToUser, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
 import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
 import { safeImportCommercialProspects, prepareCommercialProspect, inspectCommercialOutreach, sendCommercialJ0, ingestBrevoInbound, runCommercialSequenceTick } from './controlled-outreach.js';
+import { stageCommercialCandidates, runCommercialQueueFeeder } from './commercial-feeder.js';
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { pollImapReplies } from './imap-replies.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt } from './quote-rules.js';
@@ -536,6 +537,23 @@ app.post('/api/admin/prospects/:id/send', requireUser, async(req,res)=>{
   res.status(410).json({error:'Ancien chemin d’envoi désactivé. Utilisez le parcours commercial contrôlé.'});
 });
 
+app.post('/api/admin/outreach/candidates/import', requireUser, rateLimit({windowMs:60_000,max:10}), async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{
+    const rows=Array.isArray(req.body.candidates)?req.body.candidates:[];
+    res.json(await stageCommercialCandidates(rows));
+  }catch(e){
+    await reportError('outreach.candidates.import',e,{request_id:req.requestId});
+    res.status(500).json({error:'Import du backlog vérifié impossible.',request_id:req.requestId});
+  }
+});
+
+app.post('/api/admin/outreach/refill', requireUser, rateLimit({windowMs:60_000,max:5}), async(req,res)=>{
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{res.json(await runCommercialQueueFeeder())}
+  catch(e){await reportError('outreach.feeder.manual',e,{request_id:req.requestId});res.status(500).json({error:'Feeder commercial impossible.',request_id:req.requestId})}
+});
+
 app.post('/api/admin/outreach/prepare-commercial', requireUser, rateLimit({windowMs:60_000,max:30}), async(req,res)=>{
   if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
   try{
@@ -560,7 +578,28 @@ app.post('/api/admin/outreach/send-commercial', requireUser, rateLimit({windowMs
 });
 
 app.post('/api/admin/prospects/:id/reply', requireUser, async(req,res)=>{
-  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const text=sanitizeText(req.body.text,5000);if(!text)return res.status(400).json({error:'Réponse vide.'});const {data:p,error}=await db.from('prospects').select('*').eq('id',req.params.id).single();if(error)throw error;const analysis=await analyzeReply(text);await db.from('outreach_events').insert({prospect_id:p.id,type:analysis.category==='opt_out'?'opt_out':'replied',content:text,metadata:analysis});await db.from('feedback_insights').insert({prospect_id:p.id,category:analysis.category,sentiment:analysis.sentiment,confidence:analysis.confidence,summary:analysis.summary,objection:analysis.objection||'',requested_feature:analysis.requested_feature||'',needs_human:analysis.needs_human!==false,raw_text:text});const status=analysis.category==='opt_out'?'suppressed':analysis.category==='not_interested'?'not_interested':analysis.category==='not_now'?'not_now':'replied';await db.from('prospects').update({status,updated_at:nowIso()}).eq('id',p.id);if(analysis.category==='opt_out')await db.from('suppressions').upsert({email:p.email,reason:'opt_out'});res.json({analysis});}catch(e){res.status(500).json({error:e.message})}
+  if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
+  try{
+    const text=sanitizeText(req.body.text,5000);
+    if(!text)return res.status(400).json({error:'Réponse vide.'});
+    const {data:p,error}=await db.from('prospects').select('*').eq('id',req.params.id).single();
+    if(error)throw error;
+    const analysis=await analyzeReply(text);
+    const {data:applied,error:applyError}=await db.rpc('apply_outreach_reply',{
+      p_from_email:p.email,p_category:analysis.category,p_sentiment:analysis.sentiment||'neutral',p_content:text,
+      p_received_at:nowIso(),p_dedupe_key:`manual-reply:${p.id}:${crypto.randomUUID()}`,p_in_reply_to:null,
+      p_metadata:{source:'admin_manual',analysis}
+    });
+    if(applyError)throw applyError;
+    if(applied?.human!==false&&!applied?.idempotent){
+      await db.from('feedback_insights').insert({
+        prospect_id:p.id,category:analysis.category,sentiment:analysis.sentiment,confidence:analysis.confidence,
+        summary:analysis.summary,objection:analysis.objection||'',requested_feature:analysis.requested_feature||'',
+        needs_human:analysis.needs_human!==false,raw_text:text
+      });
+    }
+    res.json({analysis,applied});
+  }catch(e){res.status(500).json({error:e.message})}
 });
 app.get('/api/admin/insights', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const {data,error}=await db.from('feedback_insights').select('*').order('created_at',{ascending:false}).limit(500);if(error)return res.status(500).json({error:error.message});const categories={};for(const x of data||[])categories[x.category]=(categories[x.category]||0)+1;res.json({total:data?.length||0,categories,requestedFeatures:prioritizeProductIdeas(data||[]).slice(0,20),recent:data?.slice(0,50)||[]})});
 
@@ -575,6 +614,7 @@ cron.schedule('*/15 * * * *',async()=>{try{await runDueFollowups()}catch(e){awai
 cron.schedule('2,17,32,47 * * * *',async()=>{try{await expireTrials()}catch(e){await reportError('cron.trials',e)}},{noOverlap:true});
 cron.schedule('*/10 * * * *',async()=>{try{const result=await processOutreachQueue();if(result?.error)await reportError('cron.outreach.result',new Error(result.error),{queue_id:result.queue_id})}catch(e){await reportError('cron.outreach',e)}},{noOverlap:true});
 cron.schedule('*/10 * * * *',async()=>{try{await pollImapReplies()}catch(e){await reportError('cron.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})}},{noOverlap:true});
+cron.schedule('3,13,23,33,43,53 * * * *',async()=>{try{await runCommercialQueueFeeder()}catch(e){await reportError('cron.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'})}},{noOverlap:true});
 cron.schedule('*/5 * * * *',async()=>{try{await runCommercialSequenceTick()}catch(e){await reportError('cron.commercial-sequence',e,{code:e?.code||'COMMERCIAL_SEQUENCE_FAILED'})}},{noOverlap:true});
 cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
 
@@ -588,6 +628,7 @@ process.on('uncaughtException',e=>{reportError('process.uncaughtException',e).fi
 
 expireTrials().catch(e=>reportError('startup.trials',e));
 pollImapReplies().catch(e=>reportError('startup.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'}));
+runCommercialQueueFeeder().catch(e=>reportError('startup.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'}));
 
 if(process.env.NODE_ENV==='production'){
   app.use(express.static(dist,{maxAge:'1h',etag:true}));
