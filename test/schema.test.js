@@ -5,3 +5,13 @@ test('prospect import has unique email and safe importer',()=>{assert.match(sql,
 test('critical account, billing, support and provider routes exist',()=>{for(const route of ['/api/account','/api/billing/portal','/api/support/ask','/api/support/tickets','/api/brevo/webhook','/api/admin/ceo'])assert.ok(api.includes(route),route)});
 test('destructive account deletion requires explicit confirmation',()=>{assert.match(api,/confirmation!=='SUPPRIMER'/);assert.match(api,/auth\.admin\.deleteUser/)});
 test('controlled outreach is separately gated while legacy acquisition remains disabled',()=>{const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');assert.match(controlled,/OUTREACH_DAILY_CAP/);assert.match(controlled,/COMMERCIAL_OUTREACH_SEND_ENABLED/);assert.match(controlled,/suppressions/);assert.match(controlled,/claim_outreach_daily_slot/)});
+
+test('continuous outreach migration stages verified candidates and removes the legacy 20-slot clamp',()=>{
+  const migration=readFileSync(new URL('../supabase/migrations/20261026133000_continuous_commercial_outreach.sql',import.meta.url),'utf8');
+  assert.match(migration,/create table if not exists public\.outreach_candidates/);
+  assert.match(migration,/create table if not exists public\.sales_followups/);
+  assert.match(migration,/p_cap integer default 300/);
+  assert.match(migration,/least\(1000/);
+  assert.match(migration,/interested/);
+  assert.match(migration,/auto_reply/);
+});
