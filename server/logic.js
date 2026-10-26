@@ -55,8 +55,13 @@ export function scoreProspect(p = {}) {
   return { score: Math.min(score, 100), reasons };
 }
 
+export function isPositiveReplyCategory(category='') {
+  return ['interested','pricing','feature_request'].includes(String(category||''));
+}
+
 export function classifyReplyFallback(text = '') {
   const t = String(text).toLowerCase();
+  if (/(réponse automatique|reponse automatique|automatic reply|auto[- ]?reply|out of office|absence du bureau|message d['’]absence|je suis actuellement absent|currently out of the office|vacances jusqu['’]?au|de retour le)/i.test(t)) return { category:'auto_reply', sentiment:'neutral', confidence:.98, needs_human:false, summary:'Réponse automatique ou absence du bureau.', objection:'', requested_feature:'' };
   if (/(désinscri|ne me contactez plus|stop|retirez-moi|retirer de votre liste|unsubscribe|supprimez mon email)/i.test(t)) return { category:'opt_out', sentiment:'negative', confidence:.99, needs_human:false, summary:'Demande de ne plus être contacté.', objection:'', requested_feature:'' };
   if (/(plus tard|pas maintenant|dans quelques mois|recontactez|recontacte)/i.test(t)) return { category:'not_now', sentiment:'neutral', confidence:.88, needs_human:true, summary:'Prospect intéressé potentiellement plus tard.', objection:'timing', requested_feature:'' };
   if (/(trop cher|prix|tarif|combien|coût|cout|budget)/i.test(t)) return { category:'pricing', sentiment:'neutral', confidence:.86, needs_human:true, summary:'Question ou objection sur le prix.', objection:'pricing', requested_feature:'' };

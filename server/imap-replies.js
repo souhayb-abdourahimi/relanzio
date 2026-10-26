@@ -186,7 +186,7 @@ export async function pollImapReplies({now=new Date()}={}){
           p_received_at:receivedAt,
           p_dedupe_key:dedupeKey,
           p_in_reply_to:identity.inReplyTo,
-          p_metadata:{source:'imap_ovh',mailbox,uid:String(uid),message_id:messageId||null,subject:String(parsed.subject||'').slice(0,200),matched_by:identity.matchedBy,classification:{category,confidence:analysis.confidence??null,needs_human:analysis.needs_human!==false}}
+          p_metadata:{source:'imap_ovh',mailbox,uid:String(uid),message_id:messageId||null,subject:String(parsed.subject||'').slice(0,200),matched_by:identity.matchedBy,classification:{category,confidence:analysis.confidence??null,needs_human:analysis.needs_human!==false,summary:String(analysis.summary||'').slice(0,500)}}
         });
         if(error)throw error;
         summary.processed++;
