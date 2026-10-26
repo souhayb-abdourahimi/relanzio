@@ -1,4 +1,4 @@
-import { resolveTxt } from 'node:dns/promises';
+import { resolveCname, resolveTxt } from 'node:dns/promises';
 import { db } from './db.js';
 import { sendEmail } from './email.js';
 import {
@@ -73,6 +73,31 @@ async function pilotSentLast24h() {
   return count || 0;
 }
 
+function dnsName(host,domain='relanzio.com'){
+  const raw=String(host||'').trim().replace(/\.$/,'');
+  if(!raw)return '';
+  if(raw===domain||raw.endsWith('.'+domain))return raw;
+  return `${raw}.${domain}`;
+}
+
+async function verifyPublicDkim(record,domain='relanzio.com'){
+  if(record?.status===true)return true;
+  const host=dnsName(record?.host_name,domain);
+  if(!host)return false;
+  const type=String(record?.type||'TXT').toUpperCase();
+  try{
+    if(type==='CNAME'){
+      const rows=await resolveCname(host);
+      return Array.isArray(rows)&&rows.length>0;
+    }
+    const rows=await resolveTxt(host);
+    const values=rows.map(parts=>parts.join('').replace(/\s+/g,'')).filter(Boolean);
+    const expected=String(record?.value||'').replace(/\s+/g,'');
+    if(expected&&values.some(v=>v===expected||v.includes(expected)||expected.includes(v)))return true;
+    return values.some(v=>/p=[A-Za-z0-9+/=]+/i.test(v)||/^v=DKIM1;/i.test(v));
+  }catch{return false}
+}
+
 export async function getBrevoPilotSenderStatus() {
   if (!process.env.BREVO_API_KEY) throw pilotError('PILOT_BREVO_NOT_CONFIGURED', 'Brevo n’est pas configuré.', 503);
   const headers = { accept:'application/json', 'api-key':process.env.BREVO_API_KEY };
@@ -100,7 +125,7 @@ export async function getBrevoPilotSenderStatus() {
   const spf=spfRows.map(parts=>parts.join('')).find(x=>/^v=spf1\b/i.test(x))||null;
   const dmarc=dmarcRows.map(parts=>parts.join('')).find(x=>/^v=DMARC1\b/i.test(x))||null;
   const spfOk=Boolean(spf&&/(brevo|sendinblue)/i.test(spf));
-  const dkimOk=dnsRecords?.dkim_record?.status===true;
+  const dkimOk=await verifyPublicDkim(dnsRecords?.dkim_record,'relanzio.com');
   const dmarcOk=Boolean(dmarc)&&dnsRecords?.dmarc_record?.status===true;
   const webhooks=webhookPayload?.webhooks||[];
   const transactionalWebhook=webhooks.find(w=>{
