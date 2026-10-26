@@ -44,6 +44,7 @@ create table if not exists public.outreach_candidates (
 create unique index if not exists outreach_candidates_email_lower_unique on public.outreach_candidates(lower(email));
 create index if not exists outreach_candidates_feeder_idx
   on public.outreach_candidates(status,verification_status,score desc,verified_at desc);
+create index if not exists outreach_candidates_imported_prospect_idx on public.outreach_candidates(imported_prospect_id);
 alter table public.outreach_candidates enable row level security;
 revoke all on table public.outreach_candidates from anon, authenticated;
 grant select,insert,update,delete on table public.outreach_candidates to service_role;
@@ -59,6 +60,7 @@ create table if not exists public.sales_followups (
   updated_at timestamptz not null default now()
 );
 create index if not exists sales_followups_open_idx on public.sales_followups(status,created_at desc);
+create index if not exists sales_followups_prospect_idx on public.sales_followups(prospect_id);
 alter table public.sales_followups enable row level security;
 revoke all on table public.sales_followups from anon, authenticated;
 grant select,insert,update,delete on table public.sales_followups to service_role;
