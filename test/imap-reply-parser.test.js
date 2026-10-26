@@ -13,7 +13,7 @@ test('parses headers and body without sending or marking',()=>{
 });
 
 test('STOP always wins',()=>assert.equal(deterministicReplyCategory('STOP'),'opt_out'));
-test('normalizes neutral buckets',()=>assert.equal(normalizeReplyCategory({category:'pricing'}),'neutral'));
+test('preserves actionable reply categories',()=>{assert.equal(normalizeReplyCategory({category:'pricing'}),'pricing');assert.equal(normalizeReplyCategory({category:'feature_request'}),'feature_request');assert.equal(normalizeReplyCategory({category:'auto_reply'}),'auto_reply');assert.equal(normalizeReplyCategory({category:'interested'}),'interested')});
 test('exact provider and sender matches',()=>{
  const result=resolveProspectIdentity({from:'client@example.com',inReplyTo:['<j0>'],references:[]},{prospectByEmail:new Map([['client@example.com','p1']]),providerToProspect:new Map([['<j0>','p1']])});
  assert.deepEqual(result,{status:'matched',prospectId:'p1',matchedBy:'provider_message_id',inReplyTo:'<j0>'});
