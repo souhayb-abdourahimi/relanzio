@@ -63,7 +63,14 @@ const result={
     from:sender.from,
     reply_to:sender.reply_to,
     domain_verified:sender.domain_verified===true,
-    domain_authenticated:sender.domain_authenticated===true
+    domain_authenticated:sender.domain_authenticated===true,
+    brevo_code_ok:sender.brevo_code_ok===true,
+    dkim_ok:sender.dkim_ok===true,
+    dkim_records:(sender.dkim_records||[]).map(x=>({key:x.key,status:x.status,type:x.type,host_name:x.host_name,dns_ok:x.dns_ok})),
+    dmarc_ok:sender.dmarc_ok===true,
+    webhook_ok:sender.webhook_ok===true,
+    provider_available_credits:sender.provider_available_credits||0,
+    relay_enabled:sender.relay_enabled===true
   },
   dns:{
     spf_present:Boolean(spf),
