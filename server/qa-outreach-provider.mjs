@@ -11,7 +11,6 @@ const getJson=async url=>{
   return {ok:r.ok,status:r.status,body};
 };
 
-const sender=await getBrevoPilotSenderStatus();
 const [domainRes,txWebhooks,inboundWebhooks,inboundEvents,spfTxt,dmarcTxt,mx]=await Promise.all([
   getJson('https://api.brevo.com/v3/senders/domains/relanzio.com'),
   getJson('https://api.brevo.com/v3/webhooks?type=transactional&sort=desc'),
@@ -21,6 +20,32 @@ const [domainRes,txWebhooks,inboundWebhooks,inboundEvents,spfTxt,dmarcTxt,mx]=aw
   safeTxt('_dmarc.relanzio.com'),
   safeMx('relanzio.com')
 ]);
+
+const rawDomain=domainRes.body||{};
+const rawDomainRoot=rawDomain&&typeof rawDomain.domain==='object'?rawDomain.domain:rawDomain;
+const rawDns=rawDomainRoot?.dns_records||rawDomain?.dns_records||{};
+const relevantDns=Object.fromEntries(Object.entries(rawDns).map(([key,value])=>[
+  key,
+  value&&typeof value==='object'?{
+    status:value.status??null,
+    type:value.type??null,
+    host_name:value.host_name??null,
+    code:value.code??null,
+    verified:value.verified??null,
+    authenticated:value.authenticated??null
+  }:value
+]));
+console.log('BREVO_DOMAIN_RAW_RELEVANT '+JSON.stringify({
+  http_status:domainRes.status,
+  top_level_keys:Object.keys(rawDomain),
+  domain_object_keys:rawDomainRoot&&typeof rawDomainRoot==='object'?Object.keys(rawDomainRoot):[],
+  verified:rawDomainRoot?.verified??rawDomain?.verified??null,
+  authenticated:rawDomainRoot?.authenticated??rawDomain?.authenticated??null,
+  dns_record_keys:Object.keys(rawDns),
+  dns_records:relevantDns
+}));
+
+const sender=await getBrevoPilotSenderStatus();
 
 const tx=(txWebhooks.body?.webhooks||[]).map(w=>({
   id:w.id,type:w.type,url:w.url,events:w.events,description:w.description||null,
