@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "node --watch server/index.js",
     "dev:client": "vite --config client/vite.config.js",
-    "build": "vite build --config client/vite.config.js",
+    "build": "vite build --config client/vite.config.js && node scripts/prerender.mjs",
     "start": "node server/index.js",
     "test": "node --test test/*.test.js",
     "check": "node --check server/index.js && node --check server/logic.js && node --check server/quote-rules.js && node --check server/checkout-policy.js && node --check server/billing.js && node --check server/entitlements.js && node --check server/trials.js && node --check server/outreach.js && node --check server/outreach-health.js && node --check server/controlled-outreach-policy.js && node --check server/controlled-outreach.js && node --check server/commercial-feeder.js && node --check server/imap-reply-parser.js && node --check server/imap-replies.js && node --check server/brevo-domain-auth.js && node --check server/pilot-outreach-policy.js && node --check server/pilot-outreach.js && node --check server/pilot-admin-runner.js && node --check server/prospecting.js && node --check server/followups.js && node --check server/support.js && node --check server/ceo.js && node --check server/lifecycle.js && node --check server/stripe-webhook.js && node --check server/billing-emails.js && node --check server/morning-digest.js && node --check server/email-links.js && node --test test/*.test.js",

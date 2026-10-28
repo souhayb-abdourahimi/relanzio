@@ -6,6 +6,7 @@ import cron from 'node-cron';
 import Stripe from 'stripe';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 import { requireUser } from './auth.js';
 import { db, getProfile } from './db.js';
 import { nextDate, runDueFollowups, createFollowupPreview, sendQuoteFollowup, confirmManualFollowup } from './followups.js';
@@ -662,9 +663,13 @@ pollImapReplies().catch(e=>reportError('startup.imap-replies',e,{code:e?.code||'
 runCommercialQueueFeeder().catch(e=>reportError('startup.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'}));
 
 if(process.env.NODE_ENV==='production'){
-  app.use(express.static(dist,{maxAge:'1h',etag:true}));
+  // index:false so "/" is served by the prerendered landing below, not by the empty SPA shell.
+  app.use(express.static(dist,{maxAge:'1h',etag:true,index:false}));
   const spaRoutes=new Set(['/','/pricing','/docs','/faq','/contact','/login','/signup','/reset-password','/legal','/privacy','/dpa','/terms','/logiciel-relance-devis','/relance-devis-agence','/modele-email-relance-devis']);
+  const prerendered=path=>{const file=join(dist,'prerender',`${path==='/'?'index':path.slice(1)}.html`);return existsSync(file)?file:null;};
   app.get('*splat',(req,res)=>{
+    const file=spaRoutes.has(req.path)?prerendered(req.path):null;
+    if(file)return res.sendFile(file);
     if(spaRoutes.has(req.path))return res.sendFile(join(dist,'index.html'));
     res.status(404).type('text/plain').send('Not found');
   });
