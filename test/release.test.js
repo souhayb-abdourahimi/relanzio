@@ -6,7 +6,9 @@ import { billingTransition, planForSubscriptionStatus, shouldIgnoreBillingEvent 
 test('billing access is conservative across renewal failure and cancellation',()=>{
   assert.equal(planForSubscriptionStatus('active'),'pro');
   assert.equal(planForSubscriptionStatus('trialing'),'pro');
-  assert.equal(planForSubscriptionStatus('past_due'),'free');
+  assert.equal(planForSubscriptionStatus('past_due'),'pro','past_due keeps the plan; the grace period decides access');
+  assert.equal(planForSubscriptionStatus('unpaid'),'free');
+  assert.equal(planForSubscriptionStatus('canceled'),'free');
   assert.deepEqual(billingTransition('customer.subscription.deleted',{}, {plan:'pro',subscription_status:'active'}),{plan:'free',subscription_status:'canceled'});
   assert.deepEqual(billingTransition('invoice.paid',{}, {plan:'free',subscription_status:'past_due'}),{plan:'pro',subscription_status:'active'});
   assert.deepEqual(billingTransition('invoice.payment_failed',{}, {plan:'pro',subscription_status:'active'}),{plan:'pro',subscription_status:'past_due'});

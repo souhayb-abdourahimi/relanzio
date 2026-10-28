@@ -2,7 +2,8 @@ export function normalizeSubscriptionStatus(status='') {
   return ['active','trialing','past_due','unpaid','canceled'].includes(status) ? status : 'none';
 }
 export function planForSubscriptionStatus(status='none') {
-  return ['active','trialing'].includes(normalizeSubscriptionStatus(status)) ? 'pro' : 'free';
+  // past_due keeps plan 'pro': the grace period (entitlements.js) decides whether Pro is still usable.
+  return ['active','trialing','past_due'].includes(normalizeSubscriptionStatus(status)) ? 'pro' : 'free';
 }
 export function billingTransition(eventType, object={}, current={plan:'free',subscription_status:'none'}) {
   if(eventType==='checkout.session.completed'){

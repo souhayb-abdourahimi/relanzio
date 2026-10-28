@@ -2,7 +2,7 @@ import { db } from './db.js';
 import { generateFollowup, sendEmail } from './email.js';
 import { nextFollowupDate } from './logic.js';
 import { reportError } from './observability.js';
-import { hasProAccess } from './entitlements.js';
+import { hasProAccess, canAutoSend } from './entitlements.js';
 import { isAutomaticSendWindow, parisBusinessDate, providerFailureDisposition } from './followup-policy.js';
 import { signEmailLink, emailLinkUrl, followupFooter } from './email-links.js';
 
@@ -72,6 +72,7 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
   if (!hasProAccess(profile)) throw new Error('PRO_ACCESS_REQUIRED');
   const automatic=options.automatic===true;
   if(automatic&&!isAutomaticSendWindow())throw new Error('AUTO_SEND_OUTSIDE_WINDOW');
+  if(automatic&&!canAutoSend(profile))throw new Error('AUTO_SEND_PAYMENT_FAILING');
 
   if (requestKey) {
     const {data:prior,error:priorError}=await db.from('followups').select('*').eq('user_id',quote.user_id).eq('request_key',requestKey).maybeSingle();
@@ -162,7 +163,8 @@ export async function runDueFollowups(now=new Date()) {
     try {
       const {data:profile,error:profileError}=await db.from('profiles').select('*').eq('id',quote.user_id).maybeSingle();
       if(profileError)throw profileError;if(!profile)throw new Error('PROFILE_NOT_FOUND');
-      if (!hasProAccess(profile) || profile.email_mode !== 'automatic') {
+      if (['past_due','unpaid'].includes(profile.subscription_status)) { results.push({ id:quote.id, skipped:'payment_failing' }); continue; }
+      if (!canAutoSend(profile) || profile.email_mode !== 'automatic') {
         results.push({ id:quote.id, skipped:'approval_or_subscription_required' }); continue;
       }
       const result = await sendQuoteFollowup(quote, profile, null, {automatic:true});

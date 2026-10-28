@@ -51,9 +51,13 @@ test('past_due accounts get the portal, not a second checkout',async()=>{
   assert.equal(state.pastDue,true);
   assert.equal(state.upgradeVisible,false);
   assert.equal(state.portalVisible,true);
-  const banner=accountBanner({subscription_status:'past_due'});
+  const banner=accountBanner({subscription_status:'past_due',in_payment_grace:true,payment_grace_ends_at:'2026-12-15T00:00:00.000Z'});
   assert.equal(banner.action,'portal');
-  assert.match(banner.label,/Paiement refusé/);
+  assert.match(banner.label,/Paiement refusé : mettez à jour votre carte avant le 15\/12\/2026/);
+  assert.match(banner.endText,/Pro reste actif/);
+  const after=accountBanner({subscription_status:'past_due',in_payment_grace:false});
+  assert.match(after.label,/repassé en formule gratuite/);
+  assert.equal(accountBanner({subscription_status:'unpaid'}).action,'portal');
 });
 
 test('cancellation keeps Pro until the end of the paid period and says so',async()=>{

@@ -61,7 +61,7 @@ export default function PlansView({profile,billingEnabled,checkoutBusy=false,onU
           {state.upgradeVisible&&<button type="button" className="btn full app-upgrade-btn" disabled={state.upgradeDisabled} onClick={onUpgrade}>{checkoutBusy?'Ouverture…':state.upgradeLabel}</button>}
           {state.portalVisible&&billingEnabled&&<button type="button" className="btn ghost full app-portal-btn" onClick={onPortal}>Gérer mon abonnement</button>}
           {state.portalVisible&&<p className="app-plan-help">Carte bancaire, factures et résiliation dans le portail sécurisé Stripe.</p>}
-          {state.pastDue&&<p className="app-plan-help warn">Le dernier paiement a été refusé : mettez à jour votre carte pour rétablir Pro.</p>}
+          {state.pastDue&&<p className="app-plan-help warn">{profile.in_payment_grace?`Le dernier paiement a été refusé : mettez à jour votre carte avant le ${new Date(profile.payment_grace_ends_at).toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'})} pour garder Pro.`:'Le dernier paiement n’a pas été régularisé : mettez à jour votre carte pour retrouver Pro.'}</p>}
           {state.upgradeHint&&state.upgradeVisible&&<p className="app-plan-help">{state.upgradeHint}</p>}
           {state.paid&&<p className="app-plan-help">{state.canceling&&profile.subscription_current_period_end?`Abonnement résilié : Pro jusqu’au ${new Date(profile.subscription_current_period_end).toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'})}.`:'Votre abonnement Pro est actif.'}</p>}
         </div>

@@ -13,10 +13,11 @@ export function trialEndingEmail({appUrl,trialEndsAt}){
   };
 }
 
-export function paymentFailedEmail({appUrl}){
+export function paymentFailedEmail({appUrl,graceEndsAt=null}){
+  const until=graceEndsAt?new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',day:'numeric',month:'long'}).format(new Date(graceEndsAt)):'';
   return {
     subject:'Paiement Relanzio refusé : mettez à jour votre carte',
-    text:`Bonjour,\n\nLe dernier paiement de votre abonnement Relanzio Pro n’a pas abouti.\n\nPendant ce temps, l’envoi automatique des relances est suspendu. Vos devis et votre historique restent intacts.\n\nMettez à jour votre moyen de paiement depuis Relanzio (Formules / Abonnement → Gérer mon abonnement) : ${appLink(appUrl,'?view=plans')}\n\nDès que le paiement passe, Pro est rétabli automatiquement.${signature}`,
+    text:`Bonjour,\n\nLe dernier paiement de votre abonnement Relanzio Pro n’a pas abouti.\n\n${until?`Pro reste actif jusqu’au ${until}. `:''}En attendant, l’envoi automatique des relances est suspendu. Vos devis et votre historique restent intacts.\n\nMettez à jour votre moyen de paiement depuis Relanzio (Formules / Abonnement → Gérer mon abonnement) : ${appLink(appUrl,'?view=plans')}\n\nDès que le paiement passe, Pro est rétabli automatiquement.${signature}`,
   };
 }
 

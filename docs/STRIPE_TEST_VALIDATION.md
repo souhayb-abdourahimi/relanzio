@@ -42,7 +42,7 @@ Créer un compte de test dans l'app (inscription), récupérer son id (`auth.use
 RELANZIO_DEV_SUPABASE_CONFIRMED=yes VALIDATION_USER_ID=<uuid> node scripts/stripe-test-validation.mjs
 ```
 
-Le script utilise une *test clock* Stripe : paiement → Pro, renouvellement refusé → `past_due`, carte corrigée → Pro, résiliation en fin de période → Pro jusqu'à la date, fin de période → gratuit sans perte de devis, mention 293 B sur les factures.
+Le script utilise une *test clock* Stripe : paiement → Pro, renouvellement refusé → `past_due` avec Pro conservé pendant la grâce (début de période + 14 jours), carte corrigée → Pro, résiliation en fin de période → Pro jusqu'à la date, fin de période → gratuit sans perte de devis, mention 293 B sur les factures.
 
 ## 4. Vérifications manuelles (navigateur, mode test)
 

@@ -201,6 +201,17 @@ async function flows(browser){
       await p3.waitForURL(/__e2e\/stripe-portal/);
       await c3.close();
     });
+    await step(`${label}: past_due in grace keeps Pro (no read-only quotes) and asks to update the card`,async()=>{
+      const quotes=Array.from({length:7},(_,i)=>({id:`g${i}`,client_name:`Client ${i}`,client_email:`g${i}@example.test`,title:`Devis ${i}`,amount:1000,followup_step:0,next_followup_at:new Date(Date.now()-DAY).toISOString(),created_at:new Date(Date.now()-(10-i)*DAY).toISOString()}));
+      const b7=createFakeBackend({seedQuotes:quotes,profile:{company_name:'Toitures Martin',onboarding_completed:true,plan:'pro',subscription_status:'past_due',stripe_customer_id:'cus_e2e',stripe_subscription_id:'sub_e2e',subscription_current_period_start:new Date(Date.now()-2*DAY).toISOString(),subscription_current_period_end:new Date(Date.now()+28*DAY).toISOString()}});
+      const c7=await newContext(browser,vp,b7,{loggedIn:true});const p7=await c7.newPage();
+      await p7.goto(BASE+'/');await p7.waitForSelector('.banner-past_due');
+      assert.match(await p7.locator('.banner-past_due').innerText(),/mettez à jour votre carte avant le/);
+      assert.equal(await p7.locator('.today-card.locked').count(),0,'no read-only quote during grace');
+      await p7.getByRole('button',{name:'Mettre à jour ma carte'}).click();
+      await p7.waitForURL(/__e2e\/stripe-portal/);
+      await c7.close();
+    });
     await step(`${label}: paying customer manages the subscription from Formules`,async()=>{
       const b4=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true,plan:'pro',subscription_status:'active',stripe_customer_id:'cus_e2e',stripe_subscription_id:'sub_e2e',subscription_cancel_at_period_end:true,subscription_current_period_end:new Date(Date.now()+12*DAY).toISOString()}});
       const c4=await newContext(browser,vp,b4,{loggedIn:true});const p4=await c4.newPage();

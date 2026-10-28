@@ -5,6 +5,7 @@ import {
   shouldIgnoreBillingEvent,
 } from './billing.js';
 import { paymentFailedEmail } from './billing-emails.js';
+import { pastDueGraceEndsAt } from './entitlements.js';
 
 // Stripe webhook processing, isolated from Express so it can be exercised with signed test events.
 // Guarantees: signature verified by the caller (constructEvent), each event id processed at most once
@@ -19,10 +20,13 @@ const subscriptionIdFromObject=(obj,profile)=>{
 };
 const customerIdOf=obj=>typeof obj?.customer==='string'?obj.customer:obj?.customer?.id||null;
 
-// Period end moved from the subscription to its items in recent Stripe API versions: read both.
+// Period dates moved from the subscription to its items in recent Stripe API versions: read both.
+// current_period_start anchors the past_due grace period (see entitlements.js).
 export function subscriptionPeriod(sub={}){
+  const start=sub.current_period_start??sub.items?.data?.[0]?.current_period_start??null;
   const end=sub.current_period_end??sub.items?.data?.[0]?.current_period_end??null;
   return {
+    subscription_current_period_start:start?new Date(Number(start)*1000).toISOString():null,
     subscription_current_period_end:end?new Date(Number(end)*1000).toISOString():null,
     subscription_cancel_at_period_end:Boolean(sub.cancel_at_period_end||sub.cancel_at),
   };
@@ -117,7 +121,7 @@ export function createStripeWebhookProcessor({db,stripe,getProfile,reportError=a
         if(profile){
           result=await applyBillingEvent(profile,event,obj,{});
           if(event.type==='invoice.payment_failed'&&result?.applied)
-            await sendOnce(profile,`payment_failed:${obj.id||event.id}`,paymentFailedEmail({appUrl:env.APP_URL,companyName:profile.company_name}));
+            await sendOnce(profile,`payment_failed:${obj.id||event.id}`,paymentFailedEmail({appUrl:env.APP_URL,graceEndsAt:pastDueGraceEndsAt({...profile,...result.patch})}));
         }
       }
       await mustDb(db.from('stripe_webhook_events').update({processed_at:nowIso()}).eq('event_id',event.id));

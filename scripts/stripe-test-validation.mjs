@@ -68,8 +68,9 @@ const failing=await stripe.paymentMethods.attach('pm_card_chargeCustomerFail',{c
 await stripe.customers.update(customer.id,{invoice_settings:{default_payment_method:failing.id}});
 await stripe.subscriptions.update(sub.id,{default_payment_method:failing.id});
 await advance(clock,32*86400);
-await waitProfile('Payment failure',p=>p.subscription_status==='past_due');
-ok('Failed renewal → past_due (automatic sending suspended)');
+const pastDue=await waitProfile('Payment failure',p=>p.subscription_status==='past_due');
+if(pastDue.plan!=='pro'||!pastDue.subscription_current_period_start)fail('past_due must keep plan pro and store the period start (grace anchor).');
+ok('Failed renewal → past_due, Pro kept in grace until',new Date(new Date(pastDue.subscription_current_period_start).getTime()+14*86400000).toISOString());
 const {data:claims}=await db.from('lifecycle_messages').select('type,status').eq('user_id',userId).like('type','payment_failed:%');
 ok('Payment-failed email claims',`${(claims||[]).length} (expected 1 when BILLING_EMAILS_ENABLED=true, 0 otherwise)`);
 

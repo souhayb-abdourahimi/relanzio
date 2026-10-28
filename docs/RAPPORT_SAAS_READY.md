@@ -101,7 +101,7 @@ Légende des preuves :
    - La règle est appliquée côté serveur (code HTTP 423) et testée.
 5. **Checkout** : inchangé, passage à Pro par webhook.
 6. **Portail** (carte, factures, résiliation) : accessible quand l'abonnement est actif, impayé (`past_due`) ou résilié. Avant, il était masqué en `past_due`, ce qui empêchait de corriger sa carte.
-7. **`past_due`** :
+7. **`past_due`** : période de grâce de 14 jours (règle ci-dessous) :
    - email (une fois par facture), bannière, envoi automatique suspendu ;
    - retour à Pro dès la régularisation ;
    - nouveau Checkout refusé dans cet état, pour éviter un double abonnement.
@@ -110,6 +110,23 @@ Légende des preuves :
 10. **Webhooks** : signature vérifiée, chaque événement traité une seule fois, réservation libérée en cas d'échec, événements périmés ignorés. Les tests utilisent des événements signés par le SDK Stripe.
 11. **Prix et limites identiques partout** : voir la source unique ci-dessus.
 - **Script de validation réelle prêt** : `scripts/stripe-test-validation.mjs` et `docs/STRIPE_TEST_VALIDATION.md` (test clock Stripe, clés `sk_live` refusées).
+
+### Règle de la période de grâce `past_due`
+
+Calculée à la lecture, uniquement à partir des données Stripe stockées par le webhook. Aucune tâche planifiée n'intervient (`server/entitlements.js`, `shared/plans.js`).
+
+- `active` ou `trialing` → Pro.
+- `past_due` → le plan reste `pro`. Pro reste utilisable tant que la date courante est avant `subscription_current_period_start + 14 jours`, c'est-à-dire 14 jours après le début de la période dont le renouvellement a échoué (= la fin de la période payée).
+  - **Pendant la grâce** : pas de lecture seule, limite Pro de 100 devis, envoi via Relanzio possible.
+  - **Ce qui est suspendu pendant la grâce** : l'envoi automatique.
+  - **Ce qui s'affiche** : une bannière « Paiement refusé : mettez à jour votre carte avant le JJ/MM », avec accès au portail Stripe.
+  - **Email** : un email par facture, seulement si `BILLING_EMAILS_ENABLED=true`.
+  - **Nouveau Checkout** : refusé (409), donc pas de second abonnement.
+- **Paiement confirmé** (`invoice.paid`, puis Stripe `active`) → Pro normal, l'envoi automatique reprend.
+- **Grâce dépassée** alors que Stripe est encore `past_due` → Free et règle des 5 devis actifs, sans action de notre part.
+- **`unpaid` ou `canceled`** → Free immédiatement (plan `free`), règle des 5 devis actifs.
+- **Date de début de période inconnue** → pas de grâce (choix prudent).
+- **Tests** : `test/past-due-grace.test.js`, `test/stripe-webhook.test.js` (événements signés), E2E « past_due in grace », `test/sql/subscription_period.test.sql`.
 
 ### Étape 7 — Landing et pages publiques
 **Fichiers :** `client/src/PublicSite.jsx`, `public-meta.js`, `entry-server.jsx`, `scripts/prerender.mjs`, `client/index.html`, `client/public/og-image.png`.
@@ -199,7 +216,7 @@ Légende des preuves :
 
 ## 3. Décisions prises seul
 
-- **Accès Pro en `past_due`** : je garde le comportement existant. En `past_due`, le compte perd l'accès Pro tout de suite ; la règle de lecture seule s'applique donc pendant les relances de paiement de Stripe.
+- **Accès Pro en `past_due`** (révisé à ta demande) : période de grâce, voir « Règle de la période de grâce `past_due` » au §1.
 - **Comptes existants sans essai** : leur essai démarre au prochain devis ajouté.
 - **Désinscription par expéditeur** : elle vaut par professionnel (`followup_optouts`), et non dans la liste globale de suppression utilisée par la prospection. Un client qui se désinscrit d'un artisan peut donc encore recevoir les relances d'un autre.
 - **Bornes de la cadence** : relance 1 entre 1 et 60 jours ; les suivantes croissantes, avec 90 et 120 jours au maximum.

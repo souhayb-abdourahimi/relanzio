@@ -18,10 +18,16 @@ export function trialDisplay(profile={}){
 // One discreet banner at the top of the app, most urgent state first.
 export function accountBanner(profile={},lockedCount=0){
   const status=profile?.subscription_status;
+  if(status==='past_due'&&profile?.in_payment_grace)return {
+    kind:'past_due',tone:'warn',
+    label:`Paiement refusé : mettez à jour votre carte avant le ${day(profile.payment_grace_ends_at)}.`,
+    endText:'Pro reste actif jusque-là ; seul l’envoi automatique est suspendu. Vos devis restent intacts.',
+    action:'portal',actionLabel:'Mettre à jour ma carte'
+  };
   if(['past_due','unpaid'].includes(status))return {
     kind:'past_due',tone:'warn',
-    label:'Paiement refusé : mettez à jour votre carte.',
-    endText:'L’envoi automatique est suspendu en attendant. Vos devis restent intacts.',
+    label:'Paiement non régularisé : votre compte est repassé en formule gratuite.',
+    endText:'Mettez à jour votre carte pour retrouver Pro immédiatement. Aucune donnée n’a été supprimée.',
     action:'portal',actionLabel:'Mettre à jour ma carte'
   };
   if(status==='active'&&profile?.subscription_cancel_at_period_end&&profile?.subscription_current_period_end)return {
