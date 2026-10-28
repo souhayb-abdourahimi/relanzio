@@ -163,6 +163,21 @@ async function flows(browser){
       results.push(`INFO mobile: 3 relances recorded with ${taps} taps (+1 tap per SMS/call in the user's own app), scripted run ${Date.now()-started} ms`);
       await c5.close();
     });
+    if(label==='desktop')await step('desktop: keyboard only — Tab to Relancer, Enter opens, Escape closes and focus returns',async()=>{
+      const b6=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true}});
+      const c6=await newContext(browser,vp,b6,{loggedIn:true});const p6=await c6.newPage();
+      await p6.goto(BASE+'/');await p6.waitForSelector('.today-card');
+      let found=false;
+      for(let i=0;i<40&&!found;i++){await p6.keyboard.press('Tab');found=await p6.evaluate(()=>document.activeElement?.textContent?.trim()==='Relancer');}
+      assert.ok(found,'Relancer reachable with Tab');
+      const ring=await p6.evaluate(()=>getComputedStyle(document.activeElement).outlineStyle);
+      assert.notEqual(ring,'none','visible focus ring');
+      await p6.keyboard.press('Enter');await p6.waitForSelector('.preview-modal');
+      assert.equal(await p6.evaluate(()=>document.activeElement?.tagName),'TEXTAREA','focus moves into the dialog');
+      await p6.keyboard.press('Escape');await p6.waitForSelector('.preview-modal',{state:'detached'});
+      assert.equal(await p6.evaluate(()=>document.activeElement?.textContent?.trim()),'Relancer','focus returns to the opener');
+      await c6.close();
+    });
     await step(`${label}: free account above the limit sees read-only quotes and can still close them`,async()=>{
       const quotes=Array.from({length:7},(_,i)=>({id:`l${i}`,client_name:`Client ${i}`,client_email:`c${i}@example.test`,title:`Devis ${i}`,amount:1000+i,followup_step:0,next_followup_at:new Date(Date.now()-DAY).toISOString(),created_at:new Date(Date.now()-(10-i)*DAY).toISOString()}));
       const b2=createFakeBackend({seedQuotes:quotes,profile:{company_name:'Toitures Martin',onboarding_completed:true,trial_started_at:new Date(Date.now()-10*DAY).toISOString(),trial_ends_at:new Date(Date.now()-3*DAY).toISOString(),trial_expired_at:new Date(Date.now()-3*DAY).toISOString()}});
@@ -201,11 +216,40 @@ async function flows(browser){
   for(const r of results)console.log(r);
 }
 
+// Accessibility pass with axe-core (path in AXE_PATH, e.g. node_modules/axe-core/axe.min.js) on key screens.
+async function a11y(browser){
+  const { readFileSync }=await import('node:fs');
+  const axe=readFileSync(process.env.AXE_PATH,'utf8');
+  const report=[];
+  const audit=async(page,name)=>{
+    await page.addScriptTag({content:axe});
+    const r=await page.evaluate(async()=>await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}));
+    const bad=r.violations.filter(v=>['serious','critical'].includes(v.impact));
+    report.push(`${bad.length?'FAIL':'PASS'} ${name}: ${bad.length} serious/critical, ${r.violations.length-bad.length} minor`);
+    for(const v of r.violations){report.push(`   - [${v.impact}] ${v.id}: ${v.help} (${v.nodes.length})`);if(process.env.A11Y_VERBOSE)for(const n of v.nodes)report.push(`       ${n.target.join(' ')} :: ${(n.any[0]?.message||'').slice(0,140)}`);}
+  };
+  for(const [label,vp] of [['desktop',DESKTOP],['mobile',MOBILE]]){
+    let backend=createFakeBackend();
+    let ctx=await newContext(browser,vp,backend);let page=await ctx.newPage();
+    for(const path of ['/','/pricing','/faq','/terms','/signup']){await page.goto(BASE+path);await page.waitForSelector('h1');await audit(page,`${label} ${path}`);}
+    await ctx.close();
+    backend=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true}});
+    ctx=await newContext(browser,vp,backend,{loggedIn:true});page=await ctx.newPage();
+    await page.goto(BASE+'/');await page.waitForSelector('.today-card');await audit(page,`${label} Aujourd’hui`);
+    await page.locator('.today-card').first().getByRole('button',{name:'Relancer'}).click();await page.waitForSelector('.preview-modal');await audit(page,`${label} fenêtre de relance`);
+    await page.keyboard.press('Escape');
+    await page.goto(BASE+'/?view=plans');await page.waitForSelector('.plans-view');await audit(page,`${label} Formules`);
+    await ctx.close();
+  }
+  for(const r of report)console.log(r);
+  if(report.some(r=>r.startsWith('FAIL')))process.exitCode=1;
+}
+
 const vite=startVite();
 try{
   await waitFor(BASE+'/');
   const browser=await chromium.launch();
-  try{ if(mode==='screenshots')await screenshots(browser);else await flows(browser); }
+  try{ if(mode==='screenshots')await screenshots(browser);else if(mode==='a11y')await a11y(browser);else await flows(browser); }
   finally{ await browser.close(); }
 }catch(e){console.error(e);console.error(vite.log().slice(-2000));process.exitCode=1;}
 finally{try{process.kill(-vite.child.pid,'SIGTERM');}catch{}setTimeout(()=>process.exit(process.exitCode||0),200);}
