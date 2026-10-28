@@ -161,3 +161,4 @@ button,.btn,.mini-btn{-webkit-user-select:none;user-select:none}
 .trial-banner.banner-past_due{background:#fff3d5;border-color:#efd28c}
 .app-plan-help.warn{color:#735200;font-weight:700}
 .trial-note{margin-top:4px}
+.switch-row{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:700}
