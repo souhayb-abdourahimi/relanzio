@@ -376,6 +376,7 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
     if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'La souscription Pro n’est pas disponible pour le moment.'});
     if(!stripe||!process.env.STRIPE_PRO_PRICE_ID)return res.status(503).json({error:"Stripe n'est pas configuré."});
     const profile=await getProfile(req.user);
+    if(['past_due','unpaid'].includes(profile.subscription_status))return res.status(409).json({error:'Votre dernier paiement a été refusé. Mettez à jour votre carte depuis « Gérer mon abonnement » plutôt que de souscrire à nouveau.'});
     if(hasSubscriptionProAccess(profile))return res.status(409).json({error:'Votre compte dispose déjà d’un abonnement Pro. Utilisez Gérer mon abonnement.'});
     let customer=profile.stripe_customer_id;
     if(!customer){
