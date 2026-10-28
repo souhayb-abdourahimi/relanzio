@@ -213,3 +213,9 @@ button,.btn,.mini-btn{-webkit-user-select:none;user-select:none}
 .cta-short{display:none}
 @media (max-width:600px){.nav nav{gap:12px}.nav .cta-long{display:none}.nav .cta-short{display:inline}.nav nav .btn.small{min-height:44px;padding:10px 14px}.hero-actions .btn.ghost{text-align:center}}
 .has-session #root[data-prerendered]{visibility:hidden}
+.legal-table{font-size:13px;margin:8px 0 16px}
+.legal-table td small{display:block;color:var(--muted)}
+.legal-download{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:8px 0 18px}
+.legal-hint{margin-top:12px;font-size:12px}
+.legal-hint a{text-decoration:underline}
+@media print{.nav,.footer,.legal-download,[data-sonner-toaster]{display:none!important}.legal{padding:0}.legal h2{break-after:avoid}body{background:white}}

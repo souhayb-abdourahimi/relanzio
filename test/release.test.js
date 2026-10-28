@@ -286,6 +286,6 @@ test('signup pins confirmation redirect and records acceptance metadata',()=>{
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   assert.match(client,/emailRedirectTo:location\.origin\+'\/'/);
   assert.match(client,/terms_accepted_at:new Date\(\)\.toISOString\(\)/);
-  assert.match(client,/terms_version:'2026-10-16'/);
+  assert.match(client,/terms_version:'2026-10-28'/);
   assert.match(client,/privacy_acknowledged_at:new Date\(\)\.toISOString\(\)/);
 });
