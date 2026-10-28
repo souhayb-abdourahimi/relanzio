@@ -1,4 +1,5 @@
-export const TRIAL_DAYS = 7;
+import { TRIAL_DAYS } from '../shared/plans.js';
+export { TRIAL_DAYS };
 const DAY_MS = 24*60*60*1000;
 
 const ms = value => {

@@ -106,14 +106,16 @@ test('pricing and Stripe checkout stay aligned with VAT-exempt micro-enterprise 
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   const subscription=readFileSync(new URL('../client/src/subscription-display.js',import.meta.url),'utf8');
   const legal=readFileSync(new URL('../client/src/LegalPage.jsx',import.meta.url),'utf8');
-  assert.match(server,/TVA non applicable, art\. 293 B du CGI/);
+  const shared=readFileSync(new URL('../shared/plans.js',import.meta.url),'utf8');
+  assert.match(shared,/VAT_NOTICE='TVA non applicable, art\. 293 B du CGI'/);
+  assert.match(server,/import \{ VAT_NOTICE,PRO_PRICE_LABEL[^}]*\} from '\.\.\/shared\/plans\.js'/);
   assert.match(server,/automatic_tax:\{enabled:false\}/);
   assert.match(server,/invoice_settings:\{footer:VAT_NOTICE\}/);
   assert.match(server,/custom_text:\{submit:\{message:PRO_PRICE_LABEL\}\}/);
-  assert.match(client,/TVA non applicable, art\. 293 B du CGI/);
-  assert.match(subscription,/vatNote:'TVA non applicable, art\. 293 B du CGI'/);
+  assert.match(client,/VAT_NOTICE/);
+  assert.match(subscription,/vatNote:VAT_NOTICE/);
   assert.match(plans,/PRO_PLAN\.vatNote/);
-  assert.match(legal,/29 € \/ mois, sans engagement de durée minimale/);
+  assert.match(legal,/\{PRO_PRICE_TEXT\}, sans engagement de durée minimale\. \{VAT_NOTICE\}/);
   assert.match(legal,/Escompte pour paiement anticipé : néant/);
   assert.match(legal,/indemnité forfaitaire de 40 €/);
   assert.doesNotMatch([client,plans,subscription,legal].join('\n'),/29 € \+ TVA|TVA à 20 %|TVA 20 %/i);
@@ -196,7 +198,7 @@ test('public launch copy uses explicit account and trial CTAs without inventing 
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   assert.match(client,/Créer un compte gratuit/);
-  assert.match(plans,/Essayer Pro gratuitement pendant 7 jours/);
+  assert.match(plans,/Essayer Pro gratuitement pendant \$\{TRIAL_DAYS\} jours/);
   assert.match(plans,/Sans carte bancaire et sans débit automatique/);
   assert.match(client,/Compte, données et facturation/);
   assert.match(client,/mailto:\$\{support\}/);
@@ -243,9 +245,9 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   assert.match(client,/profile\.pro_access/);
   assert.match(trialUi,/trialDisplay\(profile\)/);
   assert.match(trialDisplay,/Essai Pro —/);
-  assert.match(trialDisplay,/Passer à Pro — 29 € \/ mois/);
+  assert.match(trialDisplay,/upgradeLabel:UPGRADE_LABEL/);
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
-  assert.match(plans,/Essayer Pro gratuitement pendant 7 jours/);
+  assert.match(plans,/Essayer Pro gratuitement pendant \$\{TRIAL_DAYS\} jours/);
 });
 
 test('trial accounts are excluded from paid MRR metrics',()=>{

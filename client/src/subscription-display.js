@@ -1,12 +1,13 @@
 import { trialDisplay } from './trial-display.js';
+import { FREE_ACTIVE_QUOTES_LIMIT,PRO_ACTIVE_QUOTES_LIMIT,PRO_MONTHLY_PRICE,VAT_NOTICE,FREE_LIMIT_TEXT,PRO_LIMIT_TEXT,UPGRADE_LABEL } from '../../shared/plans.js';
 
 export const FREE_PLAN = Object.freeze({
   id:'free',
   name:'Découverte / Gratuit',
   price:'0 €',
-  limit:5,
+  limit:FREE_ACTIVE_QUOTES_LIMIT,
   features:[
-    '5 devis actifs',
+    FREE_LIMIT_TEXT,
     'Tableau de bord',
     'Planning J+2 / J+5 / J+10',
     'Mode revue',
@@ -17,12 +18,12 @@ export const FREE_PLAN = Object.freeze({
 export const PRO_PLAN = Object.freeze({
   id:'pro',
   name:'Pro',
-  price:'29 €',
+  price:`${PRO_MONTHLY_PRICE} €`,
   period:'/ mois',
-  vatNote:'TVA non applicable, art. 293 B du CGI',
-  limit:100,
+  vatNote:VAT_NOTICE,
+  limit:PRO_ACTIVE_QUOTES_LIMIT,
   features:[
-    '100 devis actifs',
+    PRO_LIMIT_TEXT,
     'Envoi via Relanzio',
     'Mode automatique opt-in devis par devis',
     'Personnalisation IA',
@@ -51,6 +52,6 @@ export function subscriptionDisplay(profile={}, billingEnabled=false, checkoutBu
     upgradeVisible,
     upgradeDisabled,
     upgradeHint,
-    upgradeLabel:'Passer à Pro — 29 € / mois'
+    upgradeLabel:UPGRADE_LABEL
   };
 }

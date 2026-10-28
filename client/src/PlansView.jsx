@@ -1,5 +1,6 @@
 import React from 'react';
 import { FREE_PLAN,PRO_PLAN,subscriptionDisplay } from './subscription-display.js';
+import { TRIAL_DAYS } from '../../shared/plans.js';
 
 function PlanFeatures({items}){return <ul className="app-plan-features">{items.map(item=><li key={item}>{item}</li>)}</ul>}
 
@@ -56,7 +57,7 @@ export default function PlansView({profile,billingEnabled,checkoutBusy=false,tri
         <p className="app-plan-summary">Pour envoyer depuis Relanzio et automatiser progressivement le suivi, avec contrôle devis par devis.</p>
         <PlanFeatures items={PRO_PLAN.features}/>
         <div className="app-plan-actions">
-          {state.trialEligible&&<><button type="button" className="btn ghost full app-trial-btn" disabled={trialBusy} onClick={onStartTrial}>{trialBusy?'Activation…':'Essayer Pro gratuitement pendant 7 jours'}</button><p className="app-plan-help">Sans carte bancaire et sans débit automatique. Une seule fois par compte.</p></>}
+          {state.trialEligible&&<><button type="button" className="btn ghost full app-trial-btn" disabled={trialBusy} onClick={onStartTrial}>{trialBusy?'Activation…':`Essayer Pro gratuitement pendant ${TRIAL_DAYS} jours`}</button><p className="app-plan-help">Sans carte bancaire et sans débit automatique. Une seule fois par compte.</p></>}
           {state.upgradeVisible&&<button type="button" className="btn full app-upgrade-btn" disabled={state.upgradeDisabled} onClick={onUpgrade}>{checkoutBusy?'Ouverture…':state.upgradeLabel}</button>}
           {state.paid&&billingEnabled&&state.stripeManaged&&<button type="button" className="btn ghost full" onClick={onPortal}>Gérer mon abonnement</button>}
           {state.upgradeHint&&state.upgradeVisible&&<p className="app-plan-help">{state.upgradeHint}</p>}

@@ -1,3 +1,4 @@
+import { activeQuoteLimitFor } from '../shared/plans.js';
 export const MAX_QUOTE_AMOUNT = 9_999_999_999.99;
 export const ACTIVE_QUOTE_STATUSES = Object.freeze(['open','paused']);
 export const FOLLOWUP_SCHEDULE_MODES = Object.freeze(['recommended','custom','none']);
@@ -7,7 +8,7 @@ export function isActiveQuoteStatus(status=''){
 }
 
 export function activeQuoteLimit(proAccess=false){
-  return proAccess ? 100 : 5;
+  return activeQuoteLimitFor(proAccess);
 }
 
 export function parseQuoteAmount(value){
