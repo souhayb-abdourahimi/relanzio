@@ -27,7 +27,23 @@ import { stageCommercialCandidates, runCommercialQueueFeeder } from './commercia
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { pollImapReplies } from './imap-replies.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt, parseQuoteContact, sanitizeNote } from './quote-rules.js';
-import { shouldArmInitialAutoSend, initialRecommendedFollowupAt } from './followup-policy.js';
+import { shouldArmInitialAutoSend, initialRecommendedFollowupAt, nextRecommendedAfterAction, parisBusinessDate } from './followup-policy.js';
+import { effectiveOffsets, normalizeFollowupOffsets } from '../shared/followup-cadence.js';
+import { verifyEmailLink } from './email-links.js';
+import { parisLocalDateTimeToIso } from './logic.js';
+
+// "Planning recommandé" for an existing quote: relance 1 from the sent date, later ones from the last
+// follow-up actually done. Never in the past: an overdue recommendation is proposed for today.
+async function recommendedNextFollowupAt(quote,sentDate,profile,now=new Date()){
+  const step=Number(quote.followup_step||0),offsets=effectiveOffsets(profile);
+  if(step>=3)return null;
+  if(step===0)return initialRecommendedFollowupAt(sentDate,now,offsets[0]).at;
+  const {data:last,error}=await db.from('followups').select('sent_at,created_at').eq('quote_id',quote.id).eq('user_id',quote.user_id).in('status',['sent','delivered','opened','clicked','bounced']).order('step',{ascending:false}).limit(1).maybeSingle();
+  if(error)throw error;
+  const next=nextRecommendedAfterAction(last?.sent_at||last?.created_at||now.toISOString(),step,offsets);
+  const today=parisLocalDateTimeToIso(parisBusinessDate(now),9,0);
+  return next<today?today:next;
+}
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 import { rowsToSemicolonCsv } from './export.js';
 import { VAT_NOTICE,PRO_PRICE_LABEL,PRO_MONTHLY_PRICE,monthlyRecurringRevenue } from '../shared/plans.js';
@@ -151,6 +167,37 @@ app.post('/api/events', rateLimit({windowMs:60_000,max:30}), async (req,res)=>{
   res.status(202).json({ok:true});
 });
 
+// One-click email preferences from signed links (client follow-ups, morning digest). GET shows a
+// confirmation page so link scanners never unsubscribe anyone; POST (form or RFC 8058 one-click) applies it.
+const escHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const emailPage=(title,body)=>`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escHtml(title)} — Relanzio</title><style>body{font-family:system-ui,sans-serif;background:#f5f7f5;color:#10231b;margin:0;padding:40px 16px}main{max-width:520px;margin:auto;background:#fff;border:1px solid #dce6df;border-radius:16px;padding:28px}button{font:inherit;font-weight:800;background:#10231b;color:#fff;border:0;border-radius:10px;padding:13px 18px;min-height:44px;cursor:pointer}p{line-height:1.55}</style></head><body><main><h1>${escHtml(title)}</h1>${body}</main></body></html>`;
+function readEmailLink(token){
+  for(const purpose of ['followup_optout','digest_optout']){const data=verifyEmailLink(token,purpose);if(data)return data;}
+  return null;
+}
+app.get('/api/email/unsubscribe', rateLimit({windowMs:60_000,max:30}), async(req,res)=>{
+  let data=null;try{data=readEmailLink(req.query.t);}catch{}
+  if(!data)return res.status(400).type('html').send(emailPage('Lien invalide','<p>Ce lien n’est pas valide ou a été modifié.</p>'));
+  const what=data.p==='digest_optout'?'le rappel du matin de Relanzio':'les relances de devis envoyées par ce professionnel via Relanzio';
+  res.type('html').send(emailPage('Se désinscrire',`<p>Vous ne recevrez plus ${escHtml(what)} à l’adresse <b>${escHtml(data.e)}</b>.</p><form method="post"><button>Confirmer la désinscription</button></form>`));
+});
+app.post('/api/email/unsubscribe', rateLimit({windowMs:60_000,max:30}), async(req,res)=>{
+  let data=null;try{data=readEmailLink(req.query.t);}catch{}
+  if(!data)return res.status(400).type('html').send(emailPage('Lien invalide','<p>Ce lien n’est pas valide ou a été modifié.</p>'));
+  try{
+    if(data.p==='followup_optout'){
+      await mustDb(db.from('followup_optouts').upsert({user_id:data.u,email:String(data.e).toLowerCase(),source:'unsubscribe_link'},{onConflict:'user_id,email',ignoreDuplicates:true}));
+      await mustDb(db.from('quotes').update({auto_send:false,updated_at:nowIso()}).eq('user_id',data.u).eq('client_email',String(data.e).toLowerCase()));
+    }else{
+      await mustDb(db.from('profiles').update({morning_digest_enabled:false,updated_at:nowIso()}).eq('id',data.u));
+    }
+    res.type('html').send(emailPage('Désinscription confirmée','<p>C’est noté. Vous pouvez fermer cette page.</p>'));
+  }catch(e){
+    await reportError('email.unsubscribe',e,{request_id:req.requestId,purpose:data.p});
+    res.status(500).type('html').send(emailPage('Erreur','<p>La désinscription n’a pas pu être enregistrée. Répondez simplement à l’email reçu pour la demander.</p>'));
+  }
+});
+
 app.post('/api/activity', requireUser, async(req,res)=>{try{await db.from('product_events').insert({user_id:req.user.id,event:'app_active',path:sanitizeText(req.body.path||'/app',200)});res.status(202).json({ok:true})}catch(e){res.status(202).json({ok:false})}});
 
 app.get('/api/profile', requireUser, async(req,res)=>{ try{res.json({profile:await getProfile(req.user)})}catch(e){res.status(500).json({error:e.message})} });
@@ -170,6 +217,11 @@ app.patch('/api/profile', requireUser, async(req,res)=>{
     if ('role' in req.body) patch.role=sanitizeText(req.body.role,80);
     if ('onboarding_completed' in req.body) patch.onboarding_completed=Boolean(req.body.onboarding_completed);
     if ('marketing_opt_in' in req.body) patch.marketing_opt_in=Boolean(req.body.marketing_opt_in);
+    if ('followup_offsets' in req.body) {
+      const offsets=normalizeFollowupOffsets(req.body.followup_offsets);
+      if(!offsets)return res.status(400).json({error:'Cadence invalide : trois délais croissants, par exemple J+2, J+5, J+10.'});
+      patch.followup_offsets=offsets;
+    }
     if(req.body.email_mode==='review')patch.email_mode='review';
     if(req.body.email_mode==='automatic'&&hasProAccess(profile))patch.email_mode='automatic';
     const {data,error}=await db.from('profiles').update(patch).eq('id',req.user.id).select('*').single(); if(error)throw error; res.json({profile:withEntitlements(data)});
@@ -204,7 +256,7 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
     const requestedMode=('followup_schedule_mode' in req.body)?normalizeFollowupScheduleMode(req.body.followup_schedule_mode):(('next_followup_at' in req.body)?'custom':'recommended');
     if(!requestedMode)return res.status(400).json({error:'Mode de prochaine relance invalide.'});
     let nextFollowupAt=null;
-    if(requestedMode==='recommended')nextFollowupAt=initialRecommendedFollowupAt(parsedDate).at;
+    if(requestedMode==='recommended')nextFollowupAt=initialRecommendedFollowupAt(parsedDate,new Date(),effectiveOffsets(profile)[0]).at;
     if(requestedMode==='custom'){nextFollowupAt=parseCustomFollowupAt(req.body.next_followup_at);if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});}
     const requestedAutoSend=Boolean(email)&&requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'&&Boolean(auto_send);
     const safeAutoSend=shouldArmInitialAutoSend(requestedAutoSend,nextFollowupAt);
@@ -276,7 +328,7 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
     }else if(requestedMode==='none'){
       nextFollowupAt=null; patch.auto_send=false;
     }else if(requestedMode==='recommended'){
-      nextFollowupAt=nextDate(sentDate,existing.followup_step);
+      nextFollowupAt=await recommendedNextFollowupAt(existing,sentDate,profile);
     }else if(requestedMode==='custom'&&scheduleTouched){
       nextFollowupAt=parseCustomFollowupAt(req.body.next_followup_at||existing.next_followup_at);
       if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});
@@ -340,7 +392,7 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
     const result=await sendQuoteFollowup(quote,profile,sanitizeText(req.get('Idempotency-Key'),100)||null,{subject:subject||null,body:body||null});
     res.json({sent:true,result});
   } catch(e){
-    if(['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_REQUEST_ALREADY_FAILED','FOLLOWUP_DAILY_LIMIT','EMAIL_RECIPIENT_SUPPRESSED'].includes(e.message))return res.status(409).json({error:e.message==='EMAIL_RECIPIENT_SUPPRESSED'?'Cette adresse ne peut plus recevoir de relances.':'Cette relance est déjà en cours, déjà traitée ou bloquée par la limite quotidienne.'});
+    if(['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_REQUEST_ALREADY_FAILED','FOLLOWUP_DAILY_LIMIT','EMAIL_RECIPIENT_SUPPRESSED','EMAIL_RECIPIENT_OPTED_OUT','EMAIL_RECIPIENT_MISSING'].includes(e.message))return res.status(409).json({error:e.message==='EMAIL_RECIPIENT_SUPPRESSED'?'Cette adresse ne peut plus recevoir de relances.':e.message==='EMAIL_RECIPIENT_OPTED_OUT'?'Ce client a demandé à ne plus recevoir vos relances par email. Relancez-le par téléphone ou SMS.':e.message==='EMAIL_RECIPIENT_MISSING'?'Ajoutez l’email du client pour envoyer depuis Relanzio.':'Cette relance est déjà en cours, déjà traitée ou bloquée par la limite quotidienne.'});
     await reportError('followup.manual_send',e,{request_id:req.requestId});
     res.status(500).json({error:'La relance n’a pas été envoyée. Aucun succès n’a été enregistré.',request_id:req.requestId});
   }

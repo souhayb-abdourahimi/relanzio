@@ -4,6 +4,14 @@ import { nextFollowupDate } from './logic.js';
 import { reportError } from './observability.js';
 import { hasProAccess } from './entitlements.js';
 import { isAutomaticSendWindow, parisBusinessDate, providerFailureDisposition } from './followup-policy.js';
+import { signEmailLink, emailLinkUrl, followupFooter } from './email-links.js';
+
+export async function isFollowupOptedOut(userId,email){
+  if(!email)return false;
+  const {data,error}=await db.from('followup_optouts').select('email').eq('user_id',userId).eq('email',String(email).toLowerCase()).maybeSingle();
+  if(error)throw error;
+  return Boolean(data);
+}
 
 export const nextDate = nextFollowupDate;
 
@@ -77,6 +85,11 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
     }
   }
 
+  if(!quote.client_email)throw new Error('EMAIL_RECIPIENT_MISSING');
+  if(await isFollowupOptedOut(quote.user_id,quote.client_email))throw new Error('EMAIL_RECIPIENT_OPTED_OUT');
+  // Built before any claim or provider call: a missing EMAIL_LINK_SECRET blocks the send cleanly.
+  const unsubscribeUrl=emailLinkUrl(signEmailLink('followup_optout',{u:quote.user_id,e:String(quote.client_email).toLowerCase()}));
+
   const claimed = await claimQuote(quote);
   const sendStartedAt=new Date().toISOString();
   const businessDate=parisBusinessDate(sendStartedAt);
@@ -115,7 +128,9 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
     followupId=draft.id;
     providerAttempted=true;
     const sent = await sendEmail({
-      to:claimed.client_email, subject:preview.subject, text:preview.body,
+      to:claimed.client_email, subject:preview.subject,
+      text:preview.body+followupFooter({companyName:profile.company_name,quoteTitle:claimed.title,unsubscribeUrl}),
+      headers:{'List-Unsubscribe':`<${unsubscribeUrl}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click'},
       replyTo:profile.email, senderName:`${profile.company_name || 'Votre entreprise'} via Relanzio`, tags:['relanzio-followup']
     });
     const sentAt=new Date().toISOString();
@@ -154,6 +169,7 @@ export async function runDueFollowups(now=new Date()) {
       results.push({ id:quote.id, sent:true, provider_message_id:result.provider_message_id });
     } catch (e) {
       if (['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_DAILY_LIMIT'].includes(e.message)) { results.push({id:quote.id,skipped:e.message==='FOLLOWUP_DAILY_LIMIT'?'daily_limit':'already_claimed'}); continue; }
+      if (['EMAIL_RECIPIENT_OPTED_OUT','EMAIL_RECIPIENT_MISSING'].includes(e.message)) { await db.from('quotes').update({auto_send:false}).eq('id',quote.id).eq('user_id',quote.user_id); results.push({id:quote.id,skipped:e.message==='EMAIL_RECIPIENT_OPTED_OUT'?'recipient_opted_out':'no_email'}); continue; }
       await db.from('quotes').update({auto_send:false,send_claimed_at:null}).eq('id',quote.id).eq('user_id',quote.user_id);
       await reportError('followup.send', e, { quote_id:quote.id, user_id:quote.user_id });
       results.push({ id:quote.id, error:String(e.message || e) });
