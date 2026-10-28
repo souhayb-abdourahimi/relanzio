@@ -41,3 +41,5 @@ jobs:
           npx playwright test test/mobile-nav.browser.spec.js --reporter=line
       - name: browser E2E (fake API, 1366 px and 390 px)
         run: npm run test:e2e
+      - name: public pages readable without JavaScript (prerendered HTML)
+        run: npm run test:nojs

@@ -17,7 +17,8 @@
     "prebuild": "node scripts/render-public-files.mjs",
     "test:sql": "scripts/sql-test.sh test/sql/*.test.sql",
     "test:e2e": "node test/e2e/run.mjs flows",
-    "screenshots": "node test/e2e/run.mjs screenshots"
+    "screenshots": "node test/e2e/run.mjs screenshots",
+    "test:nojs": "node test/e2e/no-js.mjs"
   },
   "engines": {
     "node": ">=22.12"
