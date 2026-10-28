@@ -8,7 +8,7 @@ const require=createRequire(import.meta.url);
 const { chromium }=require('playwright');
 const PORT=3998,BASE=`http://127.0.0.1:${PORT}`;
 const server=spawn(process.execPath,['server/index.js'],{env:{...process.env,NODE_ENV:'production',PORT:String(PORT),SUPABASE_URL:'http://127.0.0.1:9',SUPABASE_ANON_KEY:'x',SUPABASE_SERVICE_ROLE_KEY:'x',APP_URL:BASE,STRIPE_SECRET_KEY:''},stdio:'ignore'});
-const checks={'/':'Chaque matin, les devis à relancer','/pricing':'Tarifs simples','/faq':'Qui êtes-vous ?','/docs':'La vue Aujourd’hui','/contact':'Contact général','/legal':'131 068 603','/privacy':'Sous-traitants','/dpa':'Télécharger le DPA','/terms':'L223-8','/logiciel-relance-devis':'sans construire un CRM','/relance-devis-agence':'petite agence','/modele-email-relance-devis':'Dernier suivi'};
+const checks={'/':'Vos devis relancés','/pricing':'Relanzio relance pour vous','/faq':'Qui êtes-vous ?','/docs':'La vue Aujourd’hui','/contact':'Contact général','/legal':'131 068 603','/privacy':'Sous-traitants','/dpa':'Télécharger le DPA','/terms':'L223-8','/logiciel-relance-devis':'sans construire un CRM','/relance-devis-agence':'petite agence','/modele-email-relance-devis':'Dernier suivi'};
 try{
   for(let i=0;i<40;i++){try{if((await fetch(BASE+'/pricing')).ok)break;}catch{}await new Promise(r=>setTimeout(r,250));}
   const browser=await chromium.launch();

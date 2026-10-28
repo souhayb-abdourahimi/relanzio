@@ -4,15 +4,17 @@ import FollowupModal from './FollowupModal.jsx';
 import PricingCards from './PricingCards.jsx';
 import LegalPage from './LegalPage.jsx';
 import { routeMeta, track } from './public-meta.js';
-import { PRO_PRICE_LABEL, PRO_PRICE_TEXT, VAT_NOTICE, TRIAL_DAYS, FREE_LIMIT_TEXT } from '../../shared/plans.js';
+import { PRO_PRICE_LABEL, TRIAL_DAYS, FREE_LIMIT_TEXT } from '../../shared/plans.js';
 import { COMPANY, telLink } from '../../shared/company.js';
+import { followupMessage } from '../../shared/followup-templates.js';
+import { REPLY_STOP_LIVE } from './claims.js';
+import Testimonials from './Testimonials.jsx';
 
 // Public site (landing, pricing, docs, FAQ, contact, resources, legal). Rendered in the browser and
 // prerendered to static HTML at build time (scripts/prerender.mjs), so it must not touch window/document
 // outside effects and must not depend on the current date.
 export const SUPPORT_EMAIL=import.meta.env.VITE_SUPPORT_EMAIL||COMPANY.supportEmail;
 export const CONTACT_EMAIL=import.meta.env.VITE_CONTACT_EMAIL||'contact@relanzio.com';
-const money=n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €';
 const goSignup=()=>{location.href='/signup';};
 
 export function Logo(){return <a className="logo" href="/" aria-label="Relanzio accueil">Relanz<span>io</span></a>}
@@ -23,57 +25,58 @@ export function Header({onStart=goSignup}){
 
 export function Footer(){
   return <footer className="footer container">
-    <div><Logo/><p>Le suivi des devis envoyés, chaque matin.</p><p className="footer-id">Édité par {COMPANY.publisherName}, {COMPANY.legalForm.toLowerCase()} · SIREN {COMPANY.siren} · {COMPANY.city}</p></div>
+    <div><Logo/><p>La relance de devis, sans harceler vos clients.</p><p className="footer-id">Édité par {COMPANY.publisherName}, {COMPANY.legalForm.toLowerCase()} · SIREN {COMPANY.siren} · {COMPANY.city}</p></div>
     <div className="footer-links"><a href="/pricing">Tarifs</a><a href="/faq">FAQ</a><a href="/docs">Documentation</a><a href="/contact">Contact</a><a href={`mailto:${SUPPORT_EMAIL}`}>Support</a><a href="/legal">Mentions légales</a><a href="/privacy">Confidentialité</a><a href="/dpa">DPA</a><a href="/terms">CGU/CGV</a></div>
   </footer>;
 }
 
 // Demo without an account: the real Today view with sample data. Dates are fixed so the static
-// prerender and the live page show the same thing.
+// prerender and the live page show the same thing. Messages come from the real templates.
 const DEMO_NOW=new Date('2026-11-03T08:00:00.000Z');
 const DEMO_QUOTES=[
-  {id:'d1',client_name:'M. et Mme Garnier',client_phone:'06 00 00 00 01',title:'Réfection toiture garage',amount:4800,status:'open',followup_step:1,next_followup_at:'2026-10-31T08:00:00.000Z',note:'Attend l’accord du conjoint',followups:[{id:'f1',step:1,status:'sent',channel:'manual',sent_at:'2026-10-28T09:00:00.000Z'}]},
-  {id:'d2',client_name:'Cabinet Rivière',client_email:'contact@exemple.fr',title:'Mise aux normes tableau électrique',amount:2100,status:'open',followup_step:0,next_followup_at:'2026-11-02T08:00:00.000Z',followups:[]},
-  {id:'d3',client_name:'Studio Nova',client_email:'hello@exemple.fr',title:'Site vitrine',amount:2500,status:'open',followup_step:3,next_followup_at:null,followups:[]},
+  {id:'d0',client_name:'Mme Benali',client_email:'contact@exemple.fr',title:'Salle de bain complète',amount:9400,status:'open',followup_step:1,next_followup_at:null,followup_schedule_mode:'none',reply_received_at:'2026-11-03T07:10:00.000Z',replies:[{id:'r0',source:'email',channel:'email',category:'interested',effect:'stop',excerpt:'Bonjour, c’est d’accord pour nous. Quand pourriez-vous commencer ?',received_at:'2026-11-03T07:10:00.000Z'}],followups:[{id:'f0',step:1,status:'sent',channel:'relanzio',sent_at:'2026-10-30T08:00:00.000Z'}]},
+  {id:'d1',client_name:'M. et Mme Garnier',client_phone:'06 00 00 00 01',title:'Réfection toiture garage',amount:4800,status:'open',followup_step:1,next_followup_at:'2026-10-30T08:00:00.000Z',note:'Attend l’accord du conjoint',followups:[{id:'f1',step:1,status:'sent',channel:'manual',sent_at:'2026-10-27T09:00:00.000Z'}]},
+  {id:'d2',client_name:'Cabinet Rivière',client_email:'contact@exemple.fr',title:'Mise aux normes tableau électrique',amount:2100,status:'open',followup_step:0,next_followup_at:'2026-11-03T08:00:00.000Z',followups:[]},
+  {id:'d3',client_name:'SARL Bâti Sud',client_phone:'06 00 00 00 03',title:'Extension 30 m²',amount:38500,status:'open',followup_step:3,next_followup_at:null,followups:[]},
 ];
-const DEMO_MESSAGE=q=>`Bonjour,\n\nJe reviens vers vous au sujet du devis « ${q.title} ». Avez-vous pu le regarder ?\n\nJe reste disponible pour en parler.\n\nBien cordialement`;
+const demoPreview=q=>({quote:q,...followupMessage({clientName:q.client_name,title:q.title,companyName:'Toitures Martin'},q.followup_step)});
 
 export function Demo(){
   const[quotes,setQuotes]=useState(DEMO_QUOTES);
   const[preview,setPreview]=useState(null);
   const[note,setNote]=useState('');
-  const done=(q,msg)=>{setQuotes(list=>list.map(x=>x.id===q.id?{...x,followup_step:x.followup_step+1,next_followup_at:'2026-11-08T08:00:00.000Z'}:x));setPreview(null);setNote(msg);};
-  const decide=(id,status)=>{setQuotes(list=>list.map(x=>x.id===id?{...x,status}:x));setNote(status==='won'?'Devis marqué gagné.':status==='lost'?'Devis marqué perdu.':'Devis mis en pause.');};
+  const update=(id,patch,msg)=>{setQuotes(list=>list.map(x=>x.id===id?{...x,...patch}:x));setPreview(null);setNote(msg);};
+  const done=q=>update(q.id,{followup_step:q.followup_step+1,next_followup_at:'2026-11-09T08:00:00.000Z'},'Relance enregistrée. La suivante est planifiée lundi 9 nov. à 9 h.');
+  const replied=q=>update(q.id,{reply_received_at:'2026-11-03T08:00:00.000Z',next_followup_at:null,replies:[{id:'m'+q.id,source:'manual',channel:'phone',category:'received',effect:'stop',received_at:'2026-11-03T08:00:00.000Z'}]},'Le client a répondu : plus aucune relance pour ce devis.');
+  const decide=(id,status)=>update(id,{status},status==='won'?'Devis marqué gagné.':status==='lost'?'Devis marqué perdu.':'Devis mis en pause.');
   return <div className="demo-phone" id="demo">
     <div className="demo-phone-bar"><b>Aujourd’hui</b><em>DÉMO · DONNÉES D’EXEMPLE</em></div>
     <div className="demo-phone-screen">
-      <TodayView quotes={quotes} now={DEMO_NOW} hideFuture
-        onPrepare={q=>setPreview({quote:q,step:q.followup_step+1,subject:`Suivi — ${q.title}`,body:DEMO_MESSAGE(q)})}
-        onMarkDone={q=>done(q,'Relance marquée comme faite. La suivante est programmée.')}
-        onPostpone={q=>{setQuotes(list=>list.map(x=>x.id===q.id?{...x,next_followup_at:'2026-11-06T08:00:00.000Z'}:x));setNote('Devis repoussé.');}}
+      <TodayView quotes={quotes} now={DEMO_NOW} hideFuture profile={{pro_access:false}}
+        onPrepare={q=>setPreview(demoPreview(q))}
+        onPostpone={q=>update(q.id,{next_followup_at:'2026-11-06T08:00:00.000Z',reply_received_at:null},'Devis repoussé à vendredi.')}
+        onClientReplied={replied}
+        onResume={q=>update(q.id,{reply_received_at:null,next_followup_at:'2026-11-05T08:00:00.000Z'},'Relances reprises.')}
         onStatus={decide}/>
-      <p className="demo-note" aria-live="polite">{note||'Essayez : Relancer, Repousser, Résultat. Rien n’est envoyé.'}{quotes!==DEMO_QUOTES&&<> <button type="button" className="linklike" onClick={()=>{setQuotes(DEMO_QUOTES);setNote('');}}>Recommencer</button></>}</p>
+      <p className="demo-note" aria-live="polite">{note||'Essayez : Relancer, Repousser, ou « ⋯ » → Le client a répondu. Rien n’est envoyé.'}{quotes!==DEMO_QUOTES&&<> <button type="button" className="linklike" onClick={()=>{setQuotes(DEMO_QUOTES);setNote('');}}>Recommencer</button></>}</p>
     </div>
-    {preview&&<FollowupModal preview={preview} onChange={patch=>setPreview(p=>({...p,...patch}))} onCopy={()=>setNote('Message copié (démo).')} onMarkDone={()=>done(preview.quote,'Relance marquée comme faite. La suivante est programmée.')} onClose={()=>setPreview(null)}/>}
+    {preview&&<FollowupModal preview={preview} onChange={patch=>setPreview(p=>({...p,...patch}))} onCopy={()=>setNote('Message copié (démo).')} onMarkDone={()=>done(preview.quote)} onClientReplied={replied} onClose={()=>setPreview(null)}/>}
   </div>;
 }
 
-export function ValueCalculator(){
-  const[avg,setAvg]=useState(1500),[monthly,setMonthly]=useState(12);
-  return <div className="value-box"><div><span className="overline">CALCULATEUR DE VALEUR</span><h2>Combien représente un seul devis récupéré ?</h2><p>Pas de promesse de conversion. Utilisez vos propres chiffres pour juger si le suivi mérite {PRO_PRICE_TEXT}.</p><label>Panier moyen du devis <input type="range" min="200" max="10000" step="100" value={avg} onChange={e=>setAvg(+e.target.value)}/><b>{money(avg)}</b></label><label>Devis envoyés par mois <input type="range" min="1" max="100" value={monthly} onChange={e=>setMonthly(+e.target.value)}/><b>{monthly}</b></label></div><div className="value-result"><small>SCÉNARIO, PAS UNE GARANTIE</small><strong>{money(avg)}</strong><p>Si votre suivi permet de récupérer <b>un seul devis supplémentaire</b> de votre panier moyen.</p><div><span>Abonnement Pro</span><b>{PRO_PRICE_TEXT}</b></div><small>{VAT_NOTICE}</small><div><span>Devis suivis</span><b>{monthly}/mois</b></div></div></div>;
-}
-
 export const FAQ_ITEMS=[
-  ['J’ai déjà un logiciel de devis (Obat, Tolteck…)','Gardez-le. Relanzio commence après l’envoi : vous ajoutez le devis envoyé (client, montant, date) en 30 secondes, sans import ni changement d’outil. Relanzio ne crée pas de devis et ne fait pas de facturation.'],
-  ['Je relance par téléphone','Très bien : Relanzio vous dit qui appeler aujourd’hui, le bouton « Appeler » compose le numéro, et « Relance faite » programme la suivante. Le téléphone suffit, l’email du client est facultatif.'],
-  ['Mes clients reçoivent-ils un email de Relanzio ?','Non, par défaut. En mode revue, c’est vous qui relancez, depuis votre messagerie, par SMS ou par téléphone ; Relanzio prépare le message. Avec Pro, vous pouvez aussi envoyer depuis Relanzio : l’email porte le nom de votre entreprise « via Relanzio », les réponses arrivent dans votre boîte et chaque message contient un lien de désinscription.'],
-  ['Où sont mes données ?','Votre compte et vos devis sont stockés dans une base Supabase située dans l’Union européenne (Paris). L’application est servie par Railway (États-Unis) ; Stripe gère le paiement et Brevo l’envoi des emails. La liste complète est dans la politique de confidentialité.'],
-  ['Puis-je exporter mes données ?','Oui, à tout moment, depuis Paramètres : export CSV de vos devis et export complet de votre compte. Vous pouvez aussi supprimer votre compte vous-même.'],
+  ['Mes clients verront-ils Relanzio ?','Si vous relancez vous-même, non : le message part de votre téléphone ou de votre messagerie. Si Relanzio envoie pour vous (Pro), l’email porte le nom de votre entreprise « via Relanzio » et contient un lien pour ne plus être relancé.'],
+  ['Et si mon client a déjà répondu ?',REPLY_STOP_LIVE?'Si la relance a été envoyée par Relanzio, sa réponse arrête automatiquement la suite et vous est transmise par email. S’il vous a répondu autrement (téléphone, SMS, en personne), touchez « Le client a répondu » : plus aucune relance ne part pour ce devis.':'Touchez « Le client a répondu » : plus aucune relance n’est proposée ni envoyée pour ce devis. Le devis reste dans votre liste pour le marquer gagné ou perdu. Quand Relanzio envoie pour vous, le client vous répond directement dans votre boîte mail.'],
+  ['Puis-je relire avant l’envoi ?','Oui, toujours. Chaque relance s’ouvre avec son message, que vous pouvez modifier avant de l’envoyer ou de le copier. Rien ne part sans votre accord.'],
+  ['Relanzio risque-t-il de harceler mes clients ?','Non. Trois relances au maximum par devis, espacées (par défaut 2, 5 puis 10 jours après l’envoi) et seulement les jours ouvrés. Tout s’arrête dès que le devis est gagné, perdu, en pause, ou que le client a répondu. Après la troisième relance sans réponse, Relanzio vous propose d’appeler plutôt que d’insister.'],
+  ['Je n’ai que le téléphone de mon client.','Ça suffit : l’email est facultatif. Relanzio vous propose le SMS prêt à envoyer depuis votre téléphone, ou le bouton Appeler.'],
+  ['Puis-je arrêter une séquence ?','À tout moment, en un geste : Gagné, Perdu, Pause, Repousser ou « Le client a répondu ».'],
+  ['Dois-je changer de logiciel de devis ?','Non. Vous faites vos devis comme d’habitude, puis vous ajoutez le devis envoyé dans Relanzio (client, objet, montant, date) en 30 secondes. Relanzio ne crée pas de devis et ne fait pas de facturation.'],
+  ['Dois-je connecter Gmail ou ma boîte mail ?','Non. Relanzio n’accède pas à votre boîte mail. Vous relancez depuis votre propre messagerie, ou Relanzio envoie l’email en votre nom (Pro).'],
+  ['Où sont stockées mes données ?','Votre compte et vos devis sont stockés dans une base Supabase située dans l’Union européenne (Paris). L’application est servie par Railway (États-Unis) ; Stripe gère le paiement et Brevo l’envoi des emails. La liste complète est dans la politique de confidentialité. Vous pouvez exporter ou supprimer vos données depuis Paramètres.'],
+  ['Puis-je résilier quand je veux ?','Oui. Pro est un abonnement mensuel sans engagement : vous résiliez depuis le portail de paiement (Formules → Gérer mon abonnement). Pro reste actif jusqu’à la fin du mois payé, puis le compte repasse en gratuit, sans perte de données.'],
+  ['Que se passe-t-il à la fin de l’essai ?',`L’essai Pro de ${TRIAL_DAYS} jours démarre à l’ajout de votre premier devis, sans carte bancaire. À la fin, sans abonnement, le compte repasse en formule gratuite (${FREE_LIMIT_TEXT}) : rien n’est supprimé, les devis au-delà passent en lecture seule et restent consultables.`],
   ['Qui êtes-vous ?',`Relanzio est édité par ${COMPANY.publisherName}, ${COMPANY.legalForm.toLowerCase()} à ${COMPANY.city} (SIREN ${COMPANY.siren}). Vous écrivez à ${COMPANY.supportEmail} ou appelez le ${COMPANY.phone} : c’est moi qui réponds.`],
-  ['Un email peut-il partir sans mon accord ?','Non. Le compte démarre en mode revue : rien ne part sans vous. L’envoi automatique exige Pro, une activation dans Paramètres puis une autorisation devis par devis, et ne part qu’en jours ouvrés, entre 8 h et 19 h, une fois par jour au plus.'],
-  ['Que se passe-t-il à la fin de l’essai ?',`L’essai Pro de ${TRIAL_DAYS} jours démarre à l’ajout de votre premier devis, sans carte bancaire. À la fin, sans abonnement, le compte repasse en formule gratuite (${FREE_LIMIT_TEXT}) : rien n’est supprimé, les devis au-delà passent en lecture seule.`],
-  ['Comment mesurez-vous le chiffre « gagné » ?','C’est le montant des devis que vous marquez vous-même comme gagnés. Relanzio ne prétend pas que chaque vente est due à une relance.'],
-  ['Pourquoi aucun témoignage client ici ?','Parce que nous n’affichons pas de témoignage inventé. Les retours clients seront publiés uniquement avec leur accord.'],
 ];
 export function Faq({open=false}){return <div className="faq">{FAQ_ITEMS.map(([q,a],i)=><details key={q} open={open&&i===0}><summary>{q}</summary><p>{a}</p></details>)}</div>;}
 
@@ -87,34 +90,63 @@ export function WhoIsBehind(){
   </section>;
 }
 
+// The three real follow-up messages, rendered from the product templates (not a mock-up).
+const EXAMPLE=[0,1,2].map(i=>({...followupMessage({clientName:'M. Durand',title:'Réfection de la toiture',companyName:'Toitures Martin'},i),when:['2 jours après l’envoi','3 jours plus tard','5 jours plus tard'][i]}));
+
 export function Marketing({onStart=goSignup}){
   useEffect(()=>{routeMeta('/');track('landing_view');},[]);
   return <><Header onStart={onStart}/><main>
     <section className="hero container">
       <div className="hero-copy">
-        <span className="eyebrow">SUIVI DES DEVIS ENVOYÉS · ARTISANS, TPE, INDÉPENDANTS</span>
-        <h1>Chaque matin, les devis à relancer. <i>Sur votre téléphone.</i></h1>
-        <p>Ajoutez vos devis envoyés en 30 secondes. Relanzio vous dit qui relancer aujourd’hui et prépare le message. Votre logiciel de devis ne change pas.</p>
-        <div className="hero-actions"><button className="btn big" onClick={onStart}>Suivre mon premier devis <span>→</span></button><a className="btn ghost big" href="#demo">Essayer la démo</a></div>
-        <div className="trust-line"><span>✓ Essai Pro {TRIAL_DAYS} jours, sans carte</span><span>✓ Rien ne part sans vous</span><span>✓ Email, SMS ou appel</span></div>
+        <span className="eyebrow">RELANCE DE DEVIS · ARTISANS</span>
+        {REPLY_STOP_LIVE
+          ?<h1>Vos devis relancés à votre place. <i>Tout s’arrête dès que le client répond.</i></h1>
+          :<h1>Vos devis relancés au bon moment. <i>Sans harceler vos clients.</i></h1>}
+        <p>Ajoutez un devis déjà envoyé : Relanzio vous dit quand relancer, prépare le message et peut l’envoyer pour vous. Sans changer de logiciel de devis.</p>
+        <div className="hero-actions"><button className="btn big" onClick={onStart}>Relancer mon premier devis <span>→</span></button><a className="btn ghost big" href="#demo">Voir la démo</a></div>
+        <div className="trust-line"><span>✓ Essai Pro {TRIAL_DAYS} jours, sans carte</span><span>✓ Rien ne part sans votre accord</span><span>✓ 3 relances au maximum</span></div>
       </div>
       <Demo/>
     </section>
-    <section className="proof-strip"><div className="container"><b>Le travail commence après « devis envoyé »</b><span>Devis envoyé</span><i>→</i><span>Relance du jour</span><i>→</i><span>Réponse</span><i>→</i><span>Gagné / perdu / pause</span></div></section>
-    <section className="section container" id="produit">
-      <div className="section-head"><span>CE QUE ÇA CHANGE</span><h2>Trois choses, chaque jour.</h2><p>Pas de migration. Pas de CRM à paramétrer.</p></div>
+    <section className="section container" id="probleme">
+      <div className="section-head"><span>LE PROBLÈME</span><h2>Un devis sans réponse n’est pas un non.</h2><p>C’est souvent un client occupé, et un artisan qui n’a pas eu le temps de rappeler.</p></div>
       <div className="feature-grid benefits">
-        <article className="feature large"><span>01</span><h3>Plus aucun devis oublié</h3><p>Chaque devis envoyé a sa prochaine relance. Les retards remontent en premier, avec le montant en jeu. En fin de séquence, Relanzio vous demande de trancher : gagné, perdu ou repousser.</p><div className="mini-ui"><b>Aujourd’hui</b><div>Garnier · 4 800 € <span>en retard de 3 j</span></div><div>Cabinet Rivière · 2 100 € <span>Relance 1/3</span></div></div></article>
-        <article className="feature"><span>02</span><h3>2 minutes par jour, depuis le téléphone</h3><p>Un rappel le matin, une liste courte. Relancer, repousser ou décider : un geste par devis, des boutons faits pour le pouce.</p></article>
-        <article className="feature"><span>03</span><h3>Rien ne part sans vous</h3><p>Relanzio prépare le message ; vous l’envoyez par email, SMS ou vous appelez. L’envoi automatique reste optionnel, devis par devis.</p></article>
+        <article className="feature"><span>01</span><h3>On oublie de relancer</h3><p>Entre deux chantiers, le devis envoyé il y a dix jours disparaît de la tête. Le client, lui, a parfois reçu trois autres devis.</p></article>
+        <article className="feature"><span>02</span><h3>On a peur de déranger</h3><p>Relancer trop tôt, trop souvent, ou après que le client a répondu : personne ne veut passer pour l’insistant.</p></article>
+        <article className="feature"><span>03</span><h3>On ne sait pas quand arrêter</h3><p>Sans suivi, on relance au hasard. Avec Relanzio, chaque devis a sa prochaine étape, et une fin.</p></article>
       </div>
     </section>
-    <section className="section dark" id="valeur"><div className="container"><ValueCalculator/></div></section>
-    <section className="section container"><div className="section-head"><span>EN 3 ÉTAPES</span><h2>Assez simple pour tous les jours.</h2></div><div className="steps"><article><b>1</b><h3>Ajoutez le devis envoyé</h3><p>Client, téléphone ou email, montant, date d’envoi. 30 secondes.</p></article><article><b>2</b><h3>Relancez quand Relanzio le dit</h3><p>J+2, J+5, J+10 par défaut, réglable. Message prêt à copier, à envoyer par email ou SMS.</p></article><article><b>3</b><h3>Fermez la boucle</h3><p>Gagné, perdu ou pause : la séquence s’arrête et vos chiffres restent justes.</p></article></div></section>
-    <section className="section soft" id="tarifs"><div className="container"><div className="section-head"><span>TARIFS</span><h2>Gratuit pour commencer. Pro quand ça vous sert.</h2></div><PricingCards onStart={onStart}/></div></section>
-    <section className="section container" id="faq"><div className="section-head"><span>FAQ</span><h2>Avant de confier vos relances à un logiciel.</h2></div><Faq/></section>
+    <section className="section soft" id="comment"><div className="container"><div className="section-head"><span>COMMENT ÇA MARCHE</span><h2>Vous ajoutez le devis. Relanzio s’occupe du reste.</h2></div><div className="steps">
+      <article><b>1</b><h3>Ajoutez le devis envoyé</h3><p>Client, email ou téléphone, objet, montant, date d’envoi. 30 secondes, depuis le téléphone.</p></article>
+      <article><b>2</b><h3>Relanzio planifie les relances</h3><p>Trois au maximum, les jours ouvrés à 9 h. Chaque matin, la vue Aujourd’hui vous montre quoi faire.</p></article>
+      <article><b>3</b><h3>Un geste par relance</h3><p>Relanzio l’envoie en votre nom (Pro), ou vous l’envoyez par email, SMS ou appel avec le message prêt.</p></article>
+      <article><b>4</b><h3>Le client répond : tout s’arrête</h3><p>{REPLY_STOP_LIVE?'Quand le client répond à une relance envoyée par Relanzio, la séquence s’arrête et sa réponse vous est transmise. Ailleurs (téléphone, SMS), un geste suffit.':'Touchez « Le client a répondu » : plus aucune relance pour ce devis. Puis gagné, perdu, ou relancer plus tard.'}</p></article>
+    </div></div></section>
+    <section className="section container" id="partage">
+      <div className="section-head"><span>QUI FAIT QUOI</span><h2>Relanzio fait le suivi. Vous gardez la décision.</h2></div>
+      <div className="split-grid">
+        <article className="split-card"><h3>Relanzio</h3><ul><li>Se souvient de chaque devis envoyé</li><li>Vous dit qui relancer aujourd’hui</li><li>Prépare un message court et poli</li><li>Envoie en votre nom si vous le demandez (Pro)</li><li>Arrête la séquence au bon moment</li><li>Remonte les gros devis à appeler</li></ul></article>
+        <article className="split-card yours"><h3>Vous</h3><ul><li>Ajoutez le devis, une fois</li><li>Relisez le message, si vous voulez</li><li>Validez l’envoi en un geste</li><li>Décidez : gagné, perdu, plus tard</li></ul></article>
+      </div>
+    </section>
+    <section className="section dark" id="garde-fous"><div className="container"><div className="section-head"><span>GARDE-FOUS</span><h2>Relancer sans harceler.</h2></div>
+      <ul className="guard-grid">
+        <li><b>3 relances au maximum</b><span>Ensuite, Relanzio vous propose d’appeler ou de trancher.</span></li>
+        <li><b>Jours ouvrés, à une heure raisonnable</b><span>Aucune relance planifiée le week-end ; 9 h par défaut.</span></li>
+        <li><b>{REPLY_STOP_LIVE?'Arrêt dès que le client répond':'Arrêt en un geste quand le client répond'}</b><span>{REPLY_STOP_LIVE?'Détecté automatiquement pour les emails envoyés par Relanzio ; un bouton pour le reste.':'« Le client a répondu » coupe toutes les relances de ce devis.'}</span></li>
+        <li><b>Arrêt dès que vous décidez</b><span>Gagné, perdu ou pause : plus rien ne part.</span></li>
+        <li><b>Vous gardez la main</b><span>Chaque message est relu et validé avant l’envoi.</span></li>
+        <li><b>Désinscription respectée</b><span>Chaque email envoyé par Relanzio contient un lien pour ne plus être relancé.</span></li>
+      </ul>
+    </div></section>
+    <section className="section container" id="exemple"><div className="section-head"><span>EXEMPLE RÉEL</span><h2>Les messages, tels qu’ils partent.</h2><p>Courts, polis, sans fausse urgence. Vous pouvez les modifier à chaque fois.</p></div>
+      <div className="example-grid">{EXAMPLE.map(m=><article key={m.step} className="example-mail"><small>Relance {m.step}/3 · {m.when}</small><b>{m.subject}</b><pre>{m.body}</pre></article>)}</div>
+    </section>
+    <section className="section soft" id="tarifs"><div className="container"><div className="section-head"><span>TARIFS</span><h2>Gratuit : vous relancez. Pro : Relanzio relance pour vous.</h2></div><PricingCards onStart={onStart}/></div></section>
+    <Testimonials/>
+    <section className="section container" id="faq"><div className="section-head"><span>FAQ</span><h2>Les questions qu’on nous pose avant de commencer.</h2></div><Faq/></section>
     <WhoIsBehind/>
-    <section className="cta"><div className="container"><span>COMMENCEZ PETIT</span><h2>Ajoutez un vrai devis. Voyez si le workflow vous fait gagner du temps.</h2><p>Si ce n’est pas utile dans votre quotidien, nous préférons le savoir avant de vous vendre quoi que ce soit.</p><button className="btn light big" onClick={onStart}>Créer mon espace gratuit →</button></div></section>
+    <section className="cta"><div className="container"><span>COMMENCEZ PAR UN DEVIS</span><h2>Ajoutez un devis qui attend une réponse. Relanzio vous dit quoi faire demain matin.</h2><p>Gratuit pour commencer, essai Pro de {TRIAL_DAYS} jours sans carte.</p><button className="btn light big" onClick={onStart}>Relancer mon premier devis →</button></div></section>
   </main><Footer/></>;
 }
 
@@ -133,12 +165,12 @@ export function SeoPage({path,onStart=goSignup}){
 export function PublicPage({kind,onStart=goSignup}){
   const support=SUPPORT_EMAIL,contact=CONTACT_EMAIL;
   const pages={
-    pricing:{title:'Tarifs simples',lead:`Pro : ${PRO_PRICE_LABEL}. Abonnement mensuel récurrent, sans engagement de durée minimale.`,body:<PricingCards onStart={onStart}/>},
+    pricing:{title:'Gratuit, vous relancez. Pro, Relanzio relance pour vous.',lead:`Pro : ${PRO_PRICE_LABEL}. Abonnement mensuel récurrent, sans engagement de durée minimale.`,body:<PricingCards onStart={onStart}/>},
     docs:{title:'Documentation',lead:'Le workflow essentiel de Relanzio, sans jargon.',body:<div className="doc-grid">
       <article><h2>1. Ajouter un devis</h2><p>Client, téléphone ou email, objet, montant et date d’envoi. La première relance est proposée J+2 après l’envoi (réglable dans Paramètres) ; un devis ancien est proposé aujourd’hui, sans rattrapage.</p></article>
-      <article><h2>2. La vue Aujourd’hui</h2><p>Les devis en retard d’abord, puis ceux du jour. Pour chacun : Relancer (message prêt, email, SMS ou appel), Relance faite, Repousser, Gagné, Perdu ou Pause.</p></article>
-      <article><h2>3. La séquence</h2><p>Chaque relance suivante est calculée à partir du jour où la précédente a été faite. Après la dernière, Relanzio vous demande de décider.</p></article>
-      <article><h2>4. Mode automatique</h2><p>Réservé à Pro : activez-le dans Paramètres puis autorisez l’envoi devis par devis. Jours ouvrés, 8 h – 19 h, une relance par devis et par jour au plus.</p></article>
+      <article><h2>2. La vue Aujourd’hui</h2><p>Les réponses reçues d’abord, puis les devis en retard, ceux du jour et ceux à appeler. Pour chacun : Relancer (message prêt, email, SMS ou appel, ou envoi par Relanzio en Pro), Repousser, et dans « ⋯ » : Le client a répondu, Gagné, Perdu, Pause.</p></article>
+      <article><h2>3. La séquence</h2><p>Trois relances au maximum, les jours ouvrés à 9 h. Chaque relance suivante est calculée à partir du jour où la précédente a été faite. Après la troisième sans réponse, Relanzio vous propose d’appeler ou de décider.</p></article>
+      <article><h2>4. Quand le client répond</h2><p>{REPLY_STOP_LIVE?'Si la relance a été envoyée par Relanzio, sa réponse arrête la séquence et vous est transmise par email. Pour une réponse par téléphone, SMS ou en personne, touchez « Le client a répondu ».':'Touchez « Le client a répondu » : plus aucune relance pour ce devis. Reprenez-les plus tard si besoin, ou marquez le devis gagné ou perdu.'}</p></article>
       <article><h2>5. Facturation</h2><p>Pro coûte {PRO_PRICE_LABEL}. Le portail Stripe permet de consulter les factures, changer de carte et résilier.</p></article>
       <article><h2>6. Besoin d’aide</h2><p>Écrivez à <a href={`mailto:${support}`}>{support}</a>, ou utilisez le support intégré depuis l’application.</p></article></div>},
     faq:{title:'Questions fréquentes',lead:'Les réponses importantes avant de confier vos relances à Relanzio.',body:<Faq open/>},

@@ -28,7 +28,7 @@ function Fixture(){
       const fr=free?.getBoundingClientRect(),pr=pro?.getBoundingClientRect();
       const oneColumn=window.innerWidth>760||Boolean(fr&&pr&&pr.top>=fr.bottom-1&&Math.abs(fr.width-pr.width)<2);
       const twoColumns=window.innerWidth<=760||Boolean(fr&&pr&&Math.abs(fr.top-pr.top)<5&&pr.left>fr.left);
-      const copyOk=text.includes('Découverte / Gratuit')&&text.includes('0 €')&&text.includes('Pro')&&text.includes('29 €')&&text.includes('5 devis actifs')&&text.includes('100 devis actifs')&&!text.toLowerCase().includes('illimité');
+      const copyOk=text.includes('Vous gardez la main')&&text.includes('Relanzio relance pour vous')&&text.includes('0 €')&&text.includes('29 €')&&text.includes('5 devis actifs')&&text.includes('100 devis actifs')&&!/illimité|\bIA\b|délivrabilité|mode revue|opt-in/i.test(text);
       const billingStateOk=billing?!button?.disabled:button?.disabled;
       const trialOk=!trial||(text.includes('Essai Pro · 4 jours restants')&&text.includes('Fin prévue le 18/10/2026'));
       const eligibleOk=!eligible||(!document.querySelector('.app-trial-btn')&&text.includes('démarre automatiquement à l’ajout de votre premier devis'));

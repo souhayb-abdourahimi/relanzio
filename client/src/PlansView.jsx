@@ -12,8 +12,8 @@ export default function PlansView({profile,billingEnabled,checkoutBusy=false,onU
   return <section className="plans-view" aria-labelledby="plans-title">
     <header className="plans-head">
       <span className="overline">FORMULES / ABONNEMENT</span>
-      <h1 id="plans-title">Choisissez la formule adaptée à votre suivi de devis.</h1>
-      <p>Deux formules simples, avec des limites explicites et adaptées au volume de suivi.</p>
+      <h1 id="plans-title">Vous relancez, ou Relanzio relance pour vous.</h1>
+      <p>Le même suivi, deux façons de travailler. Vous pouvez changer quand vous voulez.</p>
     </header>
 
     {state.trial.visible&&<section className="plan-trial-status" aria-label="Statut de l’essai Pro">
@@ -32,13 +32,13 @@ export default function PlansView({profile,billingEnabled,checkoutBusy=false,onU
       <article className={"app-plan-card"+(freeCurrent?' current':'')} data-plan="free">
         <div className="app-plan-top">
           <div>
-            <span className="overline">DÉCOUVERTE</span>
-            <h2>{FREE_PLAN.name}</h2>
+            <span className="overline">{FREE_PLAN.name.toUpperCase()}</span>
+            <h2>{FREE_PLAN.headline}</h2>
           </div>
           {freeCurrent&&<span className="current-plan-badge">Formule actuelle</span>}
         </div>
         <div className="app-plan-price"><strong>{FREE_PLAN.price}</strong></div>
-        <p className="app-plan-summary">Pour valider le workflow et suivre un petit volume de devis en mode revue.</p>
+        <p className="app-plan-summary">Pour un petit volume : Relanzio vous dit qui relancer et prépare le message, vous l’envoyez.</p>
         <PlanFeatures items={FREE_PLAN.features}/>
         {freeCurrent&&<div className="app-plan-current-note" role="status">Vous utilisez actuellement la formule gratuite.</div>}
       </article>
@@ -47,14 +47,14 @@ export default function PlansView({profile,billingEnabled,checkoutBusy=false,onU
         <div className="app-plan-top">
           <div>
             <span className="overline">PRO</span>
-            <h2>{PRO_PLAN.name}</h2>
+            <h2>{PRO_PLAN.headline}</h2>
           </div>
           {proCurrent&&<span className="current-plan-badge">{state.trial.visible?'Essai Pro actif':'Formule actuelle'}</span>}
         </div>
         <div className="app-plan-price"><strong>{PRO_PLAN.price}</strong><span>{PRO_PLAN.period}</span></div>
         <small className="app-plan-help">{PRO_PLAN.vatNote}</small>
         <p className="app-plan-help">Abonnement mensuel récurrent, sans engagement de durée minimale. Résiliation depuis le portail client.</p>
-        <p className="app-plan-summary">Pour envoyer depuis Relanzio et automatiser progressivement le suivi, avec contrôle devis par devis.</p>
+        <p className="app-plan-summary">Pour ne plus y penser : Relanzio envoie chaque relance en votre nom, vous la validez en un geste.</p>
         <PlanFeatures items={PRO_PLAN.features}/>
         <div className="app-plan-actions">
           {state.trialEligible&&<p className="app-plan-help trial-note">Essai Pro de {TRIAL_DAYS} jours sans carte bancaire : il démarre automatiquement à l’ajout de votre premier devis.</p>}

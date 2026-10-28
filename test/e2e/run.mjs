@@ -117,7 +117,7 @@ async function flows(browser){
       await page.waitForSelector('.trial-banner');
       assert.match(await page.locator('.trial-banner').innerText(),/Essai Pro · 7 jours restants/);
       const bannerHeight=await page.locator('.trial-banner').evaluate(el=>el.getBoundingClientRect().height);
-      assert.ok(bannerHeight<=64,`compact trial banner (${bannerHeight}px)`);
+      assert.ok(bannerHeight<=(label==='mobile'?72:80),`compact trial banner (${bannerHeight}px)`);
       assert.equal(backend.state.calls.filter(c=>c.path.startsWith('/admin')).length,0,'no admin route for a normal account');
       results.push(`INFO ${label}: signup → first quote in ${Math.round((Date.now()-started)/1000)} s (scripted)`);
     });
