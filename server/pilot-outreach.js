@@ -311,7 +311,8 @@ export async function sendPilotOutreach({ prospectId, requestedBy, dryRun = fals
       replyTo:PILOT_SENDER.replyTo,
       senderEmail:PILOT_SENDER.email,
       senderName:PILOT_SENDER.name,
-      tags:['relanzio-pilot','sequence-0']
+      tags:['relanzio-pilot','sequence-0'],
+      stream:'outreach'
     });
 
     const sentAt = iso();

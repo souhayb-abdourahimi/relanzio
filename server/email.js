@@ -6,8 +6,14 @@ export function generateFollowup(quote, step, companyName = '') {
   return followupMessage({clientName:quote.client_name,title:quote.title,companyName},step);
 }
 
-export async function sendEmail({ to, subject, text, replyTo, replyToName, senderName, senderEmail, tags = [], headers = null, attachments = null }) {
-  if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM_ADDRESS) {
+// stream 'outreach' = Relanzio's own prospection. It can use its own Brevo key (e.g. a sub-account with its own
+// sending domain) so a prospection reputation problem never touches client follow-ups. Unset = shared key.
+const apiKeyFor = stream => stream === 'outreach' ? (process.env.OUTREACH_BREVO_API_KEY || process.env.BREVO_API_KEY) : process.env.BREVO_API_KEY;
+const redactEmails = text => String(text || '').replace(/[^\s"'<>@,;:]+@[^\s"'<>,;:]+/g, '[email]').slice(0, 500);
+
+export async function sendEmail({ to, subject, text, replyTo, replyToName, senderName, senderEmail, tags = [], headers = null, attachments = null, stream = 'product' }) {
+  const apiKey = apiKeyFor(stream);
+  if (!apiKey || !process.env.EMAIL_FROM_ADDRESS) {
     throw new Error('EMAIL_PROVIDER_NOT_CONFIGURED');
   }
   const recipient = String(to || '').trim().toLowerCase();
@@ -24,9 +30,9 @@ export async function sendEmail({ to, subject, text, replyTo, replyToName, sende
   if (headers) body.headers = headers;
   const r = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "api-key": process.env.BREVO_API_KEY },
+    headers: { "Content-Type": "application/json", "api-key": apiKey },
     body: JSON.stringify(body)
   });
-  if (!r.ok) throw new Error(`Brevo ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw new Error(`Brevo ${r.status}: ${redactEmails(await r.text())}`);
   return r.json();
 }

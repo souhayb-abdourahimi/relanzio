@@ -372,6 +372,7 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
     res.json({sent:true,result});
   } catch(e){
     if(e.message==='QUOTE_REPLIED')return res.status(409).json({error:REPLIED_MESSAGE,code:'QUOTE_REPLIED'});
+    if(e.message==='FOLLOWUP_ACCOUNT_DAILY_CAP')return res.status(429).json({error:'Limite d’envois du jour atteinte pour votre compte. Les relances restantes peuvent partir demain, ou depuis votre propre messagerie.'});
     if(['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_REQUEST_ALREADY_FAILED','FOLLOWUP_DAILY_LIMIT','EMAIL_RECIPIENT_SUPPRESSED','EMAIL_RECIPIENT_OPTED_OUT','EMAIL_RECIPIENT_MISSING'].includes(e.message))return res.status(409).json({error:e.message==='EMAIL_RECIPIENT_SUPPRESSED'?'Cette adresse ne peut plus recevoir de relances.':e.message==='EMAIL_RECIPIENT_OPTED_OUT'?'Ce client a demandé à ne plus recevoir vos relances par email. Relancez-le par téléphone ou SMS.':e.message==='EMAIL_RECIPIENT_MISSING'?'Ajoutez l’email du client pour envoyer depuis Relanzio.':'Cette relance est déjà en cours, déjà traitée ou bloquée par la limite quotidienne.'});
     await reportError('followup.manual_send',e,{request_id:req.requestId});
     res.status(500).json({error:'La relance n’a pas été envoyée. Aucun succès n’a été enregistré.',request_id:req.requestId});

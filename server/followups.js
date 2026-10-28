@@ -99,6 +99,11 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
   let followupId = null;
   let providerAttempted=false;
   try {
+    // Per-account ceiling on emails Relanzio sends for one artisan in a day (product stream, separate from prospection caps).
+    const cap=Number(process.env.FOLLOWUP_ACCOUNT_DAILY_CAP||60);
+    const {count:sentToday,error:capError}=await db.from('followups').select('id',{count:'exact',head:true}).eq('user_id',claimed.user_id).eq('channel','relanzio').eq('business_date',businessDate);
+    if(capError)throw capError;
+    if(Number(sentToday||0)>=cap)throw new Error('FOLLOWUP_ACCOUNT_DAILY_CAP');
     if(automatic){
       const {data:today,error:todayError}=await db.from('followups').select('id,status').eq('quote_id',claimed.id).eq('channel','relanzio').eq('business_date',businessDate).limit(1).maybeSingle();
       if(todayError)throw todayError;
@@ -183,6 +188,7 @@ export async function runDueFollowups(now=new Date()) {
       results.push({ id:quote.id, sent:true, provider_message_id:result.provider_message_id });
     } catch (e) {
       if (e.message==='QUOTE_REPLIED') { results.push({id:quote.id,skipped:'client_replied'}); continue; }
+      if (e.message==='FOLLOWUP_ACCOUNT_DAILY_CAP') { results.push({id:quote.id,skipped:'account_daily_cap'}); continue; }
       if (['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_DAILY_LIMIT'].includes(e.message)) { results.push({id:quote.id,skipped:e.message==='FOLLOWUP_DAILY_LIMIT'?'daily_limit':'already_claimed'}); continue; }
       if (['EMAIL_RECIPIENT_OPTED_OUT','EMAIL_RECIPIENT_MISSING'].includes(e.message)) { await db.from('quotes').update({auto_send:false}).eq('id',quote.id).eq('user_id',quote.user_id); results.push({id:quote.id,skipped:e.message==='EMAIL_RECIPIENT_OPTED_OUT'?'recipient_opted_out':'no_email'}); continue; }
       await db.from('quotes').update({auto_send:false,send_claimed_at:null}).eq('id',quote.id).eq('user_id',quote.user_id);

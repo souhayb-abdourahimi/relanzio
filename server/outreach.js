@@ -67,7 +67,8 @@ export async function processOutreachQueue(){
       replyTo:commercial,
       senderEmail:commercial,
       senderName:'Relanzio',
-      tags:['relanzio-outreach',`sequence-${claimed.sequence_step}`]
+      tags:['relanzio-outreach',`sequence-${claimed.sequence_step}`],
+      stream:'outreach'
     });
     const sentAt=iso();
     await db.from('outreach_events').insert({
