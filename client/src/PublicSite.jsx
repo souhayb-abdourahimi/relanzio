@@ -5,7 +5,7 @@ import PricingCards from './PricingCards.jsx';
 import LegalPage from './LegalPage.jsx';
 import { routeMeta, track } from './public-meta.js';
 import { PRO_PRICE_LABEL, PRO_PRICE_TEXT, VAT_NOTICE, TRIAL_DAYS, FREE_LIMIT_TEXT } from '../../shared/plans.js';
-import { COMPANY } from '../../shared/company.js';
+import { COMPANY, telLink } from '../../shared/company.js';
 
 // Public site (landing, pricing, docs, FAQ, contact, resources, legal). Rendered in the browser and
 // prerendered to static HTML at build time (scripts/prerender.mjs), so it must not touch window/document
@@ -69,7 +69,7 @@ export const FAQ_ITEMS=[
   ['Mes clients reçoivent-ils un email de Relanzio ?','Non, par défaut. En mode revue, c’est vous qui relancez, depuis votre messagerie, par SMS ou par téléphone ; Relanzio prépare le message. Avec Pro, vous pouvez aussi envoyer depuis Relanzio : l’email porte le nom de votre entreprise « via Relanzio », les réponses arrivent dans votre boîte et chaque message contient un lien de désinscription.'],
   ['Où sont mes données ?','Votre compte et vos devis sont stockés dans une base Supabase située dans l’Union européenne (Paris). L’application est servie par Railway (États-Unis) ; Stripe gère le paiement et Brevo l’envoi des emails. La liste complète est dans la politique de confidentialité.'],
   ['Puis-je exporter mes données ?','Oui, à tout moment, depuis Paramètres : export CSV de vos devis et export complet de votre compte. Vous pouvez aussi supprimer votre compte vous-même.'],
-  ['Qui êtes-vous ?',`Relanzio est édité par ${COMPANY.publisherName}, ${COMPANY.legalForm.toLowerCase()} à ${COMPANY.city} (SIREN ${COMPANY.siren}). Vous écrivez à ${COMPANY.supportEmail}, c’est moi qui réponds.`],
+  ['Qui êtes-vous ?',`Relanzio est édité par ${COMPANY.publisherName}, ${COMPANY.legalForm.toLowerCase()} à ${COMPANY.city} (SIREN ${COMPANY.siren}). Vous écrivez à ${COMPANY.supportEmail} ou appelez le ${COMPANY.phone} : c’est moi qui réponds.`],
   ['Un email peut-il partir sans mon accord ?','Non. Le compte démarre en mode revue : rien ne part sans vous. L’envoi automatique exige Pro, une activation dans Paramètres puis une autorisation devis par devis, et ne part qu’en jours ouvrés, entre 8 h et 19 h, une fois par jour au plus.'],
   ['Que se passe-t-il à la fin de l’essai ?',`L’essai Pro de ${TRIAL_DAYS} jours démarre à l’ajout de votre premier devis, sans carte bancaire. À la fin, sans abonnement, le compte repasse en formule gratuite (${FREE_LIMIT_TEXT}) : rien n’est supprimé, les devis au-delà passent en lecture seule.`],
   ['Comment mesurez-vous le chiffre « gagné » ?','C’est le montant des devis que vous marquez vous-même comme gagnés. Relanzio ne prétend pas que chaque vente est due à une relance.'],
@@ -82,7 +82,7 @@ export function WhoIsBehind(){
     <div className="section-head"><span>QUI EST DERRIÈRE</span><h2>Un éditeur identifiable, joignable directement.</h2></div>
     <div className="who-card">
       <p><b>{COMPANY.firstName}</b>, à {COMPANY.city}. Relanzio est édité par {COMPANY.publisherName}, {COMPANY.legalForm.toLowerCase()}, SIREN {COMPANY.siren}.</p>
-      <p>Une question, un doute avant de commencer : <a href={`mailto:${COMPANY.supportEmail}`}>{COMPANY.supportEmail}</a>.</p>
+      <p>Une question, un doute avant de commencer : <a href={`mailto:${COMPANY.supportEmail}`}>{COMPANY.supportEmail}</a> ou <a href={telLink(COMPANY.phone)}>{COMPANY.phone}</a>.</p>
     </div>
   </section>;
 }
@@ -145,6 +145,7 @@ export function PublicPage({kind,onStart=goSignup}){
     contact:{title:'Contact',lead:'Une question avant d’utiliser Relanzio ?',body:<div className="doc-grid">
       <article><h2>Contact général</h2><p>Écrivez à <a href={`mailto:${contact}`}>{contact}</a> pour une question commerciale ou générale.</p></article>
       <article><h2>Support</h2><p>Écrivez à <a href={`mailto:${support}`}>{support}</a> pour une question produit ou un problème de compte.</p></article>
+      <article><h2>Téléphone</h2><p><a href={telLink(COMPANY.phone)}>{COMPANY.phone}</a> ({COMPANY.publisherName}, {COMPANY.city}).</p></article>
       <article><h2>Compte, données et facturation</h2><p>Les demandes liées au compte, aux données ou à la facturation sont traitées avec intervention humaine. Écrivez à <a href={`mailto:${support}`}>{support}</a>.</p></article></div>},
   };
   const x=pages[kind];

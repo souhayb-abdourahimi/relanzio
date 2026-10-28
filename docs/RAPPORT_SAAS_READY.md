@@ -196,7 +196,7 @@ Calculée à la lecture, uniquement à partir des données Stripe stockées par 
    | `MORNING_DIGEST_ENABLED` | `false`, jusqu'à ta validation |
    | `BILLING_EMAILS_ENABLED` | `false`, jusqu'à la validation Stripe E2E |
    | `STRIPE_PORTAL_CONFIGURATION_ID` | facultatif |
-   | `VITE_LEGAL_PHONE` | téléphone de l'éditeur. **Non fourni** : la LCEN l'exige pour une personne physique, et le préflight de production le réclame. |
+   | `VITE_LEGAL_PHONE` | `0745257878` (argument du build Docker). Obligatoire pour le préflight de production. Le numéro fourni (07 45 25 78 78) est aussi dans `shared/company.js` : il s'affiche sur les pages légales, le DPA, la page Contact et le bloc « Qui est derrière ». |
 
 3. **Stripe Live** : déjà en place, **ne rien modifier**. À lire seulement : les paramètres de relance des paiements (statut final après échec : `unpaid`, `canceled` ou `past_due`) et la configuration du portail, pour confirmer qu'un client en `past_due` peut changer sa carte.
 4. **Validation des nouveautés en Stripe Test Mode** (si possible avant merge) : renseigner `sk_test_…`, `price_…`, `whsec_…` et un projet Supabase de dev, puis lancer `scripts/stripe-test-validation.mjs`. Ce qui n'a pas été vérifié contre Stripe réel est listé en détail dans `docs/STRIPE_TEST_VALIDATION.md` §0.
@@ -232,7 +232,7 @@ Calculée à la lecture, uniquement à partir des données Stripe stockées par 
 - **Webhooks Live et ordre de déploiement** : déployer le code avant la migration `20261028120000` ferait échouer les webhooks Live jusqu'à son application.
 - **Planificateur** : il tourne sur une seule instance. Les tables de déduplication empêchent les doublons, mais pas une exécution manquée si le serveur est arrêté à 7 h 30.
 - **Ordre de déploiement** : déployer le code avant les migrations casserait la création de devis (paramètres de la fonction SQL).
-- **Production bloquée** : le téléphone de l'éditeur est manquant, donc le préflight de production échoue.
+- **Préflight de production** : il bloque tant que `EMAIL_LINK_SECRET` et `VITE_LEGAL_PHONE` ne sont pas renseignés sur Railway.
 - **`npm audit`** : il signale des vulnérabilités dans l'installation Playwright de la CI (déjà présentes avant, hors du bundle de production).
 
 ## 5. « Prêt pour la campagne »
@@ -247,6 +247,6 @@ Calculée à la lecture, uniquement à partir des données Stripe stockées par 
 | Parcours Stripe existant (Live) | ✅ Déjà en production, inchangé | Configuration Checkout identique ; compatibilité testée sur des profils écrits par le code actuel (`test/stripe-live-compat.test.js`) |
 | Nouveautés Stripe (essai, grâce `past_due`, emails, retour au Free, portail) | ⏳ REQUIRES REAL STRIPE TEST ENVIRONMENT | Testé localement avec des événements signés au format basil ; script Test Mode prêt ; détail dans `docs/STRIPE_TEST_VALIDATION.md` §0 |
 | Prix, limites et essai identiques partout | ✅ TESTED LOCALLY | `test/plans.test.js` |
-| Mentions légales, CGV, confidentialité, DPA définitifs | ⚠️ Rédigés, LEGAL REVIEW REQUIRED | Téléphone de l'éditeur manquant |
+| Mentions légales, CGV, confidentialité, DPA définitifs | ⚠️ Rédigés, LEGAL REVIEW REQUIRED | Identité complète de l'éditeur, téléphone inclus (07 45 25 78 78) ; DPA PDF régénéré |
 | Pages publiques lisibles sans JavaScript | ✅ TESTED LOCALLY | `npm run test:nojs` (12/12) |
 | Tests et build verts, captures avant/après | ✅ | 157/157, build vert, `docs/screenshots/before-*` et `after-*` |

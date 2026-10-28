@@ -42,8 +42,17 @@ test('legal pages use the publisher identity provided and keep the L223-8 safegu
   assert.match(company,/siren:'131 068 603'/);
   assert.match(company,/address:'81 rue Guillaume Janvier, 34070 Montpellier, France'/);
   assert.match(company,/eu-west-3/);
+  assert.match(company,/phone:'07 45 25 78 78'/);
+  assert.match(legal,/formatFrenchPhone\(import\.meta\.env\.VITE_LEGAL_PHONE\|\|COMPANY\.phone\)/);
   assert.doesNotMatch(legal,/à compléter|prépublication/i);
   assert.match(legal,/article L223-8 du Code de la consommation/);
   assert.match(legal,/Télécharger le DPA \(PDF\)/);
   assert.match(main,/art\. L223-8 du Code de la consommation/);
+});
+
+test('publisher phone is displayed in pairs and dialable',async()=>{
+  const { formatFrenchPhone, telLink, COMPANY }=await import('../shared/company.js');
+  assert.equal(formatFrenchPhone('0745257878'),'07 45 25 78 78');
+  assert.equal(formatFrenchPhone(COMPANY.phone),'07 45 25 78 78');
+  assert.equal(telLink(COMPANY.phone),'tel:0745257878');
 });

@@ -239,3 +239,4 @@ button,.btn,.mini-btn{-webkit-user-select:none;user-select:none}
 .today-card-note span{color:#6b4e00}
 @media (max-width:760px){.proof-strip .container{overflow:visible;flex-wrap:wrap;justify-content:flex-start;row-gap:6px;padding:12px 0}}
 .modal:focus{outline:none}
+.legal-identity a[href^="tel:"],.who-card a[href^="tel:"]{white-space:nowrap}

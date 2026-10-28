@@ -10,6 +10,7 @@ export const COMPANY=Object.freeze({
   address:'81 rue Guillaume Janvier, 34070 Montpellier, France',
   city:'Montpellier',
   supportEmail:'support@relanzio.com',
+  phone:'07 45 25 78 78',
   publicationDirector:'Souhayb Abdourahimi',
 });
 
@@ -21,3 +22,10 @@ export const SUBPROCESSORS=Object.freeze([
   {name:'Brevo',role:'Envoi des emails (compte, rappels, relances envoyées via Relanzio)',region:'Union européenne (France)',entity:'Sendinblue SAS (Brevo), Paris'},
   {name:'OpenAI',role:'Personnalisation facultative du texte des relances (sans conservation : store=false)',region:'États-Unis',entity:'OpenAI, L.L.C.',optional:true},
 ]);
+
+// Displays a French phone number in pairs (0745257878 → 07 45 25 78 78); other formats are kept as given.
+export function formatFrenchPhone(value){
+  const digits=String(value||'').replace(/\D/g,'');
+  return /^0\d{9}$/.test(digits)?digits.replace(/(\d{2})(?=\d)/g,'$1 '):String(value||'').trim();
+}
+export const telLink=phone=>`tel:${String(phone||'').replace(/[^\d+]/g,'')}`;

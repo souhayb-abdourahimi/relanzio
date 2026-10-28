@@ -1,6 +1,6 @@
 import React,{useEffect}from'react';
 import { FREE_ACTIVE_QUOTES_LIMIT,FREE_LIMIT_TEXT,PRO_LIMIT_TEXT,PRO_PRICE_TEXT,TRIAL_DAYS,VAT_NOTICE,PAST_DUE_GRACE_DAYS } from '../../shared/plans.js';
-import { COMPANY,SUBPROCESSORS } from '../../shared/company.js';
+import { COMPANY,SUBPROCESSORS,formatFrenchPhone,telLink } from '../../shared/company.js';
 import { routeMeta } from './public-meta.js';
 
 export const LEGAL_VERSION='28 octobre 2026';
@@ -14,8 +14,8 @@ function Processors(){
 
 export default function LegalPage({page,contactEmail,supportEmail}){
   const notice=page==='legal',privacy=page==='privacy',dpa=page==='dpa';
-  // Optional, set at build time when available (LCEN: phone of a natural-person publisher).
-  const phone=import.meta.env.VITE_LEGAL_PHONE||'';
+  // LCEN: phone of a natural-person publisher. VITE_LEGAL_PHONE (production build) overrides the provided value.
+  const phone=formatFrenchPhone(import.meta.env.VITE_LEGAL_PHONE||COMPANY.phone);
   const title=notice?'Mentions légales':privacy?'Politique de confidentialité':dpa?'Accord de traitement des données (DPA)':'Conditions générales d’utilisation et de vente';
   useEffect(()=>{routeMeta('/'+(page||'terms'));},[page]);
 
@@ -25,7 +25,7 @@ export default function LegalPage({page,contactEmail,supportEmail}){
     <div className="legal-identity">
       <p><b>Éditeur :</b> {COMPANY.publisherName}, {COMPANY.legalForm} · SIREN {COMPANY.siren} · {VAT_NOTICE}</p>
       <p><b>Adresse :</b> {COMPANY.address}</p>
-      <p><b>Contact :</b> <a href={'mailto:'+supportEmail}>{supportEmail}</a>{contactEmail&&contactEmail!==supportEmail?<> · <a href={'mailto:'+contactEmail}>{contactEmail}</a></>:null}{phone?<> · <b>Téléphone :</b> {phone}</>:null}</p>
+      <p><b>Contact :</b> <a href={'mailto:'+supportEmail}>{supportEmail}</a>{contactEmail&&contactEmail!==supportEmail?<> · <a href={'mailto:'+contactEmail}>{contactEmail}</a></>:null}{phone?<> · <b>Téléphone :</b> <a href={telLink(phone)}>{phone}</a></>:null}</p>
       <p><b>Directeur de la publication :</b> {COMPANY.publicationDirector}</p>
     </div>
 
