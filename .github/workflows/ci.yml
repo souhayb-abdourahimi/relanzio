@@ -4,7 +4,16 @@ on:
   pull_request:
 jobs:
   test-build:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright 1.55 cannot install browsers for.
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -13,9 +22,14 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm run build
+      - name: SQL migrations, rollbacks and SQL tests (throwaway Postgres)
+        env:
+          PGURL: postgresql://postgres@127.0.0.1:5432/postgres
+        run: npm run test:sql
       - name: mobile navigation browser DOM
         run: |
-          npm install --no-save --no-package-lock @playwright/test@1.55.0
+          # Keep the lockfile: --no-package-lock re-resolved the whole tree and hit a 404 on rollup 4.66.0.
+          npm install --no-save @playwright/test@1.55.0
           npx playwright install --with-deps chromium
           npm run dev:client -- --host 127.0.0.1 >/tmp/relanzio-vite.log 2>&1 &
           VITE_PID=$!
@@ -26,3 +40,7 @@ jobs:
           done
           curl -fsS http://127.0.0.1:5173/mobile-fixture.html >/dev/null
           npx playwright test test/mobile-nav.browser.spec.js --reporter=line
+      - name: browser E2E (fake API, 1366 px and 390 px)
+        run: npm run test:e2e
+      - name: public pages readable without JavaScript (prerendered HTML)
+        run: npm run test:nojs

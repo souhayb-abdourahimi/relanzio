@@ -54,7 +54,54 @@ export function buildTodayGroups(quotes=[],now=new Date()){
   return groups;
 }
 
+export const TERMINAL_LABEL='Séquence terminée — décidez : gagné, perdu ou repousser';
+
 export function actionStageLabel(quote){
   const step=Number(quote?.followup_step||0);
-  return step>=3?'Séquence terminée — décision requise':`Relance ${step+1}/3`;
+  return step>=3?TERMINAL_LABEL:`Relance ${step+1}/3`;
+}
+
+export function overdueLabel(days){
+  const d=Number(days||0);
+  return d>0?`en retard de ${d} j`:'';
+}
+
+// Paris-local 09:00 on a chosen calendar day (YYYY-MM-DD), for "Repousser à une date".
+export function parisDateToFollowupIso(dateKey,hour=9){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey||'')))return null;
+  return parisLocalDateTimeToIso(`${dateKey}T${String(hour).padStart(2,'0')}:00`);
+}
+
+export function formatParisDay(value){
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat('fr-FR',{timeZone:TZ,weekday:'short',day:'numeric',month:'short'}).format(d);
+}
+
+const DONE_STATUSES=['sent','delivered','opened','clicked','bounced'];
+export function lastFollowup(quote){
+  const items=(quote?.followups||[]).filter(x=>DONE_STATUSES.includes(x.status));
+  return items.sort((a,b)=>new Date(b.sent_at||b.created_at)-new Date(a.sent_at||a.created_at))[0]||null;
+}
+
+const phoneDigits=phone=>String(phone||'').replace(/[^\d+]/g,'');
+export function mailtoHref(email,subject='',body=''){
+  if(!email)return '';
+  const q=[subject&&`subject=${encodeURIComponent(subject)}`,body&&`body=${encodeURIComponent(body)}`].filter(Boolean).join('&');
+  return `mailto:${encodeURIComponent(email).replace('%40','@')}${q?'?'+q:''}`;
+}
+// "?&body=" is understood by both iOS and Android messaging apps.
+export function smsHref(phone,body=''){
+  const n=phoneDigits(phone);
+  return n?`sms:${n}${body?`?&body=${encodeURIComponent(body)}`:''}`:'';
+}
+export function telHref(phone){
+  const n=phoneDigits(phone);
+  return n?`tel:${n}`:'';
+}
+
+// Pipeline order: open quotes by urgency, then paused, then decided quotes (most recent first).
+export function sortPipeline(quotes=[]){
+  const rank={open:0,paused:1,won:2,lost:2};
+  const next=q=>q.next_followup_at?new Date(q.next_followup_at).getTime():Number.MAX_SAFE_INTEGER;
+  return [...quotes].sort((a,b)=>(rank[a.status]??3)-(rank[b.status]??3)||(a.status==='open'?next(a)-next(b):new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0)));
 }

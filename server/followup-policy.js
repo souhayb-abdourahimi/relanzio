@@ -1,8 +1,8 @@
 import { parisLocalDateTimeToIso } from './logic.js';
+import { DEFAULT_FOLLOWUP_OFFSETS, gapAfterStep } from '../shared/followup-cadence.js';
 
 export const AUTOMATIC_SEND_START_HOUR = 8;
 export const AUTOMATIC_SEND_END_HOUR = 19;
-export const RECOMMENDED_FOLLOWUP_GAPS = Object.freeze({ 1:3, 2:5 });
 
 function parisParts(value=new Date()){
   const d=value instanceof Date?value:new Date(value);
@@ -27,10 +27,10 @@ export function addDaysToDateKey(dateKey,days){
   return d.toISOString().slice(0,10);
 }
 
-export function nextRecommendedAfterAction(performedAt,nextStep){
+export function nextRecommendedAfterAction(performedAt,nextStep,offsets=DEFAULT_FOLLOWUP_OFFSETS){
   const step=Number(nextStep);
   if(step>=3)return null;
-  const gap=RECOMMENDED_FOLLOWUP_GAPS[step];
+  const gap=gapAfterStep(offsets,step);
   if(!gap)throw new Error('INVALID_NEXT_STEP');
   return parisLocalDateTimeToIso(addDaysToDateKey(parisBusinessDate(performedAt),gap),9,0);
 }
@@ -57,4 +57,12 @@ export function shouldArmInitialAutoSend(wantsAuto,nextFollowupAt,now=new Date()
   if(!wantsAuto||!nextFollowupAt)return false;
   const target=new Date(nextFollowupAt).getTime(),current=now instanceof Date?now.getTime():new Date(now).getTime();
   return Number.isFinite(target)&&Number.isFinite(current)&&target>current;
+}
+
+// First follow-up of a newly added quote. Recommended date = sent date + first cadence offset,
+// at 09:00 Paris. A quote sent long ago is never "caught up": its first follow-up is proposed today.
+export function initialRecommendedFollowupAt(sentDate,now=new Date(),firstOffsetDays=DEFAULT_FOLLOWUP_OFFSETS[0]){
+  const today=parisBusinessDate(now);
+  const target=addDaysToDateKey(sentDate,firstOffsetDays);
+  return {at:parisLocalDateTimeToIso(target<today?today:target,9,0),catchUp:target<today};
 }

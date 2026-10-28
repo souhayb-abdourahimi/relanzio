@@ -1,17 +1,18 @@
 import React from 'react';
-import { trialDisplay } from './trial-display.js';
+import { accountBanner } from './trial-display.js';
 
-export default function TrialStatus({profile,billingEnabled,onUpgrade}){
-  const display=trialDisplay(profile);
-  if(!display.visible)return null;
-  return <section className="trial-banner" role="status" aria-label="Statut de l’essai Pro">
+export default function TrialStatus({profile,billingEnabled,onUpgrade,onPortal,lockedCount=0}){
+  const banner=accountBanner(profile,lockedCount);
+  if(!banner.kind)return null;
+  const portal=banner.action==='portal';
+  return <section className={`trial-banner banner-${banner.kind}`} role="status" aria-label="Statut de votre formule">
     <div>
-      <strong>{display.label}</strong>
-      {display.endText&&<span>{display.endText}</span>}
+      <strong>{banner.label}</strong>
+      {banner.endText&&<span>{banner.endText}</span>}
     </div>
     <div className="trial-actions">
-      <button type="button" className="btn small" disabled={!billingEnabled} onClick={onUpgrade}>{display.upgradeLabel}</button>
-      {!billingEnabled&&<small>La conversion payante sera disponible lorsque la facturation publique sera activée.</small>}
+      <button type="button" className="btn small" disabled={!billingEnabled} onClick={portal?onPortal:onUpgrade}>{banner.actionLabel}</button>
+      {!billingEnabled&&<small>La gestion de l’abonnement sera disponible lorsque la facturation sera activée.</small>}
     </div>
   </section>;
 }

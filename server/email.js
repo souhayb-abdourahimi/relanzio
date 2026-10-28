@@ -28,7 +28,7 @@ export async function generateFollowup(quote, step, companyName = "Votre entrepr
   }
 }
 
-export async function sendEmail({ to, subject, text, replyTo, senderName, senderEmail, tags = [] }) {
+export async function sendEmail({ to, subject, text, replyTo, senderName, senderEmail, tags = [], headers = null }) {
   if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM_ADDRESS) {
     throw new Error('EMAIL_PROVIDER_NOT_CONFIGURED');
   }
@@ -42,6 +42,7 @@ export async function sendEmail({ to, subject, text, replyTo, senderName, sender
   };
   if (replyTo) body.replyTo = { email: replyTo };
   if (tags.length) body.tags = tags.slice(0, 10);
+  if (headers) body.headers = headers;
   const r = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: { "Content-Type": "application/json", "api-key": process.env.BREVO_API_KEY },

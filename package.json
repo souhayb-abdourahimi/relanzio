@@ -7,14 +7,18 @@
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "node --watch server/index.js",
     "dev:client": "vite --config client/vite.config.js",
-    "build": "vite build --config client/vite.config.js",
+    "build": "vite build --config client/vite.config.js && node scripts/prerender.mjs",
     "start": "node server/index.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server/index.js && node --check server/logic.js && node --check server/quote-rules.js && node --check server/checkout-policy.js && node --check server/billing.js && node --check server/entitlements.js && node --check server/trials.js && node --check server/outreach.js && node --check server/outreach-health.js && node --check server/controlled-outreach-policy.js && node --check server/controlled-outreach.js && node --check server/commercial-feeder.js && node --check server/imap-reply-parser.js && node --check server/imap-replies.js && node --check server/brevo-domain-auth.js && node --check server/pilot-outreach-policy.js && node --check server/pilot-outreach.js && node --check server/pilot-admin-runner.js && node --check server/prospecting.js && node --check server/followups.js && node --check server/support.js && node --check server/ceo.js && node --check server/lifecycle.js && node --test test/*.test.js",
+    "check": "node --check server/index.js && node --check server/logic.js && node --check server/quote-rules.js && node --check server/checkout-policy.js && node --check server/billing.js && node --check server/entitlements.js && node --check server/trials.js && node --check server/outreach.js && node --check server/outreach-health.js && node --check server/controlled-outreach-policy.js && node --check server/controlled-outreach.js && node --check server/commercial-feeder.js && node --check server/imap-reply-parser.js && node --check server/imap-replies.js && node --check server/brevo-domain-auth.js && node --check server/pilot-outreach-policy.js && node --check server/pilot-outreach.js && node --check server/pilot-admin-runner.js && node --check server/prospecting.js && node --check server/followups.js && node --check server/support.js && node --check server/ceo.js && node --check server/lifecycle.js && node --check server/stripe-webhook.js && node --check server/billing-emails.js && node --check server/morning-digest.js && node --check server/email-links.js && node --test test/*.test.js",
     "preflight": "node scripts/preflight.mjs",
     "load": "node test/load.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "prebuild": "node scripts/render-public-files.mjs"
+    "prebuild": "node scripts/render-public-files.mjs",
+    "test:sql": "scripts/sql-test.sh test/sql/*.test.sql",
+    "test:e2e": "node test/e2e/run.mjs flows",
+    "screenshots": "node test/e2e/run.mjs screenshots",
+    "test:nojs": "node test/e2e/no-js.mjs"
   },
   "engines": {
     "node": ">=22.12"
@@ -32,8 +36,9 @@
   "devDependencies": {
     "@vitejs/plugin-react": "5.0.2",
     "concurrently": "9.2.1",
-    "vite": "7.1.4",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "react-dom": "19.1.1",
+    "sonner": "2.0.7",
+    "vite": "7.1.4"
   }
 }
