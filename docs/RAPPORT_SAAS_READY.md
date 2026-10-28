@@ -4,7 +4,7 @@ Date : 28 octobre 2026. Branche : `feat/saas-ready` (28 commits au-dessus de `st
 
 Légende des preuves :
 - **TESTED LOCALLY** : vérifié ici (tests unitaires, Postgres 16 local, navigateur Chromium).
-- **REQUIRES REAL STRIPE TEST ENVIRONMENT** : nécessite les vraies clés Stripe de test et un projet Supabase de dev.
+- **REQUIRES REAL STRIPE TEST ENVIRONMENT** : concerne uniquement les **nouveautés** de cette branche liées à Stripe (essai au premier devis, grâce `past_due`, emails de paiement, retour au Free, portail élargi). Le parcours Stripe Live existant (Checkout, webhooks, passage Pro, facturation) fonctionne déjà en production et n'est pas un bloqueur ; sa configuration n'est pas modifiée.
 - **LEGAL REVIEW REQUIRED** : texte rédigé, à faire valider par un juriste.
 
 État des vérifications à la fin du travail :
@@ -198,13 +198,8 @@ Calculée à la lecture, uniquement à partir des données Stripe stockées par 
    | `STRIPE_PORTAL_CONFIGURATION_ID` | facultatif |
    | `VITE_LEGAL_PHONE` | téléphone de l'éditeur. **Non fourni** : la LCEN l'exige pour une personne physique, et le préflight de production le réclame. |
 
-3. **Stripe Live** :
-   - produit Pro mensuel 29 € sans taxe ;
-   - informations publiques de l'entreprise (nom, adresse, SIREN) pour les factures ;
-   - pied de facture 293 B ;
-   - portail : carte, factures, résiliation en fin de période ;
-   - endpoint webhook (5 événements, voir `docs/STRIPE_TEST_VALIDATION.md`).
-4. **Validation Stripe réelle en mode test** : renseigner `sk_test_…`, `price_…`, `whsec_…` et un projet Supabase de dev, puis lancer `scripts/stripe-test-validation.mjs`. La procédure est dans `docs/STRIPE_TEST_VALIDATION.md`.
+3. **Stripe Live** : déjà en place, **ne rien modifier**. À lire seulement : les paramètres de relance des paiements (statut final après échec : `unpaid`, `canceled` ou `past_due`) et la configuration du portail, pour confirmer qu'un client en `past_due` peut changer sa carte.
+4. **Validation des nouveautés en Stripe Test Mode** (si possible avant merge) : renseigner `sk_test_…`, `price_…`, `whsec_…` et un projet Supabase de dev, puis lancer `scripts/stripe-test-validation.mjs`. Ce qui n'a pas été vérifié contre Stripe réel est listé en détail dans `docs/STRIPE_TEST_VALIDATION.md` §0.
 5. **Juridique (LEGAL REVIEW REQUIRED)** :
    - CGU/CGV, confidentialité, DPA ;
    - interprétation de l'article L223-8 : une relance de devis demandé par un particulier, pour des travaux de rénovation énergétique, compte-t-elle comme de la prospection ?
@@ -233,7 +228,8 @@ Calculée à la lecture, uniquement à partir des données Stripe stockées par 
 ## 4. Risques restants
 
 - **Couverture des tests** : l'E2E utilise une fausse API. Les routes du serveur ne sont pas testées de bout en bout contre un vrai Supabase (la logique métier l'est, en unitaire et en SQL).
-- **Stripe, Brevo et OpenAI** : non appelés en réel.
+- **Nouveautés Stripe** : compatibles avec le parcours Live d'après les tests locaux (`test/stripe-live-compat.test.js`), mais non exécutées contre Stripe réel (voir `docs/STRIPE_TEST_VALIDATION.md` §0). Brevo et OpenAI non appelés en réel.
+- **Webhooks Live et ordre de déploiement** : déployer le code avant la migration `20261028120000` ferait échouer les webhooks Live jusqu'à son application.
 - **Planificateur** : il tourne sur une seule instance. Les tables de déduplication empêchent les doublons, mais pas une exécution manquée si le serveur est arrêté à 7 h 30.
 - **Ordre de déploiement** : déployer le code avant les migrations casserait la création de devis (paramètres de la fonction SQL).
 - **Production bloquée** : le téléphone de l'éditeur est manquant, donc le préflight de production échoue.
@@ -248,7 +244,8 @@ Calculée à la lecture, uniquement à partir des données Stripe stockées par 
 | Aujourd'hui, Repousser et Relance faite fonctionnent en gratuit comme en Pro | ✅ TESTED LOCALLY | E2E essai, gratuit (lecture seule) et Pro ; le serveur ne demande pas Pro pour « Relance faite » |
 | Rappel du matin envoyé une seule fois, seulement s'il y a des actions | ✅ TESTED LOCALLY / ⏳ envoi réel Brevo | `test/morning-digest.test.js`, `test/sql/morning_digest.test.sql` |
 | Envois automatiques sans rafale | ✅ TESTED LOCALLY | `test/sql/followup_cadence.test.sql` (1 par jour, calcul depuis la dernière relance), fenêtre 8 h – 19 h jours ouvrés |
-| Parcours Stripe complet en mode test | ⏳ REQUIRES REAL STRIPE TEST ENVIRONMENT | Simulé avec des événements signés : `test/stripe-webhook.test.js` ; script réel prêt |
+| Parcours Stripe existant (Live) | ✅ Déjà en production, inchangé | Configuration Checkout identique ; compatibilité testée sur des profils écrits par le code actuel (`test/stripe-live-compat.test.js`) |
+| Nouveautés Stripe (essai, grâce `past_due`, emails, retour au Free, portail) | ⏳ REQUIRES REAL STRIPE TEST ENVIRONMENT | Testé localement avec des événements signés au format basil ; script Test Mode prêt ; détail dans `docs/STRIPE_TEST_VALIDATION.md` §0 |
 | Prix, limites et essai identiques partout | ✅ TESTED LOCALLY | `test/plans.test.js` |
 | Mentions légales, CGV, confidentialité, DPA définitifs | ⚠️ Rédigés, LEGAL REVIEW REQUIRED | Téléphone de l'éditeur manquant |
 | Pages publiques lisibles sans JavaScript | ✅ TESTED LOCALLY | `npm run test:nojs` (12/12) |

@@ -1,6 +1,26 @@
-# Validation Stripe réelle — mode test uniquement
+# Validation Stripe des nouveautés de `feat/saas-ready` — mode test uniquement
 
-Statut : **REQUIRES REAL STRIPE TEST ENVIRONMENT**. Tout le parcours est testé localement avec des événements signés par le SDK Stripe (`test/stripe-webhook.test.js`), mais aucun appel réel à Stripe n'a été fait.
+**Contexte.** Stripe fonctionne déjà en production (Checkout Live, webhooks, passage Pro, facturation). Ce document ne concerne **que les nouveautés de la branche** ; la configuration Stripe Live existante ne doit pas être modifiée.
+
+**Statut des nouveautés : REQUIRES REAL STRIPE TEST ENVIRONMENT.** Aucune clé Stripe de test n'était disponible pendant le développement. Les nouveautés sont testées localement, avec des événements signés par le SDK Stripe officiel, au format de l'API utilisée par le SDK (`2025-08-27.basil`) :
+- `test/stripe-webhook.test.js` : cycle de vie complet ;
+- `test/stripe-live-compat.test.js` : compatibilité avec le parcours Live, en partant de profils écrits par le code actuellement en production ;
+- `test/past-due-grace.test.js` : règle de grâce.
+
+## 0. Ce qui n'a pas été vérifié contre Stripe réel
+
+| Nouveauté | Vérifié localement | Non vérifié contre Stripe réel |
+| --- | --- | --- |
+| Essai Pro automatique au premier devis | Ne fait aucun appel à Stripe. Testé : essai démarré une seule fois ; jamais pour un client payant ou résilié ; essai puis Checkout → Pro payant après la fin de l'essai. | Un vrai Checkout Test pendant un essai actif. |
+| Grâce `past_due` de 14 jours | Règle et bornes ; événements `invoice.payment_failed` et `customer.subscription.updated` au format basil ; stockage de `current_period_start` lu sur les items de l'abonnement. | Les dates réelles envoyées par Stripe lors d'un renouvellement refusé (test clock). L'enchaînement entre les relances de paiement Stripe (*Smart Retries*, paramétrées dans le dashboard Live) et nos 14 jours : si Stripe abandonne plus tôt (`unpaid`/`canceled`), le passage au Free est plus tôt ; s'il continue plus longtemps, le compte passe Free au 15e jour et redevient Pro au paiement. |
+| Email de paiement refusé | Contenu, un envoi par facture, coupé si `BILLING_EMAILS_ENABLED≠true`. | Envoi réel par Brevo (l'option reste à `false`). |
+| Retour au Free (`unpaid`, `canceled`, fin de grâce) | Transitions et règle des 5 devis actifs. | Le statut final réellement choisi par les paramètres de relance Live (à lire dans le dashboard, sans le modifier). |
+| Portail ouvert en `past_due`, `unpaid` et `canceled` | Affichage et appel API identiques à aujourd'hui (`billingPortal.sessions.create`). | Qu'un client en `past_due` puisse, avec la configuration de portail Live actuelle, changer sa carte et régler la facture ouverte. |
+| Checkout refusé pendant `past_due`/`unpaid` | Garde côté serveur (409), la configuration Checkout est inchangée (`pro-card-v4-vat293b`). | — (aucun appel Stripe). |
+
+**Point de compatibilité au déploiement.** Le webhook enregistre désormais `subscription_current_period_start/end` et `subscription_cancel_at_period_end`. Si le code est déployé avant la migration `20261028120000_subscription_period.sql`, les webhooks Live échoueront (HTTP 400). Stripe les renverra ensuite, en mode Live jusqu'à 3 jours. Il faut donc appliquer les migrations **avant** le code. Les migrations sont compatibles avec le code actuel.
+
+**Lecture de l'abonnement.** Le serveur relit toujours l'abonnement par l'API, avec la version épinglée par le SDK. La version d'API de l'endpoint webhook Live n'a donc pas d'effet sur la forme des données lues. Les deux formes de factures (`subscription` à la racine ou `parent.subscription_details`) sont gérées.
 
 ## 1. À renseigner dans `.env` (jamais commité)
 
@@ -18,7 +38,7 @@ Statut : **REQUIRES REAL STRIPE TEST ENVIRONMENT**. Tout le parcours est testé 
 
 Le projet Supabase de dev doit avoir reçu `supabase/schema.sql` puis toutes les migrations de `supabase/migrations/` (dans l'ordre).
 
-## 2. Configuration Stripe (dashboard, mode test)
+## 2. Configuration Stripe (dashboard, **mode test** uniquement — ne rien changer en Live)
 
 1. Produit « Relanzio Pro », prix récurrent mensuel 29,00 EUR, sans taxe.
 2. Paramètres → Informations publiques de l'entreprise : nom de l'éditeur, adresse, SIREN (apparaissent sur les factures).
