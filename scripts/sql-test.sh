@@ -15,9 +15,10 @@ run test/sql/supabase-stubs.sql
 run supabase/schema.sql
 for f in $(ls supabase/migrations/*.sql | grep -v '\.down\.sql$' | sort); do run "$f"; done
 echo "schema + migrations: OK"
-# Reversibility: every rollback must apply cleanly, then its migration must re-apply.
-for r in $(ls supabase/rollbacks/*.down.sql 2>/dev/null | sort -r); do
-  m="supabase/migrations/$(basename "$r" .down.sql).sql"
-  run "$r"; run "$m"; echo "rollback + reapply OK: $(basename "$m")"
+# Reversibility: every rollback must apply cleanly (newest first, as a real rollback would), then every migration
+# must re-apply on top of it in production order, so the final state is the same as a fresh apply.
+for r in $(ls supabase/rollbacks/*.down.sql 2>/dev/null | sort -r); do run "$r"; echo "rollback OK: $(basename "$r")"; done
+for r in $(ls supabase/rollbacks/*.down.sql 2>/dev/null | sort); do
+  m="supabase/migrations/$(basename "$r" .down.sql).sql"; run "$m"; echo "reapply OK: $(basename "$m")"
 done
 for t in "$@"; do psql "$URL" -v ON_ERROR_STOP=1 -q -X -f "$t"; echo "$t: OK"; done

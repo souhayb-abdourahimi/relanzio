@@ -9,9 +9,10 @@ import { dirname, join } from 'path';
 import { existsSync } from 'fs';
 import { requireUser } from './auth.js';
 import { db, getProfile } from './db.js';
-import { nextDate, runDueFollowups, createFollowupPreview, sendQuoteFollowup, confirmManualFollowup } from './followups.js';
+import { nextDate, runDueFollowups, createFollowupPreview, sendQuoteFollowup, confirmManualFollowup, automaticSendingAvailable } from './followups.js';
+import { replyConfiguration, pollQuoteReplies, recordManualReply } from './quote-replies.js';
 import { analyzeReply, qualifyProspect } from './prospecting.js';
-import { isValidEmail, normalizeEmail, sanitizeText, quoteMetrics, mapBrevoEvent, prioritizeProductIdeas } from './logic.js';
+import { isValidEmail, normalizeEmail, sanitizeText, quoteMetrics, valueProof, mapBrevoEvent, prioritizeProductIdeas } from './logic.js';
 import { rateLimit, safeEqual } from './security.js';
 import { sendEmail } from './email.js';
 import { answerSupport } from './support.js';
@@ -59,6 +60,14 @@ const stripeWebhooks = createStripeWebhookProcessor({db,stripe,getProfile,report
 const __dirname = dirname(fileURLToPath(import.meta.url)); const dist = join(__dirname, '..', 'dist');
 const admins = () => (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 const isAdmin = user => admins().includes((user?.email || '').toLowerCase());
+// What the server can really do right now: the app never shows a setting as active when the service is off.
+const capabilities = () => ({
+  reply_detection: replyConfiguration().configured,
+  automatic_sending: automaticSendingAvailable(),
+  morning_digest: process.env.MORNING_DIGEST_ENABLED === 'true',
+  billing_emails: process.env.BILLING_EMAILS_ENABLED === 'true'
+});
+const profileFor = (profile, user) => ({ ...profile, is_admin: isAdmin(user), capabilities: capabilities() });
 const nowIso = () => new Date().toISOString();
 const providerRank = {draft:0,sent:1,delivered:2,opened:3,clicked:4,failed:5,bounced:6};
 const shouldApplyProviderStatus = (current,next) => {
@@ -92,7 +101,9 @@ app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async 
 
 app.use(express.json({limit:'256kb'}));
 app.get('/api/health', (_req,res)=>res.json({ok:true,service:'relanzio',version:'0.4.0'}));
-app.get('/api/readiness', (_req,res)=>{const integrations={supabase:Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_ANON_KEY&&process.env.SUPABASE_SERVICE_ROLE_KEY),stripe:Boolean(process.env.STRIPE_SECRET_KEY&&process.env.STRIPE_PRO_PRICE_ID&&process.env.STRIPE_WEBHOOK_SECRET),brevo:Boolean(process.env.BREVO_API_KEY&&process.env.BREVO_WEBHOOK_SECRET&&process.env.EMAIL_FROM_ADDRESS),openai:Boolean(process.env.OPENAI_API_KEY)};const ready=integrations.supabase&&integrations.stripe&&integrations.brevo;res.status(ready?200:503).json({ready,integrations,automation:{followups:process.env.FOLLOWUP_AUTOMATION_ENABLED==='true',lifecycle:process.env.LIFECYCLE_EMAILS_ENABLED==='true',acquisition:process.env.ACQUISITION_ENABLED==='true',morningDigest:process.env.MORNING_DIGEST_ENABLED==='true',billingEmails:process.env.BILLING_EMAILS_ENABLED==='true'}})});
+// Public readiness says only whether the service can work (healthchecks, smoke tests). Details are admin-only.
+function readinessReport(){const integrations={supabase:Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_ANON_KEY&&process.env.SUPABASE_SERVICE_ROLE_KEY),stripe:Boolean(process.env.STRIPE_SECRET_KEY&&process.env.STRIPE_PRO_PRICE_ID&&process.env.STRIPE_WEBHOOK_SECRET),brevo:Boolean(process.env.BREVO_API_KEY&&process.env.BREVO_WEBHOOK_SECRET&&process.env.EMAIL_FROM_ADDRESS),openai:Boolean(process.env.OPENAI_API_KEY)};const ready=integrations.supabase&&integrations.stripe&&integrations.brevo;return {ready,integrations,automation:{followups:process.env.FOLLOWUP_AUTOMATION_ENABLED==='true',lifecycle:process.env.LIFECYCLE_EMAILS_ENABLED==='true',acquisition:process.env.ACQUISITION_ENABLED==='true',morningDigest:process.env.MORNING_DIGEST_ENABLED==='true',billingEmails:process.env.BILLING_EMAILS_ENABLED==='true',replyDetection:replyConfiguration().configured,automaticSending:automaticSendingAvailable()}}}
+app.get('/api/readiness', (_req,res)=>{const {ready}=readinessReport();res.status(ready?200:503).json({ready})});
 
 // Privacy-friendly first-party product analytics. No ad tracker/cross-site identifier.
 app.post('/api/events', rateLimit({windowMs:60_000,max:30}), async (req,res)=>{
@@ -135,7 +146,7 @@ app.post('/api/email/unsubscribe', rateLimit({windowMs:60_000,max:30}), async(re
 
 app.post('/api/activity', requireUser, async(req,res)=>{try{await db.from('product_events').insert({user_id:req.user.id,event:req.body?.event==='digest_opened'?'digest_opened':'app_active',path:sanitizeText(req.body.path||'/app',200)});res.status(202).json({ok:true})}catch(e){res.status(202).json({ok:false})}});
 
-app.get('/api/profile', requireUser, async(req,res)=>{ try{res.json({profile:await getProfile(req.user)})}catch(e){res.status(500).json({error:e.message})} });
+app.get('/api/profile', requireUser, async(req,res)=>{ try{res.json({profile:profileFor(await getProfile(req.user),req.user)})}catch(e){res.status(500).json({error:e.message})} });
 app.patch('/api/profile', requireUser, async(req,res)=>{
   try{
     const profile=await getProfile(req.user), patch={updated_at:nowIso()};
@@ -150,8 +161,11 @@ app.patch('/api/profile', requireUser, async(req,res)=>{
       patch.followup_offsets=offsets;
     }
     if(req.body.email_mode==='review')patch.email_mode='review';
-    if(req.body.email_mode==='automatic'&&hasProAccess(profile))patch.email_mode='automatic';
-    const {data,error}=await db.from('profiles').update(patch).eq('id',req.user.id).select('*').single(); if(error)throw error; res.json({profile:withEntitlements(data)});
+    if(req.body.email_mode==='automatic'){
+      if(!automaticSendingAvailable())return res.status(409).json({error:'L’envoi automatique n’est pas encore disponible. Vos relances restent à valider une par une.'});
+      if(hasProAccess(profile))patch.email_mode='automatic';
+    }
+    const {data,error}=await db.from('profiles').update(patch).eq('id',req.user.id).select('*').single(); if(error)throw error; res.json({profile:profileFor(withEntitlements(data),req.user)});
   }catch(e){res.status(500).json({error:e.message})}
 });
 
@@ -176,20 +190,22 @@ async function isQuoteLocked(quote,profile){
   if(error)throw error;
   return lockedQuoteIds(data||[],false).has(quote.id);
 }
+const REPLIED_MESSAGE='Le client a répondu : les relances de ce devis sont arrêtées. Repoussez-le pour les reprendre.';
 const LOCKED_MESSAGE=`Ce devis est en lecture seule : la formule gratuite permet ${FREE_LIMIT_TEXT}. Marquez un devis gagné ou perdu pour libérer une place, ou passez à Pro.`;
 
 app.get('/api/quotes', requireUser, async(req,res)=>{
   try{
     const profile=await getProfile(req.user);
-    const [{data:quotes,error},{data:followups,error:followupError}]=await Promise.all([
+    const [{data:quotes,error},{data:followups,error:followupError},{data:replies,error:replyError}]=await Promise.all([
       db.from('quotes').select('*').eq('user_id',req.user.id).order('created_at',{ascending:false}),
-      db.from('followups').select('id,quote_id,step,status,channel,sent_at,created_at').eq('user_id',req.user.id).order('created_at',{ascending:true}).limit(500)
+      db.from('followups').select('id,quote_id,step,status,channel,sent_at,created_at').eq('user_id',req.user.id).order('created_at',{ascending:true}).limit(500),
+      db.from('quote_replies').select('id,quote_id,source,channel,category,effect,from_email,excerpt,received_at').eq('user_id',req.user.id).order('received_at',{ascending:true}).limit(500)
     ]);
-    if(error)throw error;if(followupError)throw followupError;
-    const history=new Map();
-    for(const item of followups||[]){const list=history.get(item.quote_id)||[];list.push(item);history.set(item.quote_id,list)}
-    const hydrated=withLocks(quotes||[],hasProAccess(profile)).map(q=>({...q,followups:history.get(q.id)||[]}));
-    res.json({quotes:hydrated,metrics:quoteMetrics(quotes||[])});
+    if(error)throw error;if(followupError)throw followupError;if(replyError)throw replyError;
+    const group=list=>{const m=new Map();for(const item of list||[]){const l=m.get(item.quote_id)||[];l.push(item);m.set(item.quote_id,l)}return m;};
+    const history=group(followups),answers=group(replies);
+    const hydrated=withLocks(quotes||[],hasProAccess(profile)).map(q=>({...q,followups:history.get(q.id)||[],replies:answers.get(q.id)||[]}));
+    res.json({quotes:hydrated,metrics:{...quoteMetrics(quotes||[]),proof:valueProof(quotes||[],followups||[],replies||[])}});
   }catch(e){res.status(500).json({error:e.message})}
 });
 app.post('/api/quotes', requireUser, async(req,res)=>{
@@ -305,6 +321,8 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
       patch.followup_schedule_mode=effectiveMode;
       patch.next_followup_at=nextFollowupAt;
     }
+    // After a client reply, follow-ups only start again when the user explicitly plans one (Repousser / Reprendre).
+    if(existing.reply_received_at&&scheduleTouched&&['recommended','custom'].includes(requestedMode)&&isActiveQuoteStatus(targetStatus))patch.reply_received_at=null;
     if ('auto_send' in req.body) {
       const autoEligible=effectiveMode!=='none'&&targetStatus==='open'&&hasProAccess(profile)&&profile.email_mode==='automatic';
       const wantsAuto=autoEligible&&Boolean(req.body.auto_send);
@@ -318,7 +336,7 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
 
     const {data,error}=await db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id).select('*').single();
     if(error)throw error; const bodyKeys=Object.keys(req.body||{}).sort().join(',');
-    if(patch.status==='won'&&existing.status!=='won')await db.from('product_events').insert({user_id:req.user.id,event:'quote_won',path:'/app',metadata:{amount:Number(data.amount||0)}});
+    if(patch.status==='won'&&existing.status!=='won')await db.from('product_events').insert({user_id:req.user.id,event:'quote_won',path:'/app',metadata:{amount:Number(data.amount||0),followups_done:Number(existing.followup_step||0),after_reply:Boolean(existing.reply_received_at)}});
     if(bodyKeys==='followup_schedule_mode,next_followup_at'&&req.body.followup_schedule_mode==='custom')await db.from('product_events').insert({user_id:req.user.id,event:'snoozed',path:'/app'});
     res.json({quote:data});
   } catch(e) { await reportError('quotes.update',e,{request_id:req.requestId}); res.status(500).json({error:'Impossible de modifier le devis.',request_id:req.requestId}); }
@@ -339,12 +357,13 @@ app.delete('/api/quotes/:id', requireUser, async(req,res)=>{
   } catch(e){await reportError('quotes.delete',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de supprimer le devis.',request_id:req.requestId});}
 });
 app.get('/api/quotes/:id/followup-preview', requireUser, async(req,res)=>{
-  try { const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]); if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});if(await isQuoteLocked(quote,profile))return res.status(423).json({error:LOCKED_MESSAGE,code:'QUOTE_LOCKED'});res.json({preview:await createFollowupPreview(quote,profile)}); } catch(e){if(e.message==='SEQUENCE_COMPLETE')return res.status(409).json({error:'Séquence terminée.'});await reportError('followup.preview',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de préparer la relance.',request_id:req.requestId});}
+  try { const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]); if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});if(quote.reply_received_at)return res.status(409).json({error:REPLIED_MESSAGE,code:'QUOTE_REPLIED'});if(await isQuoteLocked(quote,profile))return res.status(423).json({error:LOCKED_MESSAGE,code:'QUOTE_LOCKED'});res.json({preview:createFollowupPreview(quote,profile)}); } catch(e){if(e.message==='SEQUENCE_COMPLETE')return res.status(409).json({error:'Séquence terminée.'});await reportError('followup.preview',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de préparer la relance.',request_id:req.requestId});}
 });
 app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
   try {
     const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]);
     if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});
+    if(quote.reply_received_at)return res.status(409).json({error:REPLIED_MESSAGE,code:'QUOTE_REPLIED'});
     if(await isQuoteLocked(quote,profile))return res.status(423).json({error:LOCKED_MESSAGE,code:'QUOTE_LOCKED'});
     if(!hasProAccess(profile))return res.status(403).json({error:'L’envoi depuis Relanzio nécessite des droits Pro actifs.'});
     if(!quote.client_email)return res.status(409).json({error:'Ajoutez l’email du client pour envoyer depuis Relanzio, ou relancez-le par téléphone / SMS.'});
@@ -352,6 +371,7 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
     const result=await sendQuoteFollowup(quote,profile,sanitizeText(req.get('Idempotency-Key'),100)||null,{subject:subject||null,body:body||null});
     res.json({sent:true,result});
   } catch(e){
+    if(e.message==='QUOTE_REPLIED')return res.status(409).json({error:REPLIED_MESSAGE,code:'QUOTE_REPLIED'});
     if(['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_REQUEST_ALREADY_FAILED','FOLLOWUP_DAILY_LIMIT','EMAIL_RECIPIENT_SUPPRESSED','EMAIL_RECIPIENT_OPTED_OUT','EMAIL_RECIPIENT_MISSING'].includes(e.message))return res.status(409).json({error:e.message==='EMAIL_RECIPIENT_SUPPRESSED'?'Cette adresse ne peut plus recevoir de relances.':e.message==='EMAIL_RECIPIENT_OPTED_OUT'?'Ce client a demandé à ne plus recevoir vos relances par email. Relancez-le par téléphone ou SMS.':e.message==='EMAIL_RECIPIENT_MISSING'?'Ajoutez l’email du client pour envoyer depuis Relanzio.':'Cette relance est déjà en cours, déjà traitée ou bloquée par la limite quotidienne.'});
     await reportError('followup.manual_send',e,{request_id:req.requestId});
     res.status(500).json({error:'La relance n’a pas été envoyée. Aucun succès n’a été enregistré.',request_id:req.requestId});
@@ -371,9 +391,25 @@ app.post('/api/quotes/:id/confirm-manual-followup', requireUser, rateLimit({wind
     res.json({confirmed:true,idempotent:Boolean(result.idempotent),quote:result.quote,followup:result.followup});
   }catch(e){
     if(e.code==='QUOTE_NOT_FOUND')return res.status(404).json({error:'Devis introuvable.'});
+    if(e.code==='QUOTE_REPLIED')return res.status(409).json({error:REPLIED_MESSAGE,code:'QUOTE_REPLIED'});
     if(['QUOTE_NOT_OPEN','SEQUENCE_COMPLETE','FOLLOWUP_ALREADY_RECORDED','FOLLOWUP_STEP_STALE'].includes(e.code||e.message))return res.status(409).json({error:'Cette relance a déjà été traitée ou le devis n’est plus éligible.'});
     await reportError('followup.manual_confirm',e,{request_id:req.requestId,quote_id:req.params.id});
     res.status(500).json({error:'Impossible d’enregistrer la relance manuelle.',request_id:req.requestId});
+  }
+});
+
+// "Le client a répondu" (phone, SMS, in person…): stops every follow-up of this quote, keeps it active.
+// Allowed on read-only quotes too: it only stops things.
+app.post('/api/quotes/:id/client-replied', requireUser, rateLimit({windowMs:60_000,max:30}), async(req,res)=>{
+  try{
+    const {data:quote,error}=await db.from('quotes').select('id,user_id,status').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle();
+    if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});
+    if(!['open','paused'].includes(quote.status))return res.status(409).json({error:'Ce devis est déjà marqué gagné ou perdu.'});
+    const result=await recordManualReply({quote,channel:sanitizeText(req.body?.channel,20),requestKey:sanitizeText(req.get('Idempotency-Key'),100)||null});
+    res.json({recorded:true,duplicate:Boolean(result.duplicate),quote:result.quote});
+  }catch(e){
+    await reportError('quotes.client_replied',e,{request_id:req.requestId,quote_id:req.params.id});
+    res.status(500).json({error:'Impossible d’enregistrer la réponse du client.',request_id:req.requestId});
   }
 });
 
@@ -490,6 +526,8 @@ app.post('/api/brevo/webhook', async(req,res)=>{
     const rawEvent=String(req.body.event||'').toLowerCase().replace(/[_\s-]/g,'');
     if(email&&['hardbounce','invalid','spam','blocked'].includes(rawEvent)){
       await mustDb(db.from('suppressions').upsert({email,reason:`provider_${rawEvent}`}));
+      // Client follow-ups to this address cannot be delivered: stop automatic sending on those quotes.
+      await mustDb(db.from('quotes').update({auto_send:false,updated_at:nowIso()}).eq('client_email',email).eq('auto_send',true));
       await mustDb(db.from('prospects').update({status:'suppressed',updated_at:nowIso()}).eq('email',email));
       const {data:prospect}=await db.from('prospects').select('id').eq('email',email).maybeSingle();
       if(prospect)await mustDb(db.from('outreach_queue').update({status:'canceled',error:`provider_${rawEvent}`,updated_at:nowIso()}).eq('prospect_id',prospect.id).in('status',['queued','held','ready']));
@@ -633,6 +671,7 @@ app.get('/api/admin/insights', requireUser, async(req,res)=>{if(!isAdmin(req.use
 
 app.get('/api/admin/system', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const since=new Date(Date.now()-7*86400000).toISOString();const [{data:errors},{data:failed},{data:tickets},{data:pastDue}]=await Promise.all([db.from('system_events').select('*').gte('created_at',since).order('created_at',{ascending:false}).limit(100),db.from('followups').select('id,quote_id,error,created_at').eq('status','failed').gte('created_at',since).limit(100),db.from('support_tickets').select('id,subject,status,priority,created_at').in('priority',['high','urgent']).neq('status','closed').limit(100),db.from('profiles').select('id,email,subscription_status').in('subscription_status',['past_due','unpaid']).limit(100)]);res.json({window_days:7,errors:errors||[],failed_followups:failed||[],sensitive_tickets:tickets||[],billing_attention:pastDue||[]})}catch(e){await reportError('admin.system',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de charger la santé système.',request_id:req.requestId})}});
 
+app.get('/api/admin/readiness', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});res.json(readinessReport())});
 app.get('/api/admin/ceo', requireUser, async(req,res)=>{
   if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const [{data:events},{data:profiles},{data:prospects},{data:outreach},{data:quotes},{data:insights},{data:followups},{data:systemEvents},{data:tickets}]=await Promise.all([db.from('product_events').select('anonymous_id,user_id,event,created_at').order('created_at',{ascending:false}).limit(20000),db.from('profiles').select('id,plan,subscription_status,activated_at,trial_started_at,trial_ends_at,trial_expired_at,created_at'),db.from('prospects').select('id,status'),db.from('outreach_events').select('type'),db.from('quotes').select('status'),db.from('feedback_insights').select('requested_feature,confidence'),db.from('followups').select('user_id,status,created_at').limit(20000),db.from('system_events').select('level,scope,created_at').gte('created_at',new Date(Date.now()-7*86400000).toISOString()).limit(1000),db.from('support_tickets').select('status,priority').neq('status','closed')]);// The site sets no audience identifier: "visitors" counts landing visits (landing_view events).
     const visitors=(events||[]).filter(e=>e.event==='landing_view').length;const signups=(profiles||[]).length,activated=(profiles||[]).filter(p=>p.activated_at).length,paying=(profiles||[]).filter(p=>p.plan==='pro'&&p.subscription_status==='active').length,trials=(profiles||[]).filter(p=>isManagedTrialActive(p)).length,canceled=(profiles||[]).filter(p=>p.subscription_status==='canceled').length;const outreachSent=(outreach||[]).filter(x=>x.type==='sent').length,replies=(outreach||[]).filter(x=>x.type==='replied').length,meetings=(outreach||[]).filter(x=>x.type==='meeting').length;const activeSince=Date.now()-30*86400000;const activeUsers=new Set((events||[]).filter(e=>e.user_id&&new Date(e.created_at).getTime()>=activeSince).map(e=>e.user_id)).size;const followupsSent=(followups||[]).filter(x=>['sent','delivered','opened','clicked'].includes(x.status)).length;const openProblems=(systemEvents||[]).length+(tickets||[]).filter(t=>['high','urgent'].includes(t.priority)&&t.status!=='resolved').length;const metrics={...buildCeoMetrics({visitors,signups,activated,paying,canceled,mrr:monthlyRecurringRevenue(paying),prospects:(prospects||[]).length,outreachSent,replies,meetings,quotes:(quotes||[]).length,wonQuotes:(quotes||[]).filter(q=>q.status==='won').length}),trials,activeUsers,followupsSent,openProblems};const since30=new Date(Date.now()-30*86400000).toISOString();
@@ -643,6 +682,7 @@ app.post('/api/cron/run', async(req,res)=>{if(!safeEqual(String(req.headers['x-c
 cron.schedule('*/15 * * * *',async()=>{try{await runDueFollowups()}catch(e){await reportError('cron.followups',e)}},{noOverlap:true});
 cron.schedule('2,17,32,47 * * * *',async()=>{try{await expireTrials()}catch(e){await reportError('cron.trials',e)}},{noOverlap:true});
 cron.schedule('*/10 * * * *',async()=>{try{const result=await processOutreachQueue();if(result?.error)await reportError('cron.outreach.result',new Error(result.error),{queue_id:result.queue_id})}catch(e){await reportError('cron.outreach',e)}},{noOverlap:true});
+cron.schedule('*/2 * * * *',async()=>{try{await pollQuoteReplies()}catch(e){await reportError('cron.quote-replies',e,{code:e?.code||'REPLY_POLL_FAILED'})}},{noOverlap:true});
 cron.schedule('*/10 * * * *',async()=>{try{await pollImapReplies()}catch(e){await reportError('cron.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})}},{noOverlap:true});
 cron.schedule('3,13,23,33,43,53 * * * *',async()=>{try{await runCommercialQueueFeeder()}catch(e){await reportError('cron.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'})}},{noOverlap:true});
 cron.schedule('*/5 * * * *',async()=>{try{await runCommercialSequenceTick()}catch(e){await reportError('cron.commercial-sequence',e,{code:e?.code||'COMMERCIAL_SEQUENCE_FAILED'})}},{noOverlap:true});

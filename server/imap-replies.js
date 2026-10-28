@@ -206,3 +206,6 @@ export async function pollImapReplies({now=new Date()}={}){
     throw safeError(code,'Échec du polling IMAP.');
   }finally{await client.close();}
 }
+
+// Transport reused by the product reply mailbox (server/quote-replies.js); prospection logic above is unchanged.
+export { ReadOnlyImapClient, extractLiteral, parseSearchUids, parseMessageSize };

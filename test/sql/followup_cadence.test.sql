@@ -7,9 +7,10 @@ do $$
 declare r jsonb;
 begin
   -- Relance 1 done on 28 Oct (late): relance 2 = 28 Oct + (7-3) days, 09:00 Paris — not 1 Sept + 7.
+  -- 1 Nov 2026 is a Sunday: since 20261029100000 follow-ups never fall on a weekend, so Monday 2 Nov 09:00 Paris.
   r:=public.confirm_manual_followup('aaaaaaaa-0000-4000-8000-000000000001','22222222-2222-4222-8222-222222222222',1,'','','k1','2026-10-28 15:00+00');
   assert (r->>'ok')::boolean, r::text;
-  assert (r->'quote'->>'next_followup_at')::timestamptz='2026-11-01 08:00+00', r->'quote'->>'next_followup_at';
+  assert (r->'quote'->>'next_followup_at')::timestamptz='2026-11-02 08:00+00', r->'quote'->>'next_followup_at';
   -- Same request key twice is idempotent and does not advance again.
   r:=public.confirm_manual_followup('aaaaaaaa-0000-4000-8000-000000000001','22222222-2222-4222-8222-222222222222',1,'','','k1','2026-10-28 15:05+00');
   assert (r->>'idempotent')::boolean and (r->'quote'->>'followup_step')::int=1, r::text;

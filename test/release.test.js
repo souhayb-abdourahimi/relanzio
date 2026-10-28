@@ -38,7 +38,8 @@ test('email layer never uses a fake development success',()=>{
   const email=readFileSync(new URL('../server/email.js',import.meta.url),'utf8');
   assert.match(email,/EMAIL_PROVIDER_NOT_CONFIGURED/);
   assert.doesNotMatch(email,/DEV EMAIL/);
-  assert.match(email,/store:false/);
+  // Follow-up text is a fixed template: the email layer never sends client data to an AI provider.
+  assert.doesNotMatch(email,/openai/i);
 });
 
 test('release source contains required self-service routes and safety gates',()=>{

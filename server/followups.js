@@ -5,6 +5,7 @@ import { reportError } from './observability.js';
 import { hasProAccess, canAutoSend } from './entitlements.js';
 import { isAutomaticSendWindow, parisBusinessDate, providerFailureDisposition } from './followup-policy.js';
 import { signEmailLink, emailLinkUrl, followupFooter } from './email-links.js';
+import { replyConfiguration, newReplyToken, replyAddress } from './quote-replies.js';
 
 export async function isFollowupOptedOut(userId,email){
   if(!email)return false;
@@ -15,18 +16,18 @@ export async function isFollowupOptedOut(userId,email){
 
 export const nextDate = nextFollowupDate;
 
-export async function createFollowupPreview(quote, profile) {
+export function createFollowupPreview(quote, profile) {
+  if (quote.reply_received_at) throw new Error('QUOTE_REPLIED');
   const step = Number(quote.followup_step || 0);
   if (step >= 3) throw new Error('SEQUENCE_COMPLETE');
-  const body = await generateFollowup(quote, step, profile.company_name || 'Votre entreprise');
-  return { step:step + 1, subject:`Suivi — ${quote.title}`, body };
+  return generateFollowup(quote, step, profile.company_name || '');
 }
 
 async function claimQuote(quote) {
   const stale = new Date(Date.now()-5*60_000).toISOString();
   const claimedAt=new Date().toISOString();
   const { data, error } = await db.from('quotes').update({ send_claimed_at:claimedAt, updated_at:claimedAt })
-    .eq('id',quote.id).eq('user_id',quote.user_id).eq('status','open').eq('followup_step',quote.followup_step)
+    .eq('id',quote.id).eq('user_id',quote.user_id).eq('status','open').eq('followup_step',quote.followup_step).is('reply_received_at',null)
     .or(`send_claimed_at.is.null,send_claimed_at.lt.${stale}`).select('*').maybeSingle();
   if (error) throw error;
   if (!data) throw new Error('FOLLOWUP_ALREADY_IN_PROGRESS');
@@ -86,6 +87,7 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
     }
   }
 
+  if(quote.reply_received_at)throw new Error('QUOTE_REPLIED');
   if(!quote.client_email)throw new Error('EMAIL_RECIPIENT_MISSING');
   if(await isFollowupOptedOut(quote.user_id,quote.client_email))throw new Error('EMAIL_RECIPIENT_OPTED_OUT');
   // Built before any claim or provider call: a missing EMAIL_LINK_SECRET blocks the send cleanly.
@@ -103,7 +105,9 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
       if(today)throw new Error('FOLLOWUP_DAILY_LIMIT');
     }
 
-    const generated = await createFollowupPreview(claimed, profile);
+    const generated = createFollowupPreview(claimed, profile);
+    // Replies to this email carry a one-time token so Relanzio can stop the sequence (null when not configured).
+    const replyToken=replyConfiguration().configured?newReplyToken():null;
     const preview={
       ...generated,
       subject:String(options.subject||generated.subject).slice(0,200),
@@ -111,7 +115,7 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
     };
     const {data:draft,error:draftError}=await db.from('followups').insert({
       quote_id:claimed.id,user_id:claimed.user_id,step:preview.step,subject:preview.subject,body:preview.body,
-      status:'draft',request_key:requestKey,channel:'relanzio',business_date:businessDate
+      status:'draft',request_key:requestKey,channel:'relanzio',business_date:businessDate,reply_token:replyToken
     }).select('id').single();
     if(draftError){
       await db.from('quotes').update({send_claimed_at:null}).eq('id',claimed.id).eq('user_id',claimed.user_id);
@@ -132,10 +136,11 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
       to:claimed.client_email, subject:preview.subject,
       text:preview.body+followupFooter({companyName:profile.company_name,quoteTitle:claimed.title,unsubscribeUrl}),
       headers:{'List-Unsubscribe':`<${unsubscribeUrl}>`,'List-Unsubscribe-Post':'List-Unsubscribe=One-Click'},
-      replyTo:profile.email, senderName:`${profile.company_name || 'Votre entreprise'} via Relanzio`, tags:['relanzio-followup']
+      replyTo:(replyToken&&replyAddress(replyToken))||profile.email, senderName:`${profile.company_name || 'Votre entreprise'} via Relanzio`, tags:['relanzio-followup']
     });
     const sentAt=new Date().toISOString();
     const finalized=await finalizeRelanzioFollowup({followupId,claimed,sentAt,providerMessageId:sent?.messageId||null});
+    await db.from('product_events').insert({user_id:claimed.user_id,event:'followup_sent',path:'/app',metadata:{channel:'relanzio',automatic,step:preview.step,reply_tracking:Boolean(replyToken)}});
     return {...preview,provider_message_id:sent?.messageId||null,next_followup_at:finalized.quote?.next_followup_at||null};
   } catch (e) {
     await db.from('quotes').update({send_claimed_at:null}).eq('id',claimed.id).eq('user_id',claimed.user_id);
@@ -152,11 +157,18 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
   }
 }
 
+// Automatic sending needs the global switch AND reply detection: never send by itself to a client
+// whose answer Relanzio could not see.
+export function automaticSendingAvailable(env=process.env){
+  return env.FOLLOWUP_AUTOMATION_ENABLED==='true'&&replyConfiguration(env).configured;
+}
+
 export async function runDueFollowups(now=new Date()) {
   if (process.env.FOLLOWUP_AUTOMATION_ENABLED !== 'true') return [{ skipped:'automation_disabled' }];
+  if (!replyConfiguration().configured) return [{ skipped:'reply_detection_not_configured' }];
   if(!isAutomaticSendWindow(now))return [{skipped:'outside_business_window'}];
   const nowIso=now.toISOString();
-  const { data: quotes, error } = await db.from('quotes').select('*').eq('status','open').eq('auto_send',true).lte('next_followup_at',nowIso).lt('followup_step',3).not('client_email','is',null).order('next_followup_at',{ascending:true}).limit(100);
+  const { data: quotes, error } = await db.from('quotes').select('*').eq('status','open').eq('auto_send',true).lte('next_followup_at',nowIso).lt('followup_step',3).is('reply_received_at',null).not('client_email','is',null).order('next_followup_at',{ascending:true}).limit(100);
   if (error) throw error;
   const results = [];
   for (const quote of quotes || []) {
@@ -170,6 +182,7 @@ export async function runDueFollowups(now=new Date()) {
       const result = await sendQuoteFollowup(quote, profile, null, {automatic:true});
       results.push({ id:quote.id, sent:true, provider_message_id:result.provider_message_id });
     } catch (e) {
+      if (e.message==='QUOTE_REPLIED') { results.push({id:quote.id,skipped:'client_replied'}); continue; }
       if (['FOLLOWUP_ALREADY_IN_PROGRESS','FOLLOWUP_DAILY_LIMIT'].includes(e.message)) { results.push({id:quote.id,skipped:e.message==='FOLLOWUP_DAILY_LIMIT'?'daily_limit':'already_claimed'}); continue; }
       if (['EMAIL_RECIPIENT_OPTED_OUT','EMAIL_RECIPIENT_MISSING'].includes(e.message)) { await db.from('quotes').update({auto_send:false}).eq('id',quote.id).eq('user_id',quote.user_id); results.push({id:quote.id,skipped:e.message==='EMAIL_RECIPIENT_OPTED_OUT'?'recipient_opted_out':'no_email'}); continue; }
       await db.from('quotes').update({auto_send:false,send_claimed_at:null}).eq('id',quote.id).eq('user_id',quote.user_id);
