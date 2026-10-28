@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { lockedQuoteIds } from '../shared/quota.js';
 
 const stamp=Date.now(),results=[];
 let userA,userB,server,local,app,db,createClient;
@@ -296,7 +297,13 @@ try{
   const afterExpiry=(await api(userA.token,'/api/profile')).data?.profile;
   assert(thirdTrial.status!==201&&afterExpiry?.trial_eligible===false&&afterExpiry?.pro_access===false&&afterExpiry?.trial_started_at===trialStartedAt,'expired_trial_cannot_restart',JSON.stringify({trial_start_status:thirdTrial.status}));
 
-  const claimedQuote=(await db.from('quotes').select('*').eq('user_id',userA.id).eq('status','open').limit(1).single()).data;
+  // userA is Free again with 99 active quotes: only the 5 most recent stay editable (shared/quota.js), the
+  // others answer 423 (read-only). The in-flight send guard is checked on an editable quote.
+  const {data:activeA,error:activeAError}=await db.from('quotes').select('id,status,created_at').eq('user_id',userA.id).in('status',['open','paused']);
+  if(activeAError)throw activeAError;
+  const lockedA=lockedQuoteIds(activeA||[],false);
+  const editableId=(activeA||[]).find(x=>x.status==='open'&&!lockedA.has(x.id))?.id;
+  const claimedQuote=editableId?(await db.from('quotes').select('*').eq('id',editableId).single()).data:null;
   if(!claimedQuote)throw new Error('claimed quote missing');
   const {error:claimSeedError}=await db.from('quotes').update({send_claimed_at:new Date().toISOString()}).eq('id',claimedQuote.id);
   if(claimSeedError)throw claimSeedError;

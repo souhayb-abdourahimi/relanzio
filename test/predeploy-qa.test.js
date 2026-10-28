@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { isTrialEligible, withEntitlements } from '../server/entitlements.js';
 import { activeQuoteLimitFor, FREE_ACTIVE_QUOTES_LIMIT, TRIAL_DAYS } from '../shared/plans.js';
+import { lockedQuoteIds } from '../shared/quota.js';
 
 // Regression: the Railway pre-deploy QA (server/qa-auth-domain-final.mjs) assumed an account that had
 // created its first quote was still Free. Since the first quote starts the 7-day Pro trial, its Free quota
@@ -50,4 +51,19 @@ test('trial checks follow the automatic first-quote trial, never the retired sel
   assert.match(qa,/t1-t0===7\*24\*3600000,'first_quote_starts_trial_exact_7d'/);
   for(const name of ['second_quote_keeps_same_trial','trial_one_time_only','trial_survives_refresh','trial_survives_logout_login','expired_trial_cannot_restart'])assert.ok(qa.includes(`'${name}'`),name);
   assert.match(qa,/trialAgain\.status!==201&&pr\?\.trial_started_at===trialStartedAt/);
+});
+
+test('after the trial, the in-flight send check uses an editable quote, not a read-only one (423)',()=>{
+  assert.match(server,/isQuoteLocked\(existing,profile\)\) return res\.status\(423\)/);
+  assert.doesNotMatch(qa,/eq\('status','open'\)\.limit\(1\)\.single\(\)/,'an arbitrary open quote is read-only 93 times out of 98');
+  assert.match(qa,/const lockedA=lockedQuoteIds\(activeA\|\|\[\],false\);/);
+  assert.match(qa,/find\(x=>x\.status==='open'&&!lockedA\.has\(x\.id\)\)/);
+  // Same data shape as the QA: 98 rows inserted together share created_at, plus one closed quote.
+  const created='2026-10-28T15:00:00.000Z';
+  const quotes=Array.from({length:98},(_,i)=>({id:`00000000-0000-4000-8000-${String(i).padStart(12,'0')}`,status:'open',created_at:created}));
+  quotes.push({id:'ffffffff-0000-4000-8000-000000000000',status:'lost',created_at:'2026-10-28T15:01:00.000Z'});
+  const locked=lockedQuoteIds(quotes,false);
+  assert.equal(locked.size,98-FREE_ACTIVE_QUOTES_LIMIT);
+  const editable=quotes.find(x=>x.status==='open'&&!locked.has(x.id));
+  assert.ok(editable&&!locked.has(editable.id));
 });
