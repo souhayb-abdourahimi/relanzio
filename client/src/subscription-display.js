@@ -38,7 +38,12 @@ export function subscriptionDisplay(profile={}, billingEnabled=false, checkoutBu
   const paid=Boolean(profile?.is_paid_subscription || (profile?.plan==='pro' && profile?.subscription_status==='active'));
   const stripeManaged=Boolean(profile?.stripe_customer_id);
   const trialEligible=Boolean(profile?.trial_eligible && !trial.visible && !paid);
-  const upgradeVisible=currentPlan==='free' || trial.visible;
+  const status=profile?.subscription_status||'none';
+  const pastDue=['past_due','unpaid'].includes(status);
+  const canceling=status==='active'&&Boolean(profile?.subscription_cancel_at_period_end);
+  // Card update, invoices and cancellation live in the Stripe portal, also while a payment is failing.
+  const portalVisible=stripeManaged&&['active','past_due','unpaid','canceled'].includes(status);
+  const upgradeVisible=!pastDue&&(currentPlan==='free' || trial.visible);
   const upgradeDisabled=!billingEnabled || checkoutBusy || paid;
   let upgradeHint='';
   if(!billingEnabled)upgradeHint='La souscription Pro n’est pas disponible pour le moment. Votre formule actuelle reste active.';
@@ -49,6 +54,9 @@ export function subscriptionDisplay(profile={}, billingEnabled=false, checkoutBu
     stripeManaged,
     trial,
     trialEligible,
+    pastDue,
+    canceling,
+    portalVisible,
     upgradeVisible,
     upgradeDisabled,
     upgradeHint,

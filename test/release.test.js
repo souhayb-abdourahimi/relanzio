@@ -200,8 +200,8 @@ test('public launch copy uses explicit account and trial CTAs without inventing 
   const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   assert.match(client,/Créer un compte gratuit/);
-  assert.match(plans,/Essayer Pro gratuitement pendant \$\{TRIAL_DAYS\} jours/);
-  assert.match(plans,/Sans carte bancaire et sans débit automatique/);
+  assert.match(plans,/il démarre automatiquement à l’ajout de votre premier devis/);
+  assert.doesNotMatch(plans,/onStartTrial/);
   assert.match(client,/Compte, données et facturation/);
   assert.match(client,/mailto:\$\{support\}/);
 });
@@ -246,11 +246,11 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   assert.match(server,/hasProAccess\(profile\)/);
   assert.match(followups,/hasProAccess\(profile\)/);
   assert.match(client,/profile\.pro_access/);
-  assert.match(trialUi,/trialDisplay\(profile\)/);
-  assert.match(trialDisplay,/Essai Pro —/);
+  assert.match(trialUi,/accountBanner\(profile,lockedCount\)/);
+  assert.match(trialDisplay,/Essai Pro :/);
   assert.match(trialDisplay,/upgradeLabel:UPGRADE_LABEL/);
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
-  assert.match(plans,/Essayer Pro gratuitement pendant \$\{TRIAL_DAYS\} jours/);
+  assert.match(plans,/Essai Pro de \{TRIAL_DAYS\} jours sans carte bancaire/);
 });
 
 test('trial accounts are excluded from paid MRR metrics',()=>{

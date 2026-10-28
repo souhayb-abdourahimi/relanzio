@@ -30,15 +30,13 @@ function Fixture(){
       const twoColumns=window.innerWidth<=760||Boolean(fr&&pr&&Math.abs(fr.top-pr.top)<5&&pr.left>fr.left);
       const copyOk=text.includes('Découverte / Gratuit')&&text.includes('0 €')&&text.includes('Pro')&&text.includes('29 €')&&text.includes('5 devis actifs')&&text.includes('100 devis actifs')&&!text.toLowerCase().includes('illimité');
       const billingStateOk=billing?!button?.disabled:button?.disabled;
-      const trialOk=!trial||(text.includes('Essai Pro — 4 jours restants')&&text.includes('Fin prévue le 18/10/2026'));
-      const trialButton=document.querySelector('.app-trial-btn');
-      const eligibleOk=!eligible||(trialButton&&text.includes('Essayer Pro gratuitement pendant 7 jours')&&text.includes('Sans carte bancaire et sans débit automatique'));
-      if(eligible&&trialButton)trialButton.click();
+      const trialOk=!trial||(text.includes('Essai Pro : 4 jours restants')&&text.includes('Fin prévue le 18/10/2026'));
+      const eligibleOk=!eligible||(!document.querySelector('.app-trial-btn')&&text.includes('démarre automatiquement à l’ajout de votre premier devis'));
       document.body.dataset.plansQa=cards.length===2&&copyOk&&noOverflow&&touchOk&&oneColumn&&twoColumns&&billingStateOk&&trialOk&&eligibleOk?'pass':'fail';
     },100);
   },[qa,billing,trial]);
 
   useEffect(()=>{document.body.dataset.upgradeClicks=String(upgradeClicks);document.body.dataset.trialClicks=String(trialClicks)},[upgradeClicks,trialClicks]);
-  return <main className="dash"><PlansView profile={profile} billingEnabled={billing} checkoutBusy={false} trialBusy={false} onStartTrial={()=>setTrialClicks(x=>x+1)} onUpgrade={()=>setUpgradeClicks(x=>x+1)} onPortal={()=>{}}/></main>;
+  return <main className="dash"><PlansView profile={profile} billingEnabled={billing} checkoutBusy={false} onUpgrade={()=>setUpgradeClicks(x=>x+1)} onPortal={()=>{}}/></main>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);

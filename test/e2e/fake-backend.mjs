@@ -4,6 +4,7 @@
 import { quoteMetrics } from '../../server/logic.js';
 import { withEntitlements } from '../../server/entitlements.js';
 import { activeQuoteLimitFor, TRIAL_DAYS } from '../../shared/plans.js';
+import { withLocks } from '../../shared/quota.js';
 
 const DAY=86400000;
 const json=(route,status,body)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
@@ -38,7 +39,7 @@ export function createFakeBackend({now=()=>new Date(),seedQuotes=[],profile={}}=
     if(path==='/profile'&&method==='PATCH'){Object.assign(state.profile,body);return json(route,200,{profile:profileOut()});}
     if(path.startsWith('/admin'))return json(route,403,{error:'Forbidden'});
     if(path==='/quotes'&&method==='GET'){
-      const hydrated=state.quotes.map(q=>({...q,followups:state.followups.filter(f=>f.quote_id===q.id)}));
+      const hydrated=withLocks(state.quotes,profileOut().pro_access).map(q=>({...q,followups:state.followups.filter(f=>f.quote_id===q.id)}));
       return json(route,200,{quotes:hydrated,metrics:quoteMetrics(state.quotes,now())});
     }
     if(path==='/quotes'&&method==='POST'){

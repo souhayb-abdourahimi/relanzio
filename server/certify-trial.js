@@ -78,9 +78,9 @@ assert(duration===7*24*60*60*1000,'trial window exactly seven days');
 
 const display=trialDisplay(active);
 assert(display.visible===true,'trial UI visible');
-assert(display.label==='Essai Pro — 7 jours restants','trial UI label');
+assert(display.label==='Essai Pro : 7 jours restants','trial UI label');
 assert(display.endText.includes(new Date(active.trial_ends_at).toLocaleDateString('fr-FR')),'trial UI contains end date');
-assert(display.upgradeLabel==='Passer à Pro — 29 €/mois','upgrade CTA label');
+assert(display.upgradeLabel==='Passer à Pro — 29 € / mois','upgrade CTA label');
 
 const simulatedNow=new Date(new Date(active.trial_ends_at).getTime()+1000);
 const expiredRaw=await settleExpiredTrial(active,simulatedNow);

@@ -4,7 +4,7 @@ import { TRIAL_DAYS } from '../../shared/plans.js';
 
 function PlanFeatures({items}){return <ul className="app-plan-features">{items.map(item=><li key={item}>{item}</li>)}</ul>}
 
-export default function PlansView({profile,billingEnabled,checkoutBusy=false,trialBusy=false,onStartTrial,onUpgrade,onPortal}){
+export default function PlansView({profile,billingEnabled,checkoutBusy=false,onUpgrade,onPortal}){
   const state=subscriptionDisplay(profile,billingEnabled,checkoutBusy);
   const freeCurrent=state.currentPlan==='free';
   const proCurrent=state.currentPlan==='pro';
@@ -57,11 +57,13 @@ export default function PlansView({profile,billingEnabled,checkoutBusy=false,tri
         <p className="app-plan-summary">Pour envoyer depuis Relanzio et automatiser progressivement le suivi, avec contrôle devis par devis.</p>
         <PlanFeatures items={PRO_PLAN.features}/>
         <div className="app-plan-actions">
-          {state.trialEligible&&<><button type="button" className="btn ghost full app-trial-btn" disabled={trialBusy} onClick={onStartTrial}>{trialBusy?'Activation…':`Essayer Pro gratuitement pendant ${TRIAL_DAYS} jours`}</button><p className="app-plan-help">Sans carte bancaire et sans débit automatique. Une seule fois par compte.</p></>}
+          {state.trialEligible&&<p className="app-plan-help trial-note">Essai Pro de {TRIAL_DAYS} jours sans carte bancaire : il démarre automatiquement à l’ajout de votre premier devis.</p>}
           {state.upgradeVisible&&<button type="button" className="btn full app-upgrade-btn" disabled={state.upgradeDisabled} onClick={onUpgrade}>{checkoutBusy?'Ouverture…':state.upgradeLabel}</button>}
-          {state.paid&&billingEnabled&&state.stripeManaged&&<button type="button" className="btn ghost full" onClick={onPortal}>Gérer mon abonnement</button>}
+          {state.portalVisible&&billingEnabled&&<button type="button" className="btn ghost full app-portal-btn" onClick={onPortal}>Gérer mon abonnement</button>}
+          {state.portalVisible&&<p className="app-plan-help">Carte bancaire, factures et résiliation dans le portail sécurisé Stripe.</p>}
+          {state.pastDue&&<p className="app-plan-help warn">Le dernier paiement a été refusé : mettez à jour votre carte pour rétablir Pro.</p>}
           {state.upgradeHint&&state.upgradeVisible&&<p className="app-plan-help">{state.upgradeHint}</p>}
-          {state.paid&&<p className="app-plan-help">Votre abonnement Pro est actif.</p>}
+          {state.paid&&<p className="app-plan-help">{state.canceling&&profile.subscription_current_period_end?`Abonnement résilié : Pro jusqu’au ${new Date(profile.subscription_current_period_end).toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'})}.`:'Votre abonnement Pro est actif.'}</p>}
         </div>
       </article>
     </div>

@@ -12,6 +12,6 @@ export function QuoteCards({quotes=[],onStatus,onPrepare,onEdit,onRemove}){
       <label>Statut<select aria-label={`Statut ${q.title}`} value={q.status} onChange={e=>onStatus?.(q.id,e.target.value)}><option value="open">En attente</option><option value="paused">Pause</option><option value="won">Gagné</option><option value="lost">Perdu</option></select></label>
       <div><small>Prochaine relance</small><b>{schedule(q)}</b></div>
     </div>
-    <div className="quote-mobile-actions">{q.status==='open'&&q.followup_step<3&&<button className="mini-btn" onClick={()=>onPrepare?.(q)}>Relancer</button>}<button className="mini-btn" onClick={()=>onEdit?.(q)}>Modifier</button><button className="mini-btn danger-text" onClick={()=>onRemove?.(q)}>Supprimer</button></div>
+    <div className="quote-mobile-actions">{q.locked&&<span className="lock-badge">Lecture seule</span>}{q.status==='open'&&q.followup_step<3&&!q.locked&&<button className="mini-btn" onClick={()=>onPrepare?.(q)}>Relancer</button>}{!q.locked&&<button className="mini-btn" onClick={()=>onEdit?.(q)}>Modifier</button>}<button className="mini-btn danger-text" onClick={()=>onRemove?.(q)}>Supprimer</button></div>
   </article>)}</div>;
 }

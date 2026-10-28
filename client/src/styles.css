@@ -157,3 +157,7 @@ button,.btn,.mini-btn{-webkit-user-select:none;user-select:none}
 .cadence-form label{font-size:13px;font-weight:700}
 .cadence-input{display:flex;align-items:center;gap:4px;margin-top:4px;font-weight:800}
 .cadence-input input{width:64px;margin:0;text-align:center}
+.lock-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:800;color:#735200;background:#fff3d5;border:1px solid #efd28c;border-radius:6px;padding:3px 7px;white-space:nowrap}
+.trial-banner.banner-past_due{background:#fff3d5;border-color:#efd28c}
+.app-plan-help.warn{color:#735200;font-weight:700}
+.trial-note{margin-top:4px}

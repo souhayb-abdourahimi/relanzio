@@ -24,7 +24,7 @@ const DAY=86400000;
 
 function startVite(){
   const env={...process.env,VITE_SUPABASE_URL:`https://${SUPABASE_HOST}`,VITE_SUPABASE_ANON_KEY:'e2e-anon-key',VITE_BILLING_ENABLED:'true'};
-  const child=spawn('npx',['vite','--config','client/vite.config.js','--host','127.0.0.1','--port',String(port),'--strictPort'],{cwd:appDir,env,stdio:['ignore','pipe','pipe']});
+  const child=spawn('npx',['vite','--config','client/vite.config.js','--host','127.0.0.1','--port',String(port),'--strictPort'],{cwd:appDir,env,stdio:['ignore','pipe','pipe'],detached:true});
   let log='';child.stdout.on('data',d=>log+=d);child.stderr.on('data',d=>log+=d);
   return {child,log:()=>log};
 }
@@ -117,7 +117,7 @@ async function flows(browser){
       assert.ok(await page.getByRole('link',{name:'SMS'}).isVisible(),'SMS link');
       assert.ok(await page.getByRole('link',{name:'Appeler'}).isVisible(),'tel link');
       await page.locator('.preview-modal textarea').fill('Bonjour, avez-vous pu regarder le devis ?');
-      await page.getByRole('button',{name:'Relance faite'}).click();
+      await page.getByRole('dialog').getByRole('button',{name:'Relance faite'}).click();
       await page.waitForSelector('.preview-modal',{state:'detached'});
       assert.equal(backend.state.quotes[0].followup_step,1);
       await page.getByText('Relance marquée comme faite').waitFor();
@@ -145,6 +145,38 @@ async function flows(browser){
       await page.waitForURL(/__e2e\/stripe-checkout/);
       assert.ok(backend.state.calls.some(c=>c.path==='/billing/checkout'));
     });
+    await step(`${label}: free account above the limit sees read-only quotes and can still close them`,async()=>{
+      const quotes=Array.from({length:7},(_,i)=>({id:`l${i}`,client_name:`Client ${i}`,client_email:`c${i}@example.test`,title:`Devis ${i}`,amount:1000+i,followup_step:0,next_followup_at:new Date(Date.now()-DAY).toISOString(),created_at:new Date(Date.now()-(10-i)*DAY).toISOString()}));
+      const b2=createFakeBackend({seedQuotes:quotes,profile:{company_name:'Toitures Martin',onboarding_completed:true,trial_started_at:new Date(Date.now()-10*DAY).toISOString(),trial_ends_at:new Date(Date.now()-3*DAY).toISOString(),trial_expired_at:new Date(Date.now()-3*DAY).toISOString()}});
+      const c2=await newContext(browser,vp,b2,{loggedIn:true});const p2=await c2.newPage();
+      await p2.goto(BASE+'/');await p2.waitForSelector('.today-card');
+      assert.match(await p2.locator('.trial-banner').innerText(),/2 devis en lecture seule/);
+      const locked=p2.locator('.today-card.locked');
+      assert.equal(await locked.count(),2);
+      assert.equal(await locked.first().getByRole('button',{name:'Relancer'}).count(),0,'no follow-up on a locked quote');
+      if(label==='mobile')await locked.first().getByRole('button',{name:'Résultat'}).click();
+      await locked.first().getByRole('button',{name:'Perdu'}).click();
+      await p2.getByText('Devis marqué perdu').waitFor();
+      assert.equal(b2.state.quotes.find(q=>q.id==='l0').status,'lost');
+      await c2.close();
+    });
+    await step(`${label}: past_due shows the payment banner and opens the Stripe portal`,async()=>{
+      const b3=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true,plan:'free',subscription_status:'past_due',stripe_customer_id:'cus_e2e',stripe_subscription_id:'sub_e2e',trial_started_at:new Date(Date.now()-40*DAY).toISOString(),trial_ends_at:new Date(Date.now()-33*DAY).toISOString(),trial_expired_at:new Date(Date.now()-33*DAY).toISOString()}});
+      const c3=await newContext(browser,vp,b3,{loggedIn:true});const p3=await c3.newPage();
+      await p3.goto(BASE+'/');await p3.waitForSelector('.banner-past_due');
+      await p3.getByRole('button',{name:'Mettre à jour ma carte'}).click();
+      await p3.waitForURL(/__e2e\/stripe-portal/);
+      await c3.close();
+    });
+    await step(`${label}: paying customer manages the subscription from Formules`,async()=>{
+      const b4=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true,plan:'pro',subscription_status:'active',stripe_customer_id:'cus_e2e',stripe_subscription_id:'sub_e2e',subscription_cancel_at_period_end:true,subscription_current_period_end:new Date(Date.now()+12*DAY).toISOString()}});
+      const c4=await newContext(browser,vp,b4,{loggedIn:true});const p4=await c4.newPage();
+      await p4.goto(BASE+'/?view=plans');await p4.waitForSelector('.plans-view');
+      assert.match(await p4.locator('.plans-view').innerText(),/Abonnement résilié : Pro jusqu’au/);
+      await p4.getByRole('button',{name:'Gérer mon abonnement'}).click();
+      await p4.waitForURL(/__e2e\/stripe-portal/);
+      await c4.close();
+    });
     assert.deepEqual(errors,[],`${label}: no page errors`);
     await ctx.close();
   }
@@ -158,4 +190,4 @@ try{
   try{ if(mode==='screenshots')await screenshots(browser);else await flows(browser); }
   finally{ await browser.close(); }
 }catch(e){console.error(e);console.error(vite.log().slice(-2000));process.exitCode=1;}
-finally{vite.child.kill();}
+finally{try{process.kill(-vite.child.pid,'SIGTERM');}catch{}setTimeout(()=>process.exit(process.exitCode||0),200);}
