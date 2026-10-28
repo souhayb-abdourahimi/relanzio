@@ -38,3 +38,8 @@ test('an old quote is proposed for today instead of catching up the sequence',()
   assert.equal(r.at,'2026-10-28T08:00:00.000Z');
   assert.equal(r.catchUp,true);
 });
+
+test('client email is capped at 254 characters (RFC 5321)',()=>{
+  const long='a'.repeat(250)+'@b.fr';
+  assert.match(parseQuoteContact({email:long,phone:''},isValidEmail).error,/Email invalide/);
+});

@@ -29,9 +29,9 @@ function QuoteActionCard({quote,onPrepare,onMarkDone,onPostpone,onStatus,busy}){
   return <article className={'today-card'+(meta.terminal?' terminal':'')+(meta.daysOverdue>0?' late':'')+(locked?' locked':'')} data-quote-id={quote.id}>
     <div className="today-card-main">
       <div className="today-card-title"><b>{quote.client_name}</b><span>{money(quote.amount)}</span></div>
-      <p>{quote.title}</p>
+      <p className="today-card-subject" title={quote.title}>{quote.title}</p>
       <div className="today-card-meta"><strong>{actionStageLabel(quote)}</strong>{timing&&<span className={meta.daysOverdue>0?'is-late':''}>{timing}</span>}</div>
-      {quote.note&&<p className="today-card-note"><span>Note</span>{quote.note}</p>}
+      {quote.note&&<p className="today-card-note clamp-2" title={quote.note}><span>Note</span>{quote.note}</p>}
       {last&&<p className="today-card-last">Dernière relance : {formatParisDay(last.sent_at||last.created_at)} · {channelLabel(last)}</p>}
       {locked&&<p className="today-card-lock">Lecture seule : au-delà des devis actifs de la formule gratuite.</p>}
     </div>
@@ -69,9 +69,10 @@ export default function TodayView({quotes=[],onPrepare,onMarkDone,onPostpone,onS
       </div>
       {dueOnly&&<button className="filter-chip" onClick={onShowAll}>Filtre : à relancer · <u>Tout afficher</u></button>}
     </div>
+    {!(groups.overdue.length||groups.today.length||groups.future.length)?<p className="today-empty-all">Aucune relance prévue pour l’instant. Chaque devis ajouté apparaît ici le jour où il faut le relancer.</p>:<>
     <Group title="EN RETARD" quotes={groups.overdue} empty="Aucun retard." card={card}/>
     <Group title="AUJOURD’HUI" quotes={groups.today} empty="Rien d’autre à traiter aujourd’hui." card={card}/>
-    {!dueOnly&&!hideFuture&&<Group title="À VENIR" quotes={groups.future} limit={8} empty="Aucune prochaine relance planifiée." card={card}/>}
+    {!dueOnly&&!hideFuture&&<Group title="À VENIR" quotes={groups.future} limit={8} empty="Aucune prochaine relance planifiée." card={card}/>}</>}
   </section>;
 }
 

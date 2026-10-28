@@ -16,9 +16,19 @@ function makeQuotes(count){
   return base.slice(0,count);
 }
 
+// Worst realistic data for break-ui (dev fixture only): schema limits are client_name 120, title 180,
+// note 1000, phone 40, amount 9 999 999 999,99; email has no length limit.
+const WORST=[
+  {id:'w1',client_name:'SCI Les Jardins de la Méditerranée — Résidence Saint-Jean-de-Védas Bâtiment C (syndic Foncia)',client_email:'bartholomew.fitzgerald@northwind-industries-holdings.example.com',client_phone:'+33 (0)6 12 34 56 78',title:'Réfection complète de la toiture-terrasse, reprise des relevés d’étanchéité, remplacement des évacuations EP et mise en sécurité des accès techniques (lot 3)',amount:9999999999.99,status:'open',followup_step:1,next_followup_at:'2026-09-16T07:00:00.000Z',note:'Le gérant attend la validation de l’assemblée générale prévue en novembre ; rappeler après le 15. Interlocuteur : Mme Wiśniewska-Kowalczyk (comptabilité), joignable le matin uniquement, ne pas appeler le vendredi. Devis comparé avec deux autres entreprises.',followups:[{id:'wf',step:1,status:'sent',channel:'relanzio',sent_at:'2026-09-10T08:00:00.000Z'}]},
+  {id:'w2',client_name:'Jo',client_phone:'06 00 00 00 00',title:'Haie',amount:0,status:'open',followup_step:0,next_followup_at:'2026-10-16T08:00:00.000Z'},
+  {id:'w3',client_name:'Nguyễn Thị Ánh Tuyết',client_email:'anh.tuyet@example.vn',title:'Pose de 12 m² de carrelage 🧱 salle d’eau',amount:1234567.89,status:'open',followup_step:3,next_followup_at:null},
+  {id:'w4',client_name:'Établissements Dupont-Moretti & Fils',client_email:'x@y.fr',title:'Devis n° 2026-10-0001234-RENOVATION-CUISINE-ET-SALLE-DE-BAIN-ETAGE',amount:15,status:'open',followup_step:2,next_followup_at:'2026-10-20T07:00:00.000Z'},
+];
+
 function Fixture(){
   const params=new URLSearchParams(location.search),qa=params.get('qa')==='1',count=Math.max(3,Math.min(100,Number(params.get('count')||15)));
-  const[quotes,setQuotes]=useState(()=>makeQuotes(count));
+  const data=params.get('data')||'demo';
+  const[quotes,setQuotes]=useState(()=>data==='worst'?WORST:data==='empty'?[]:data==='one'?makeQuotes(3).slice(0,1):makeQuotes(count));
   const[preview,setPreview]=useState(null);
   const renderStarted=useMemo(()=>performance.now(),[]);
   const prepare=q=>{document.body.dataset.lastAction='prepare';setPreview({quote:q,step:q.followup_step+1,subject:'Suivi — '+q.title,body:'Message initial'})};
@@ -63,7 +73,8 @@ function Fixture(){
     });
   },[qa]);
 
-  return <main className="dash p0-fixture"><TodayView quotes={quotes} now={fixedNow} onPrepare={prepare} onPostpone={postpone} onStatus={status} onEdit={edit}/>
+  const toggle=<nav className="dev-data-toggle" aria-label="Jeu de données (dev)">{['demo','worst','empty','one'].map(x=><a key={x} href={`?data=${x}`} aria-current={data===x?'page':undefined}>{{demo:'Demo data',worst:'Worst case',empty:'Empty',one:'One'}[x]}</a>)}<a href="?count=100" aria-current={data==='demo'&&count===100?'page':undefined}>100 rows</a></nav>;
+  return <main className="dash p0-fixture">{!qa&&toggle}<TodayView quotes={quotes} now={fixedNow} onPrepare={prepare} onPostpone={postpone} onStatus={status} onEdit={edit}/>
     {preview&&<FollowupModal preview={preview} onChange={patch=>setPreview(p=>({...p,...patch}))} onCopy={()=>{document.body.dataset.copyOnly='yes'}} onMarkDone={()=>{document.body.dataset.manualConfirmed='yes';setPreview(null)}} onClose={()=>setPreview(null)}/>}
   </main>
 }

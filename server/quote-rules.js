@@ -67,7 +67,7 @@ export function sanitizeNote(value){
 // A quote needs at least one way to reach the client: a valid email or a valid phone.
 export function parseQuoteContact({email,phone},isValidEmail){
   const e=String(email??'').trim().toLowerCase(),p=normalizePhone(phone);
-  if(e&&!isValidEmail(e))return {error:'Email invalide.'};
+  if(e&&(e.length>254||!isValidEmail(e)))return {error:'Email invalide.'};
   if(p===null)return {error:'Téléphone invalide.'};
   if(!e&&!p)return {error:'Renseignez un email ou un téléphone client.'};
   return {email:e||null,phone:p||null};

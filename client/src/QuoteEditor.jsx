@@ -7,7 +7,7 @@ export function QuoteEditor({form,setForm,editing=false,profile={},saving=false,
   return <form onSubmit={onSubmit} className="quote-editor-form">
     <label>Client<input required maxLength="120" value={form.client_name} onChange={e=>set('client_name',e.target.value)}/></label>
     <div className="two">
-      <label>Email<input type="email" autoComplete="off" inputMode="email" value={form.client_email||''} onChange={e=>set('client_email',e.target.value)}/></label>
+      <label>Email<input type="email" autoComplete="off" inputMode="email" maxLength="254" value={form.client_email||''} onChange={e=>set('client_email',e.target.value)}/></label>
       <label>Téléphone<input type="tel" autoComplete="off" inputMode="tel" maxLength="40" value={form.client_phone||''} onChange={e=>set('client_phone',e.target.value)} placeholder="06 12 34 56 78"/></label>
     </div>
     <small className="field-hint">Email ou téléphone : au moins l’un des deux.</small>
