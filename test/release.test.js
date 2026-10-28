@@ -23,9 +23,11 @@ test('Stripe billing event ordering ignores stale or foreign subscription events
 });
 
 test('Stripe webhook idempotency and ordering guards are present in release source',()=>{
-  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  const server=readFileSync(new URL('../server/stripe-webhook.js',import.meta.url),'utf8');
+  const index=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  assert.match(index,/stripe\.webhooks\.constructEvent\(req\.body, req\.headers\['stripe-signature'\], process\.env\.STRIPE_WEBHOOK_SECRET\)/);
   assert.match(server,/stripe_webhook_events'\)\.insert\(\{event_id:event\.id,event_type:event\.type\}\)/);
-  assert.match(server,/claimError\?\.code === '23505'/);
+  assert.match(server,/claimError\?\.code==='23505'/);
   assert.match(server,/shouldIgnoreBillingEvent/);
   assert.match(server,/stripe_state_event_created/);
 });
@@ -237,7 +239,8 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
     assert.ok(migration.includes(field),field);
   }
   assert.match(schema,/create table if not exists public\.trial_events/);
-  assert.match(server,/app\.post\('\/api\/trial\/start'/);
+  assert.match(server,/async function startTrialOnFirstQuote/);
+  assert.doesNotMatch(server,/app\.post\('\/api\/trial\/start'/);
   assert.match(server,/app\.post\('\/api\/admin\/trials\/grant'/);
   assert.match(server,/expireTrials\(\)/);
   assert.match(server,/hasProAccess\(profile\)/);

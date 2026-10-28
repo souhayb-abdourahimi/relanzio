@@ -17,8 +17,7 @@ import { answerSupport } from './support.js';
 import { buildCeoMetrics, weeklyRecommendations } from './ceo.js';
 import { runLifecycleEmails } from './lifecycle.js';
 import { reportError } from './observability.js';
-import { billingTransition, normalizeSubscriptionStatus, planForSubscriptionStatus, shouldIgnoreBillingEvent } from './billing.js';
-import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, withEntitlements } from './entitlements.js';
+import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, isTrialEligible, withEntitlements } from './entitlements.js';
 import { grantTrialToEmail, grantTrialToUser, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
 import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
@@ -46,10 +45,14 @@ async function recommendedNextFollowupAt(quote,sentDate,profile,now=new Date()){
 }
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 import { rowsToSemicolonCsv } from './export.js';
-import { VAT_NOTICE,PRO_PRICE_LABEL,PRO_MONTHLY_PRICE,monthlyRecurringRevenue } from '../shared/plans.js';
+import { createStripeWebhookProcessor } from './stripe-webhook.js';
+import { runTrialEndingReminders } from './billing-emails.js';
+import { withLocks, lockedQuoteIds, isAllowedLockedPatch } from '../shared/quota.js';
+import { VAT_NOTICE,PRO_PRICE_LABEL,PRO_MONTHLY_PRICE,FREE_LIMIT_TEXT,monthlyRecurringRevenue } from '../shared/plans.js';
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const stripeWebhooks = createStripeWebhookProcessor({db,stripe,getProfile,reportError,sendEmail});
 const __dirname = dirname(fileURLToPath(import.meta.url)); const dist = join(__dirname, '..', 'dist');
 const admins = () => (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 const isAdmin = user => admins().includes((user?.email || '').toLowerCase());
@@ -60,62 +63,16 @@ const shouldApplyProviderStatus = (current,next) => {
   if (next === 'bounced') return true;
   return (providerRank[next] ?? -1) >= (providerRank[current] ?? -1);
 };
-const subscriptionIdFromObject = (obj, profile) => {
-  const direct = typeof obj?.subscription === 'string' ? obj.subscription : obj?.subscription?.id;
-  const parent = typeof obj?.parent?.subscription_details?.subscription === 'string'
-    ? obj.parent.subscription_details.subscription
-    : obj?.parent?.subscription_details?.subscription?.id;
-  return direct || parent || profile?.stripe_subscription_id || null;
-};
-async function authoritativeBillingTransition(eventType,obj,profile={plan:'free',subscription_status:'none'}) {
-  const subscriptionId = ['customer.subscription.updated','customer.subscription.deleted'].includes(eventType)
-    ? obj?.id
-    : subscriptionIdFromObject(obj,profile);
-  if (stripe && subscriptionId) {
-    try {
-      const current = await stripe.subscriptions.retrieve(subscriptionId);
-      const status = normalizeSubscriptionStatus(current.status);
-      return { transition:{plan:planForSubscriptionStatus(status),subscription_status:status}, subscriptionId:current.id };
-    } catch (e) {
-      if (eventType === 'customer.subscription.deleted' && (e?.code === 'resource_missing' || e?.statusCode === 404)) {
-        return { transition:{plan:'free',subscription_status:'canceled'}, subscriptionId };
-      }
-      throw e;
-    }
-  }
-  return { transition:billingTransition(eventType,obj,profile), subscriptionId };
-}
 async function mustDb(promise) {
   const result = await promise;
   if (result.error) throw result.error;
   return result.data;
 }
-async function applyStripeBillingEvent(profile,event,obj,extra={}) {
-  if(!profile||shouldIgnoreBillingEvent(profile,event.type,obj,event.created))return {applied:false,ignored:true};
-  const state=await authoritativeBillingTransition(event.type,obj,profile);
-  const eventCreated=Number(event.created||0);
-  const patch={...state.transition,...extra,updated_at:nowIso()};
-  if(eventCreated)patch.stripe_state_event_created=eventCreated;
-  const subscriptionId=state.subscriptionId||extra.stripe_subscription_id;
-  if(subscriptionId!==undefined)patch.stripe_subscription_id=subscriptionId||null;
-  let query=db.from('profiles').update(patch).eq('id',profile.id);
-  if(eventCreated)query=query.lte('stripe_state_event_created',eventCreated);
-  const {data,error}=await query.select('id').maybeSingle();
-  if(error)throw error;
-  return {applied:Boolean(data),ignored:!data};
-}
-
 app.use(helmet({ contentSecurityPolicy: process.env.NODE_ENV === 'production' ? { directives:{ defaultSrc:["'self'"],scriptSrc:["'self'"],styleSrc:["'self'","'unsafe-inline'"],imgSrc:["'self'",'data:'],connectSrc:["'self'",'https://*.supabase.co'],frameAncestors:["'none'"],baseUri:["'self'"],formAction:["'self'"] } } : false, crossOriginEmbedderPolicy:false }));
 app.use(cors({ origin:process.env.NODE_ENV === 'production' ? process.env.APP_URL : true, credentials:false }));
 app.use((req,res,next)=>{ req.requestId=crypto.randomUUID(); res.setHeader('X-Request-Id',req.requestId); next(); });
 app.use(rateLimit({ windowMs:60_000, max:180 }));
 
-
-async function profileByCustomer(customerId) {
-  if (!customerId) return null;
-  const { data } = await db.from('profiles').select('*').eq('stripe_customer_id', customerId).maybeSingle();
-  return data;
-}
 
 // Raw body must come before express.json.
 app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async (req,res)=>{
@@ -123,32 +80,7 @@ app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async 
   let event;
   try {
     event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
-    const { error:claimError } = await db.from('stripe_webhook_events').insert({event_id:event.id,event_type:event.type});
-    if (claimError?.code === '23505') return res.json({received:true,duplicate:true});
-    if (claimError) throw claimError;
-    try {
-      const obj = event.data.object;
-      if (event.type === 'checkout.session.completed') {
-        const userId=obj.metadata?.user_id, customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id;
-        if(userId){
-          const profile=await getProfile({id:userId,email:obj.customer_details?.email||''});
-          await applyStripeBillingEvent(profile,event,obj,{stripe_customer_id:customerId||profile.stripe_customer_id||null});
-        }
-      }
-      if (['customer.subscription.updated','customer.subscription.deleted'].includes(event.type)) {
-        const customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id, profile=await profileByCustomer(customerId);
-        if(profile)await applyStripeBillingEvent(profile,event,obj,{stripe_subscription_id:obj.id||profile.stripe_subscription_id});
-      }
-      if (['invoice.payment_failed','invoice.paid'].includes(event.type)) {
-        const customerId=typeof obj.customer==='string'?obj.customer:obj.customer?.id, profile=await profileByCustomer(customerId);
-        if(profile)await applyStripeBillingEvent(profile,event,obj,{});
-      }
-      await mustDb(db.from('stripe_webhook_events').update({processed_at:nowIso()}).eq('event_id',event.id));
-      res.json({received:true});
-    } catch(e) {
-      await db.from('stripe_webhook_events').delete().eq('event_id',event.id);
-      throw e;
-    }
+    res.json(await stripeWebhooks.processEvent(event));
   } catch(e) {
     await reportError('stripe.webhook',e,{event_id:event?.id||null,event_type:event?.type||null,request_id:req.requestId});
     res.status(400).send('Webhook processing failed');
@@ -201,15 +133,6 @@ app.post('/api/email/unsubscribe', rateLimit({windowMs:60_000,max:30}), async(re
 app.post('/api/activity', requireUser, async(req,res)=>{try{await db.from('product_events').insert({user_id:req.user.id,event:'app_active',path:sanitizeText(req.body.path||'/app',200)});res.status(202).json({ok:true})}catch(e){res.status(202).json({ok:false})}});
 
 app.get('/api/profile', requireUser, async(req,res)=>{ try{res.json({profile:await getProfile(req.user)})}catch(e){res.status(500).json({error:e.message})} });
-app.post('/api/trial/start', requireUser, rateLimit({windowMs:60_000,max:5}), async(req,res)=>{
-  try{
-    const profile=await grantTrialToUser(req.user,'self_service');
-    res.status(201).json({profile});
-  }catch(e){
-    const status=e.code==='PROFILE_NOT_FOUND'?404:e.code==='TRIAL_ALREADY_USED'||e.code==='ALREADY_PRO'?409:500;
-    res.status(status).json({error:e.message,code:e.code||'TRIAL_START_FAILED'});
-  }
-});
 app.patch('/api/profile', requireUser, async(req,res)=>{
   try{
     const profile=await getProfile(req.user), patch={updated_at:nowIso()};
@@ -228,9 +151,32 @@ app.patch('/api/profile', requireUser, async(req,res)=>{
   }catch(e){res.status(500).json({error:e.message})}
 });
 
+// The 7-day Pro trial starts by itself when the account adds a quote for the first time it is eligible
+// (never used a trial, never subscribed). grantTrialToUser is conditional on trial_started_at IS NULL,
+// so concurrent requests cannot start it twice.
+async function startTrialOnFirstQuote(user,profile){
+  if(!isTrialEligible(profile))return profile;
+  try{
+    const updated=await grantTrialToUser(user,'first_quote');
+    await db.from('product_events').insert({user_id:user.id,event:'trial_started',path:'/app'});
+    return updated;
+  }catch(e){
+    if(!['TRIAL_ALREADY_USED','ALREADY_PRO'].includes(e.code))await reportError('trial.first_quote',e,{user_id:user.id});
+    return getProfile(user);
+  }
+}
+// A quote is locked (read-only) when the account has more active quotes than its plan allows: see shared/quota.js.
+async function isQuoteLocked(quote,profile){
+  if(!quote||!['open','paused'].includes(quote.status)||hasProAccess(profile))return false;
+  const {data,error}=await db.from('quotes').select('id,status,created_at').eq('user_id',quote.user_id).in('status',['open','paused']);
+  if(error)throw error;
+  return lockedQuoteIds(data||[],false).has(quote.id);
+}
+const LOCKED_MESSAGE=`Ce devis est en lecture seule : la formule gratuite permet ${FREE_LIMIT_TEXT}. Marquez un devis gagné ou perdu pour libérer une place, ou passez à Pro.`;
+
 app.get('/api/quotes', requireUser, async(req,res)=>{
   try{
-    await getProfile(req.user);
+    const profile=await getProfile(req.user);
     const [{data:quotes,error},{data:followups,error:followupError}]=await Promise.all([
       db.from('quotes').select('*').eq('user_id',req.user.id).order('created_at',{ascending:false}),
       db.from('followups').select('id,quote_id,step,status,channel,sent_at,created_at').eq('user_id',req.user.id).order('created_at',{ascending:true}).limit(500)
@@ -238,7 +184,7 @@ app.get('/api/quotes', requireUser, async(req,res)=>{
     if(error)throw error;if(followupError)throw followupError;
     const history=new Map();
     for(const item of followups||[]){const list=history.get(item.quote_id)||[];list.push(item);history.set(item.quote_id,list)}
-    const hydrated=(quotes||[]).map(q=>({...q,followups:history.get(q.id)||[]}));
+    const hydrated=withLocks(quotes||[],hasProAccess(profile)).map(q=>({...q,followups:history.get(q.id)||[]}));
     res.json({quotes:hydrated,metrics:quoteMetrics(quotes||[])});
   }catch(e){res.status(500).json({error:e.message})}
 });
@@ -281,8 +227,13 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
     const data=created?.quote;
     const idempotent=Boolean(created?.idempotent);
     if(!profile.activated_at&&!idempotent)await db.from('profiles').update({activated_at:nowIso(),updated_at:nowIso()}).eq('id',req.user.id);
-    if(!idempotent)await db.from('product_events').insert({user_id:req.user.id,event:'quote_created',path:'/app'});
-    res.status(idempotent?200:201).json({quote:data,idempotent});
+    let currentProfile=profile;
+    if(!idempotent){
+      const {count:quoteCount}=await db.from('quotes').select('id',{count:'exact',head:true}).eq('user_id',req.user.id);
+      await db.from('product_events').insert({user_id:req.user.id,event:quoteCount===1?'first_quote_added':'quote_created',path:'/app'});
+      currentProfile=await startTrialOnFirstQuote(req.user,profile);
+    }
+    res.status(idempotent?200:201).json({quote:data,idempotent,profile:currentProfile});
   }catch(e){await reportError('quotes.create',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de créer le devis.',request_id:req.requestId})}
 });
 app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
@@ -292,6 +243,7 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
       getProfile(req.user)
     ]);
     if (findError) throw findError; if (!existing) return res.status(404).json({error:'Devis introuvable.'});
+    if (!isAllowedLockedPatch(req.body) && await isQuoteLocked(existing,profile)) return res.status(423).json({error:LOCKED_MESSAGE,code:'QUOTE_LOCKED'});
     const patch={updated_at:nowIso()};
     const claimTime=existing.send_claimed_at?new Date(existing.send_claimed_at).getTime():NaN;
     const claimFresh=Number.isFinite(claimTime)&&claimTime>Date.now()-5*60_000;
@@ -380,12 +332,13 @@ app.delete('/api/quotes/:id', requireUser, async(req,res)=>{
   } catch(e){await reportError('quotes.delete',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de supprimer le devis.',request_id:req.requestId});}
 });
 app.get('/api/quotes/:id/followup-preview', requireUser, async(req,res)=>{
-  try { const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]); if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});res.json({preview:await createFollowupPreview(quote,profile)}); } catch(e){if(e.message==='SEQUENCE_COMPLETE')return res.status(409).json({error:'Séquence terminée.'});await reportError('followup.preview',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de préparer la relance.',request_id:req.requestId});}
+  try { const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]); if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});if(await isQuoteLocked(quote,profile))return res.status(423).json({error:LOCKED_MESSAGE,code:'QUOTE_LOCKED'});res.json({preview:await createFollowupPreview(quote,profile)}); } catch(e){if(e.message==='SEQUENCE_COMPLETE')return res.status(409).json({error:'Séquence terminée.'});await reportError('followup.preview',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de préparer la relance.',request_id:req.requestId});}
 });
 app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
   try {
     const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]);
     if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});
+    if(await isQuoteLocked(quote,profile))return res.status(423).json({error:LOCKED_MESSAGE,code:'QUOTE_LOCKED'});
     if(!hasProAccess(profile))return res.status(403).json({error:'L’envoi depuis Relanzio nécessite des droits Pro actifs.'});
     if(!quote.client_email)return res.status(409).json({error:'Ajoutez l’email du client pour envoyer depuis Relanzio, ou relancez-le par téléphone / SMS.'});
     const subject=sanitizeText(req.body?.subject,200),body=sanitizeText(req.body?.body,10000);
@@ -403,7 +356,11 @@ app.post('/api/quotes/:id/confirm-manual-followup', requireUser, rateLimit({wind
     const step=Number(req.body?.step),requestKey=sanitizeText(req.get('Idempotency-Key'),100);
     const subject=sanitizeText(req.body?.subject,200),body=sanitizeText(req.body?.body,10000);
     if(!Number.isInteger(step)||step<1||step>3||!requestKey)return res.status(400).json({error:'Confirmation de relance invalide.'});
+    const [{data:lockQuote,error:lockError},lockProfile]=await Promise.all([db.from('quotes').select('id,user_id,status,created_at').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]);
+    if(lockError)throw lockError;
+    if(await isQuoteLocked(lockQuote,lockProfile))return res.status(423).json({error:LOCKED_MESSAGE,code:'QUOTE_LOCKED'});
     const result=await confirmManualFollowup({quoteId:req.params.id,userId:req.user.id,expectedStep:step,subject,body,requestKey});
+    if(!result.idempotent)await db.from('product_events').insert({user_id:req.user.id,event:'followup_marked_done',path:'/app',metadata:{step}});
     res.json({confirmed:true,idempotent:Boolean(result.idempotent),quote:result.quote,followup:result.followup});
   }catch(e){
     if(e.code==='QUOTE_NOT_FOUND')return res.status(404).json({error:'Devis introuvable.'});
@@ -679,6 +636,7 @@ cron.schedule('*/10 * * * *',async()=>{try{const result=await processOutreachQue
 cron.schedule('*/10 * * * *',async()=>{try{await pollImapReplies()}catch(e){await reportError('cron.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})}},{noOverlap:true});
 cron.schedule('3,13,23,33,43,53 * * * *',async()=>{try{await runCommercialQueueFeeder()}catch(e){await reportError('cron.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'})}},{noOverlap:true});
 cron.schedule('*/5 * * * *',async()=>{try{await runCommercialSequenceTick()}catch(e){await reportError('cron.commercial-sequence',e,{code:e?.code||'COMMERCIAL_SEQUENCE_FAILED'})}},{noOverlap:true});
+cron.schedule('5 10 * * *',async()=>{try{await runTrialEndingReminders({db,sendOnce:stripeWebhooks.sendOnce})}catch(e){await reportError('cron.trial-ending',e)}},{noOverlap:true,timezone:'Europe/Paris'});
 cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
 
 app.use((err,req,res,next)=>{
