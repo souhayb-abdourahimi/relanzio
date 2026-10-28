@@ -46,7 +46,7 @@ test('release source contains required self-service routes and safety gates',()=
   const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
   assert.match(outreach,/ACQUISITION_ENABLED!=='true'/);
   assert.match(controlled,/COMMERCIAL_OUTREACH_SEND_ENABLED!=='true'/);
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   for(const path of ['/pricing','/docs','/faq','/contact','/reset-password'])assert.ok(client.includes(path),path);
   assert.match(client,/updateUser\(\{password:p1\}\)/);
 });
@@ -104,7 +104,7 @@ test('Stripe customer is stable while checkout idempotency is versioned per clai
 
 test('pricing and Stripe checkout stay aligned with VAT-exempt micro-enterprise configuration',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   const subscription=readFileSync(new URL('../client/src/subscription-display.js',import.meta.url),'utf8');
   const legal=readFileSync(new URL('../client/src/LegalPage.jsx',import.meta.url),'utf8');
@@ -125,7 +125,7 @@ test('pricing and Stripe checkout stay aligned with VAT-exempt micro-enterprise 
 
 test('production capabilities remain independently gated',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   assert.match(server,/BILLING_ENABLED!=='true'/);
   const outreach=readFileSync(new URL('../server/outreach.js',import.meta.url),'utf8');
   const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
@@ -137,7 +137,7 @@ test('production capabilities remain independently gated',()=>{
 });
 
 test('public site uses role-based Relanzio contact addresses and no persistent audience id',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const lifecycle=readFileSync(new URL('../server/lifecycle.js',import.meta.url),'utf8');
   assert.match(client,/support@relanzio\.com/);
   assert.match(client,/contact@relanzio\.com/);
@@ -197,7 +197,7 @@ test('launch build uses lockfile installs in CI and Docker',()=>{
 });
 
 test('public launch copy uses explicit account and trial CTAs without inventing payment',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   assert.match(client,/Créer un compte gratuit/);
   assert.match(plans,/il démarre automatiquement à l’ajout de votre premier devis/);
@@ -214,7 +214,7 @@ test('privacy copy includes direct B2B opposition right',()=>{
 
 
 test('compact mobile navigation remains accessible',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const css=readFileSync(new URL('../client/src/styles.css',import.meta.url),'utf8');
   assert.match(client,/aria-label="Navigation de l’application"/);
   assert.match(client,/aria-label="Tableau de bord"/);
@@ -231,7 +231,7 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   const migration=readFileSync(new URL('../supabase/migrations/006_pro_trial_7d.sql',import.meta.url),'utf8');
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
   const followups=readFileSync(new URL('../server/followups.js',import.meta.url),'utf8');
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const trialUi=readFileSync(new URL('../client/src/TrialStatus.jsx',import.meta.url),'utf8');
   const trialDisplay=readFileSync(new URL('../client/src/trial-display.js',import.meta.url),'utf8');
   for(const field of ['trial_started_at','trial_ends_at','trial_expired_at']){
@@ -283,7 +283,7 @@ test('production SPA fallback serves only known routes and 404s scanner paths',(
 
 
 test('signup pins confirmation redirect and records acceptance metadata',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   assert.match(client,/emailRedirectTo:location\.origin\+'\/'/);
   assert.match(client,/terms_accepted_at:new Date\(\)\.toISOString\(\)/);
   assert.match(client,/terms_version:'2026-10-16'/);

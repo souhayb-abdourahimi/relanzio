@@ -55,7 +55,7 @@ function QuoteActionCard({quote,onPrepare,onMarkDone,onPostpone,onStatus,busy}){
   </article>;
 }
 
-export default function TodayView({quotes=[],onPrepare,onMarkDone,onPostpone,onStatus,busyId=null,dueOnly=false,onShowAll,now=new Date()}){
+export default function TodayView({quotes=[],onPrepare,onMarkDone,onPostpone,onStatus,busyId=null,dueOnly=false,hideFuture=false,onShowAll,now=new Date()}){
   const groups=useMemo(()=>buildTodayGroups(quotes,now),[quotes,now instanceof Date?now.getTime():String(now)]);
   const actionCount=groups.overdue.length+groups.today.length;
   const atStake=[...groups.overdue,...groups.today].reduce((s,q)=>s+Number(q.amount||0),0);
@@ -71,7 +71,7 @@ export default function TodayView({quotes=[],onPrepare,onMarkDone,onPostpone,onS
     </div>
     <Group title="EN RETARD" quotes={groups.overdue} empty="Aucun retard." card={card}/>
     <Group title="AUJOURD’HUI" quotes={groups.today} empty="Rien d’autre à traiter aujourd’hui." card={card}/>
-    {!dueOnly&&<Group title="À VENIR" quotes={groups.future} limit={8} empty="Aucune prochaine relance planifiée." card={card}/>}
+    {!dueOnly&&!hideFuture&&<Group title="À VENIR" quotes={groups.future} limit={8} empty="Aucune prochaine relance planifiée." card={card}/>}
   </section>;
 }
 
