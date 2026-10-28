@@ -26,7 +26,7 @@ function QuoteActionCard({quote,onPrepare,onMarkDone,onPostpone,onStatus,busy}){
   const locked=Boolean(quote.locked);
   const toggle=name=>setOpen(x=>x===name?null:name);
   const timing=meta.daysOverdue>0?overdueLabel(meta.daysOverdue):quote.next_followup_at?formatParisDateTime(quote.next_followup_at):'';
-  return <article className={'today-card'+(meta.terminal?' terminal':'')+(meta.daysOverdue>0?' late':'')+(locked?' locked':'')} data-quote-id={quote.id}>
+  return <article className={'today-card'+(meta.terminal?' terminal':'')+(meta.daysOverdue>0?' late':'')+(locked?' locked':'')} data-quote-id={quote.id} aria-busy={busy||undefined}>
     <div className="today-card-main">
       <div className="today-card-title"><b>{quote.client_name}</b><span>{money(quote.amount)}</span></div>
       <p className="today-card-subject" title={quote.title}>{quote.title}</p>

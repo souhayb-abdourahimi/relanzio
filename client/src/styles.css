@@ -229,3 +229,7 @@ button,.btn,.mini-btn{-webkit-user-select:none;user-select:none}
 .today-card-main p.today-card-subject,.clamp-2{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 .today-card-actions{align-self:start}
 .today-empty-all{margin:0;padding:22px 18px;background:white;border:1px dashed var(--line);border-radius:15px;color:var(--muted);font-size:14px}
+/* find-animation-opportunities: the only motion kept — the card dims the moment an action is sent,
+   so the user sees it was taken into account before the list refreshes. */
+.today-card{transition:opacity 150ms var(--ease-out)}
+.today-card[aria-busy="true"]{opacity:.5}
