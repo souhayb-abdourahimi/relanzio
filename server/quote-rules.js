@@ -47,3 +47,28 @@ export function parseCustomFollowupAt(value,now=new Date()){
   if(d.getTime()<current.getTime()-60_000)return null;
   return d.toISOString();
 }
+
+export const MAX_NOTE_LENGTH = 1000;
+
+// French and international numbers: keep the user's formatting, require 6 to 15 digits.
+export function normalizePhone(value){
+  const v=String(value??'').trim().replace(/\s+/g,' ');
+  if(!v)return '';
+  if(v.length>40||!/^\+?[\d\s.()\-]+$/.test(v))return null;
+  const digits=v.replace(/\D/g,'').length;
+  return digits>=6&&digits<=15?v:null;
+}
+
+export function sanitizeNote(value){
+  const v=String(value??'').replace(/\r\n/g,'\n').trim();
+  return v?v.slice(0,MAX_NOTE_LENGTH):null;
+}
+
+// A quote needs at least one way to reach the client: a valid email or a valid phone.
+export function parseQuoteContact({email,phone},isValidEmail){
+  const e=String(email??'').trim().toLowerCase(),p=normalizePhone(phone);
+  if(e&&!isValidEmail(e))return {error:'Email invalide.'};
+  if(p===null)return {error:'Téléphone invalide.'};
+  if(!e&&!p)return {error:'Renseignez un email ou un téléphone client.'};
+  return {email:e||null,phone:p||null};
+}

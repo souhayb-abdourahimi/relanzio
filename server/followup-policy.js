@@ -58,3 +58,11 @@ export function shouldArmInitialAutoSend(wantsAuto,nextFollowupAt,now=new Date()
   const target=new Date(nextFollowupAt).getTime(),current=now instanceof Date?now.getTime():new Date(now).getTime();
   return Number.isFinite(target)&&Number.isFinite(current)&&target>current;
 }
+
+// First follow-up of a newly added quote. Recommended date = sent date + first cadence offset,
+// at 09:00 Paris. A quote sent long ago is never "caught up": its first follow-up is proposed today.
+export function initialRecommendedFollowupAt(sentDate,now=new Date(),firstOffsetDays=2){
+  const today=parisBusinessDate(now);
+  const target=addDaysToDateKey(sentDate,firstOffsetDays);
+  return {at:parisLocalDateTimeToIso(target<today?today:target,9,0),catchUp:target<today};
+}

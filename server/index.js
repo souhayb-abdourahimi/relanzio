@@ -26,8 +26,8 @@ import { safeImportCommercialProspects, prepareCommercialProspect, inspectCommer
 import { stageCommercialCandidates, runCommercialQueueFeeder } from './commercial-feeder.js';
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { pollImapReplies } from './imap-replies.js';
-import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt } from './quote-rules.js';
-import { shouldArmInitialAutoSend } from './followup-policy.js';
+import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt, parseQuoteContact, sanitizeNote } from './quote-rules.js';
+import { shouldArmInitialAutoSend, initialRecommendedFollowupAt } from './followup-policy.js';
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 import { rowsToSemicolonCsv } from './export.js';
 import { VAT_NOTICE,PRO_PRICE_LABEL,PRO_MONTHLY_PRICE,monthlyRecurringRevenue } from '../shared/plans.js';
@@ -193,17 +193,20 @@ app.get('/api/quotes', requireUser, async(req,res)=>{
 app.post('/api/quotes', requireUser, async(req,res)=>{
   try{
     const profile=await getProfile(req.user);
-    const {client_name,client_email,title,amount,sent_at,auto_send}=req.body, email=normalizeEmail(client_email);
+    const {client_name,client_email,client_phone,title,amount,sent_at,auto_send}=req.body;
+    const contact=parseQuoteContact({email:client_email,phone:client_phone},isValidEmail);
+    if(contact.error)return res.status(400).json({error:contact.error});
+    const email=contact.email;
     const parsedAmount=parseQuoteAmount(amount), parsedDate=parseSentDate(sent_at), requestKey=sanitizeText(req.get('Idempotency-Key'),100)||null;
-    if(!sanitizeText(client_name,120)||!isValidEmail(email)||!sanitizeText(title,180)||parsedAmount===null||!parsedDate)return res.status(400).json({error:'Champs invalides.'});
+    if(!sanitizeText(client_name,120)||!sanitizeText(title,180)||parsedAmount===null||!parsedDate)return res.status(400).json({error:'Champs invalides.'});
     if(requestKey){const {data:prior,error:priorError}=await db.from('quotes').select('*').eq('user_id',req.user.id).eq('request_key',requestKey).maybeSingle();if(priorError)throw priorError;if(prior)return res.json({quote:prior,idempotent:true});}
     const limit=activeQuoteLimit(hasProAccess(profile));
     const requestedMode=('followup_schedule_mode' in req.body)?normalizeFollowupScheduleMode(req.body.followup_schedule_mode):(('next_followup_at' in req.body)?'custom':'recommended');
     if(!requestedMode)return res.status(400).json({error:'Mode de prochaine relance invalide.'});
     let nextFollowupAt=null;
-    if(requestedMode==='recommended')nextFollowupAt=nextDate(parsedDate,0);
+    if(requestedMode==='recommended')nextFollowupAt=initialRecommendedFollowupAt(parsedDate).at;
     if(requestedMode==='custom'){nextFollowupAt=parseCustomFollowupAt(req.body.next_followup_at);if(!nextFollowupAt)return res.status(400).json({error:'La prochaine relance personnalisée doit être une date future valide.'});}
-    const requestedAutoSend=requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'&&Boolean(auto_send);
+    const requestedAutoSend=Boolean(email)&&requestedMode!=='none'&&hasProAccess(profile)&&profile.email_mode==='automatic'&&Boolean(auto_send);
     const safeAutoSend=shouldArmInitialAutoSend(requestedAutoSend,nextFollowupAt);
     const {data:created,error:createError}=await db.rpc('create_quote_with_quota',{
       p_user_id:req.user.id,
@@ -217,7 +220,9 @@ app.post('/api/quotes', requireUser, async(req,res)=>{
       p_auto_send:safeAutoSend,
       p_followup_step:0,
       p_followup_schedule_mode:requestedMode,
-      p_next_followup_at:nextFollowupAt
+      p_next_followup_at:nextFollowupAt,
+      p_client_phone:contact.phone,
+      p_note:sanitizeNote(req.body.note)
     });
     if(createError?.message?.startsWith('ACTIVE_QUOTE_LIMIT:'))return res.status(403).json({error:`Votre formule est limitée à ${limit} devis actifs (en attente ou en pause).`});
     if(createError)throw createError;
@@ -279,7 +284,12 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
 
     if ('status' in req.body) { patch.status=targetStatus; patch.won_at=targetStatus==='won'?nowIso():null; }
     if ('client_name' in req.body) { const v=sanitizeText(req.body.client_name,120); if(!v)return res.status(400).json({error:'Client invalide.'}); patch.client_name=v; }
-    if ('client_email' in req.body) { const v=normalizeEmail(req.body.client_email); if(!isValidEmail(v))return res.status(400).json({error:'Email invalide.'}); patch.client_email=v; }
+    if ('client_email' in req.body||'client_phone' in req.body) {
+      const contact=parseQuoteContact({email:'client_email' in req.body?req.body.client_email:existing.client_email,phone:'client_phone' in req.body?req.body.client_phone:existing.client_phone},isValidEmail);
+      if(contact.error)return res.status(400).json({error:contact.error});
+      patch.client_email=contact.email; patch.client_phone=contact.phone;
+    }
+    if ('note' in req.body) patch.note=sanitizeNote(req.body.note);
     if ('title' in req.body) { const v=sanitizeText(req.body.title,180); if(!v)return res.status(400).json({error:'Objet invalide.'}); patch.title=v; }
     if ('amount' in req.body) { const v=parseQuoteAmount(req.body.amount); if(v===null)return res.status(400).json({error:'Montant invalide.'}); patch.amount=v; }
     if ('sent_at' in req.body) patch.sent_at=sentDate;
@@ -296,6 +306,7 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
       patch.auto_send=wantsAuto;
     }
     if(targetStatus!=='open')patch.auto_send=false;
+    if(!('client_email' in patch?patch.client_email:existing.client_email))patch.auto_send=false;
 
     const {data,error}=await db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id).select('*').single();
     if(error)throw error; res.json({quote:data});
@@ -324,6 +335,7 @@ app.post('/api/quotes/:id/send-followup', requireUser, async(req,res)=>{
     const [{data:quote,error},profile]=await Promise.all([db.from('quotes').select('*').eq('id',req.params.id).eq('user_id',req.user.id).maybeSingle(),getProfile(req.user)]);
     if(error)throw error;if(!quote)return res.status(404).json({error:'Devis introuvable.'});if(quote.status!=='open')return res.status(409).json({error:'Ce devis n’est pas ouvert.'});
     if(!hasProAccess(profile))return res.status(403).json({error:'L’envoi depuis Relanzio nécessite des droits Pro actifs.'});
+    if(!quote.client_email)return res.status(409).json({error:'Ajoutez l’email du client pour envoyer depuis Relanzio, ou relancez-le par téléphone / SMS.'});
     const subject=sanitizeText(req.body?.subject,200),body=sanitizeText(req.body?.body,10000);
     const result=await sendQuoteFollowup(quote,profile,sanitizeText(req.get('Idempotency-Key'),100)||null,{subject:subject||null,body:body||null});
     res.json({sent:true,result});
@@ -429,9 +441,9 @@ app.get('/api/account/export', requireUser, async(req,res)=>{
 });
 app.get('/api/quotes/export.csv', requireUser, async(req,res)=>{
   try{
-    const {data,error}=await db.from('quotes').select('client_name,client_email,title,amount,sent_at,status,followup_step,followup_schedule_mode,next_followup_at,created_at,updated_at').eq('user_id',req.user.id).order('created_at',{ascending:true});
+    const {data,error}=await db.from('quotes').select('client_name,client_email,client_phone,title,amount,sent_at,status,followup_step,followup_schedule_mode,next_followup_at,note,created_at,updated_at').eq('user_id',req.user.id).order('created_at',{ascending:true});
     if(error)throw error;
-    const header=['client_name','client_email','title','amount','sent_at','status','followup_step','followup_schedule_mode','next_followup_at','created_at','updated_at'];
+    const header=['client_name','client_email','client_phone','title','amount','sent_at','status','followup_step','followup_schedule_mode','next_followup_at','note','created_at','updated_at'];
     const csv=rowsToSemicolonCsv(data||[],header);
     res.type('text/csv; charset=utf-8').setHeader('Content-Disposition','attachment; filename="relanzio-devis.csv"');
     res.send(csv);

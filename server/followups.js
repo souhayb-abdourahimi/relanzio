@@ -140,7 +140,7 @@ export async function runDueFollowups(now=new Date()) {
   if (process.env.FOLLOWUP_AUTOMATION_ENABLED !== 'true') return [{ skipped:'automation_disabled' }];
   if(!isAutomaticSendWindow(now))return [{skipped:'outside_business_window'}];
   const nowIso=now.toISOString();
-  const { data: quotes, error } = await db.from('quotes').select('*').eq('status','open').eq('auto_send',true).lte('next_followup_at',nowIso).lt('followup_step',3).order('next_followup_at',{ascending:true}).limit(100);
+  const { data: quotes, error } = await db.from('quotes').select('*').eq('status','open').eq('auto_send',true).lte('next_followup_at',nowIso).lt('followup_step',3).not('client_email','is',null).order('next_followup_at',{ascending:true}).limit(100);
   if (error) throw error;
   const results = [];
   for (const quote of quotes || []) {
