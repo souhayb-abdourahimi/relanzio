@@ -145,6 +145,24 @@ async function flows(browser){
       await page.waitForURL(/__e2e\/stripe-checkout/);
       assert.ok(backend.state.calls.some(c=>c.path==='/billing/checkout'));
     });
+    if(label==='mobile')await step('mobile: 3 relances processed from the Today view (taps counted)',async()=>{
+      const due=[0,1,2].map(i=>({id:`d${i}`,client_name:`Client ${i}`,client_phone:'06 12 34 56 7'+i,title:`Devis ${i}`,amount:1500,followup_step:0,next_followup_at:new Date(Date.now()-DAY).toISOString()}));
+      const b5=createFakeBackend({seedQuotes:due,profile:{company_name:'Toitures Martin',onboarding_completed:true}});
+      const c5=await newContext(browser,vp,b5,{loggedIn:true});const p5=await c5.newPage();
+      await p5.goto(BASE+'/');await p5.waitForSelector('.today-card');
+      const started=Date.now();let taps=0;
+      for(let i=0;i<3;i++){
+        await p5.locator('.today-card').filter({hasText:'Relance 1/3'}).first().getByRole('button',{name:'Relancer'}).tap();taps++;
+        await p5.waitForSelector('.preview-modal');
+        assert.ok(await p5.getByRole('link',{name:'SMS'}).isVisible());
+        await p5.getByRole('dialog').getByRole('button',{name:'Relance faite'}).tap();taps++;
+        await p5.waitForSelector('.preview-modal',{state:'detached'});
+      }
+      await p5.waitForFunction(()=>!document.body.innerText.includes('Relance 1/3'));
+      assert.ok(b5.state.quotes.every(q=>q.followup_step===1));
+      results.push(`INFO mobile: 3 relances recorded with ${taps} taps (+1 tap per SMS/call in the user's own app), scripted run ${Date.now()-started} ms`);
+      await c5.close();
+    });
     await step(`${label}: free account above the limit sees read-only quotes and can still close them`,async()=>{
       const quotes=Array.from({length:7},(_,i)=>({id:`l${i}`,client_name:`Client ${i}`,client_email:`c${i}@example.test`,title:`Devis ${i}`,amount:1000+i,followup_step:0,next_followup_at:new Date(Date.now()-DAY).toISOString(),created_at:new Date(Date.now()-(10-i)*DAY).toISOString()}));
       const b2=createFakeBackend({seedQuotes:quotes,profile:{company_name:'Toitures Martin',onboarding_completed:true,trial_started_at:new Date(Date.now()-10*DAY).toISOString(),trial_ends_at:new Date(Date.now()-3*DAY).toISOString(),trial_expired_at:new Date(Date.now()-3*DAY).toISOString()}});

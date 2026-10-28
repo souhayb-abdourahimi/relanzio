@@ -169,3 +169,13 @@ button,.btn,.mini-btn{-webkit-user-select:none;user-select:none}
 .funnel li b{font-size:18px}
 .funnel li em{font-style:normal;color:var(--muted);font-size:12px;text-align:right}
 @media (max-width:760px){.funnel-cols{grid-template-columns:1fr}}
+.preview-modal input,.preview-modal textarea,.quote-editor-form input,.quote-editor-form textarea,.quote-editor-form select{font-weight:400}
+.preview-modal .today-card-note{margin:0 0 12px}
+@media (max-width:760px){
+  .dash-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .dash-head h1{font-size:30px;margin:2px 0}
+  .dash-head p{font-size:13px}
+  .dash-head .btn{flex:none;min-height:44px;padding:10px 14px}
+  .today-view-head h2{font-size:22px}
+}
+@media (min-width:761px){.today-card-actions{max-width:640px}.result-buttons{display:contents}}
