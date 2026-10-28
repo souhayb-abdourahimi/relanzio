@@ -47,6 +47,7 @@ import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession,
 import { rowsToSemicolonCsv } from './export.js';
 import { createStripeWebhookProcessor } from './stripe-webhook.js';
 import { runTrialEndingReminders } from './billing-emails.js';
+import { runMorningDigest } from './morning-digest.js';
 import { withLocks, lockedQuoteIds, isAllowedLockedPatch } from '../shared/quota.js';
 import { VAT_NOTICE,PRO_PRICE_LABEL,PRO_MONTHLY_PRICE,FREE_LIMIT_TEXT,monthlyRecurringRevenue } from '../shared/plans.js';
 
@@ -89,7 +90,7 @@ app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async 
 
 app.use(express.json({limit:'256kb'}));
 app.get('/api/health', (_req,res)=>res.json({ok:true,service:'relanzio',version:'0.4.0'}));
-app.get('/api/readiness', (_req,res)=>{const integrations={supabase:Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_ANON_KEY&&process.env.SUPABASE_SERVICE_ROLE_KEY),stripe:Boolean(process.env.STRIPE_SECRET_KEY&&process.env.STRIPE_PRO_PRICE_ID&&process.env.STRIPE_WEBHOOK_SECRET),brevo:Boolean(process.env.BREVO_API_KEY&&process.env.BREVO_WEBHOOK_SECRET&&process.env.EMAIL_FROM_ADDRESS),openai:Boolean(process.env.OPENAI_API_KEY)};const ready=integrations.supabase&&integrations.stripe&&integrations.brevo;res.status(ready?200:503).json({ready,integrations,automation:{followups:process.env.FOLLOWUP_AUTOMATION_ENABLED==='true',lifecycle:process.env.LIFECYCLE_EMAILS_ENABLED==='true',acquisition:process.env.ACQUISITION_ENABLED==='true'}})});
+app.get('/api/readiness', (_req,res)=>{const integrations={supabase:Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_ANON_KEY&&process.env.SUPABASE_SERVICE_ROLE_KEY),stripe:Boolean(process.env.STRIPE_SECRET_KEY&&process.env.STRIPE_PRO_PRICE_ID&&process.env.STRIPE_WEBHOOK_SECRET),brevo:Boolean(process.env.BREVO_API_KEY&&process.env.BREVO_WEBHOOK_SECRET&&process.env.EMAIL_FROM_ADDRESS),openai:Boolean(process.env.OPENAI_API_KEY)};const ready=integrations.supabase&&integrations.stripe&&integrations.brevo;res.status(ready?200:503).json({ready,integrations,automation:{followups:process.env.FOLLOWUP_AUTOMATION_ENABLED==='true',lifecycle:process.env.LIFECYCLE_EMAILS_ENABLED==='true',acquisition:process.env.ACQUISITION_ENABLED==='true',morningDigest:process.env.MORNING_DIGEST_ENABLED==='true',billingEmails:process.env.BILLING_EMAILS_ENABLED==='true'}})});
 
 // Privacy-friendly first-party product analytics. No ad tracker/cross-site identifier.
 app.post('/api/events', rateLimit({windowMs:60_000,max:30}), async (req,res)=>{
@@ -140,6 +141,7 @@ app.patch('/api/profile', requireUser, async(req,res)=>{
     if ('role' in req.body) patch.role=sanitizeText(req.body.role,80);
     if ('onboarding_completed' in req.body) patch.onboarding_completed=Boolean(req.body.onboarding_completed);
     if ('marketing_opt_in' in req.body) patch.marketing_opt_in=Boolean(req.body.marketing_opt_in);
+    if ('morning_digest_enabled' in req.body) patch.morning_digest_enabled=Boolean(req.body.morning_digest_enabled);
     if ('followup_offsets' in req.body) {
       const offsets=normalizeFollowupOffsets(req.body.followup_offsets);
       if(!offsets)return res.status(400).json({error:'Cadence invalide : trois délais croissants, par exemple J+2, J+5, J+10.'});
@@ -637,6 +639,7 @@ cron.schedule('*/10 * * * *',async()=>{try{const result=await processOutreachQue
 cron.schedule('*/10 * * * *',async()=>{try{await pollImapReplies()}catch(e){await reportError('cron.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})}},{noOverlap:true});
 cron.schedule('3,13,23,33,43,53 * * * *',async()=>{try{await runCommercialQueueFeeder()}catch(e){await reportError('cron.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'})}},{noOverlap:true});
 cron.schedule('*/5 * * * *',async()=>{try{await runCommercialSequenceTick()}catch(e){await reportError('cron.commercial-sequence',e,{code:e?.code||'COMMERCIAL_SEQUENCE_FAILED'})}},{noOverlap:true});
+cron.schedule('30 7 * * 1-5',async()=>{try{await runMorningDigest({db,sendEmail,reportError})}catch(e){await reportError('cron.morning-digest',e)}},{noOverlap:true,timezone:'Europe/Paris'});
 cron.schedule('5 10 * * *',async()=>{try{await runTrialEndingReminders({db,sendOnce:stripeWebhooks.sendOnce})}catch(e){await reportError('cron.trial-ending',e)}},{noOverlap:true,timezone:'Europe/Paris'});
 cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
 
