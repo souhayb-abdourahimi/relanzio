@@ -13,31 +13,38 @@ function parisWeekday(now){
 }
 export function isDigestDay(now=new Date()){return !['Sat','Sun'].includes(parisWeekday(now));}
 
-// Quotes needing an action today: open, usable (not read-only), and either due today or earlier,
-// or at the end of their sequence without a new date (a decision is expected).
+// What needs the artisan today: client replies first (last 7 days), then usable open quotes due today or
+// earlier, then quotes whose 3 follow-ups got no answer (a call is advised).
 export function digestItems(quotes=[],now=new Date(),proAccess=false){
   const today=parisBusinessDate(now),locked=lockedQuoteIds(quotes,proAccess);
-  return quotes.filter(q=>q.status==='open'&&!locked.has(q.id)).map(q=>{
+  return quotes.filter(q=>['open','paused'].includes(q.status)).map(q=>{
+    if(q.reply_received_at)return now.getTime()-Date.parse(q.reply_received_at)<=7*DAY?{quote:q,kind:'reply',lateDays:0}:null;
+    if(q.status!=='open'||locked.has(q.id))return null;
     const step=Number(q.followup_step||0);
-    if(!q.next_followup_at)return step>=3?{quote:q,lateDays:0,terminal:true}:null;
+    if(!q.next_followup_at)return step>=3?{quote:q,kind:'call',lateDays:0,terminal:true}:null;
     const due=parisBusinessDate(q.next_followup_at);
     if(due>today)return null;
     const lateDays=Math.round((Date.parse(today+'T00:00:00Z')-Date.parse(due+'T00:00:00Z'))/DAY);
-    return {quote:q,lateDays,terminal:step>=3};
-  }).filter(Boolean).sort((a,b)=>b.lateDays-a.lateDays||Number(b.quote.amount||0)-Number(a.quote.amount||0));
+    return {quote:q,kind:step>=3?'call':'followup',lateDays,terminal:step>=3};
+  }).filter(Boolean).sort((a,b)=>KIND_ORDER[a.kind]-KIND_ORDER[b.kind]||b.lateDays-a.lateDays||Number(b.quote.amount||0)-Number(a.quote.amount||0));
 }
+const KIND_ORDER={reply:0,followup:1,call:2};
+const plural=(n,one,many)=>`${n} ${n>1?many:one}`;
 
+// Very short: the three counts, one link, then the list.
 export function buildDigest({profile,items,appUrl,unsubscribeUrl}){
-  const count=items.length,atStake=items.reduce((s,x)=>s+Number(x.quote.amount||0),0);
-  const subject=`${count} relance${count>1?'s':''} aujourd’hui · ${money(atStake)} en jeu`;
-  const lines=items.slice(0,15).map(({quote,lateDays,terminal})=>{
-    const stage=terminal?'séquence terminée, à décider':`relance ${Number(quote.followup_step||0)+1}/3`;
-    return `• ${quote.client_name} — ${quote.title} (${money(quote.amount)}) · ${stage}${lateDays>0?` · en retard de ${lateDays} j`:''}`;
-  });
-  if(items.length>15)lines.push(`• … et ${items.length-15} autre${items.length-15>1?'s':''}`);
+  const by=k=>items.filter(x=>x.kind===k);
+  const replies=by('reply'),followups=by('followup'),calls=by('call');
+  const atStake=followups.reduce((s,x)=>s+Number(x.quote.amount||0),0);
+  const parts=[replies.length&&plural(replies.length,'réponse reçue','réponses reçues'),followups.length&&plural(followups.length,'devis à relancer','devis à relancer'),calls.length&&plural(calls.length,'appel conseillé','appels conseillés')].filter(Boolean);
+  const subject=`Aujourd’hui : ${parts.join(' · ')}`;
+  const line=({quote,lateDays,kind})=>`• ${quote.client_name} — ${quote.title} (${money(quote.amount)})${kind==='followup'?` · relance ${Number(quote.followup_step||0)+1}/3${lateDays>0?` · en retard de ${lateDays} j`:''}`:''}`;
+  const section=(title,list)=>list.length?`${title}\n${list.slice(0,8).map(line).join('\n')}${list.length>8?`\n• … et ${list.length-8} autre${list.length-8>1?'s':''}`:''}`:'';
   const link=`${String(appUrl||'https://relanzio.com').replace(/\/$/,'')}/?from=digest`;
-  const text=`Bonjour${profile.company_name?' '+profile.company_name:''},\n\nAujourd’hui : ${subject}.\n\n${lines.join('\n')}\n\nOuvrir la vue Aujourd’hui : ${link}\n\nRelanzio prépare chaque message ; rien ne part sans vous en mode revue.\n\n—\nRappel du matin Relanzio, envoyé les jours ouvrés lorsqu’au moins une action est prévue.\nNe plus le recevoir : ${unsubscribeUrl}\nVous pouvez aussi le désactiver dans Paramètres.`;
-  return {subject,text,count,atStake};
+  const text=[`Bonjour${profile.company_name?' '+profile.company_name:''},`,'',`Aujourd’hui :`,...parts.map(p=>`• ${p}`),'',`Voir ma journée : ${link}`,'',
+    [section('Réponses reçues',replies),section(`À relancer${atStake?` (${money(atStake)} en jeu)`:''}`,followups),section('À appeler',calls)].filter(Boolean).join('\n\n'),
+    '','—','Rappel du matin Relanzio, envoyé les jours ouvrés seulement s’il y a quelque chose à faire.',`Ne plus le recevoir : ${unsubscribeUrl}`,'Vous pouvez aussi le désactiver dans Paramètres.'].join('\n');
+  return {subject,text,count:items.length,atStake};
 }
 
 export async function runMorningDigest({db,sendEmail,reportError=async()=>{},env=process.env,now=new Date()}){
@@ -49,7 +56,7 @@ export async function runMorningDigest({db,sendEmail,reportError=async()=>{},env
   const results=[];
   for(const profile of profiles||[]){
     try{
-      const {data:quotes,error:qError}=await db.from('quotes').select('id,client_name,title,amount,status,followup_step,next_followup_at,created_at').eq('user_id',profile.id).in('status',['open','paused']);
+      const {data:quotes,error:qError}=await db.from('quotes').select('id,client_name,title,amount,status,followup_step,next_followup_at,reply_received_at,created_at').eq('user_id',profile.id).in('status',['open','paused']);
       if(qError)throw qError;
       const items=digestItems(quotes||[],now,hasProAccess(profile,now));
       if(!items.length){results.push({user:profile.id,skipped:'nothing_due'});continue;}

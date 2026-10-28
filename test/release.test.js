@@ -249,8 +249,9 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   assert.match(server,/hasProAccess\(profile\)/);
   assert.match(followups,/hasProAccess\(profile\)/);
   assert.match(client,/profile\.pro_access/);
-  assert.match(trialUi,/accountBanner\(profile,lockedCount\)/);
-  assert.match(trialDisplay,/Essai Pro :/);
+  assert.match(trialUi,/accountBanner\(profile,lockedCount,activeCount\)/);
+  // Compact one-line label (mobile): "Essai Pro · 6 jours restants".
+  assert.match(trialDisplay,/Essai Pro · /);
   assert.match(trialDisplay,/upgradeLabel:UPGRADE_LABEL/);
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   assert.match(plans,/Essai Pro de \{TRIAL_DAYS\} jours sans carte bancaire/);

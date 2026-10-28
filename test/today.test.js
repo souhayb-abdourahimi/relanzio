@@ -16,11 +16,13 @@ test('Today groups overdue, today, future and terminal decisions',()=>{
     q('paused','2026-10-14T07:00:00.000Z',0,'paused')
   ],now);
   assert.deepEqual(groups.overdue.map(x=>x.id),['late-2','late-1']);
-  assert.deepEqual(groups.today.map(x=>x.id),['terminal','today']);
+  assert.deepEqual(groups.today.map(x=>x.id),['today']);
+  // Three follow-ups without answer and no new date: its own "À appeler ou décider" group, not mixed with today's relances.
+  assert.deepEqual(groups.call.map(x=>x.id),['terminal']);
   assert.deepEqual(groups.future.map(x=>x.id),['future','terminal-later']);
   assert.equal(groups.overdue[0].action_meta.daysOverdue,2);
-  assert.equal(actionStageLabel(groups.today[0]),'Séquence terminée — décidez : gagné, perdu ou repousser');
-  assert.equal(actionStageLabel(groups.today[1]),'Relance 2/3');
+  assert.equal(actionStageLabel(groups.call[0]),'3 relances sans réponse : un appel, ou décidez gagné / perdu');
+  assert.equal(actionStageLabel(groups.today[0]),'Relance 2/3');
 });
 
 test('Today classification uses Paris calendar before and after midnight',()=>{
@@ -57,4 +59,27 @@ test('Today labels, contact links and pipeline order',async()=>{
   assert.equal(telHref(''),'');
   const sorted=sortPipeline([{id:'won',status:'won'},{id:'later',status:'open',next_followup_at:'2026-10-30T08:00:00Z'},{id:'paused',status:'paused'},{id:'soon',status:'open',next_followup_at:'2026-10-20T08:00:00Z'}]);
   assert.deepEqual(sorted.map(x=>x.id),['soon','later','paused','won']);
+});
+
+test('a quote whose client answered is listed first, open or paused, newest reply first',async()=>{
+  const {buildTodayGroups,nextFollowupLine,senderLine,formatParisWhen,latestReply}=await import('../client/src/today.js');
+  const now=new Date('2026-10-29T09:00:00Z');
+  const groups=buildTodayGroups([
+    {id:'due',status:'open',followup_step:0,next_followup_at:'2026-10-29T08:00:00Z'},
+    {id:'old',status:'open',followup_step:1,next_followup_at:null,reply_received_at:'2026-10-27T10:00:00Z'},
+    {id:'new',status:'paused',followup_step:1,next_followup_at:null,reply_received_at:'2026-10-28T10:00:00Z'},
+    {id:'won',status:'won',reply_received_at:'2026-10-28T10:00:00Z'}
+  ],now);
+  assert.deepEqual(groups.replied.map(x=>x.id),['new','old']);
+  assert.deepEqual(groups.today.map(x=>x.id),['due']);
+  assert.equal(formatParisWhen('2026-10-29T08:00:00Z'),'jeudi 29 oct. à 9 h');
+  assert.equal(nextFollowupLine({status:'open',next_followup_at:'2026-11-02T08:00:00Z'}),'Prochaine relance : lundi 2 nov. à 9 h');
+  assert.equal(nextFollowupLine({status:'open',reply_received_at:'x'}),'Relances arrêtées : le client a répondu');
+  assert.equal(nextFollowupLine({status:'open',followup_step:3,next_followup_at:null}),'3 relances faites');
+  const q={status:'open',next_followup_at:'2026-11-02T08:00:00Z',client_email:'a@b.fr',auto_send:true};
+  assert.equal(senderLine(q,{pro_access:false}),'Vous relancez : email, SMS ou appel');
+  assert.equal(senderLine(q,{pro_access:true}),'Vous validez, Relanzio envoie');
+  assert.equal(senderLine(q,{pro_access:true,email_mode:'automatic',capabilities:{automatic_sending:false}}),'Vous validez, Relanzio envoie','never claims automatic when the server does not offer it');
+  assert.equal(senderLine(q,{pro_access:true,email_mode:'automatic',capabilities:{automatic_sending:true}}),'Relanzio l’enverra pour vous');
+  assert.equal(latestReply({replies:[{effect:'record',received_at:'2026-10-29'},{effect:'stop',received_at:'2026-10-28',id:'r'}]}).id,'r');
 });

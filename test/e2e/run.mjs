@@ -95,21 +95,33 @@ async function flows(browser){
       await page.getByLabel('Mot de passe').fill('motdepasse-solide');
       await page.locator('.legal-check input').check();
       await page.getByRole('button',{name:'Créer mon espace'}).click();
-      await page.getByLabel('Entreprise').fill('Toitures Martin');
-      await page.getByRole('button',{name:/Accéder au tableau de bord/}).click();
-      await page.getByRole('button',{name:/Ajouter (un|mon premier) devis/}).first().click();
+      await page.getByLabel('Entreprise',{exact:true}).fill('Toitures Martin');
+      await page.getByRole('button',{name:/Continuer : ajouter mon premier devis/}).click();
+      // Onboarding opens the first quote directly: landing → account → first quote.
       await page.getByLabel('Client',{exact:true}).fill('Mme Leroy');
       await page.getByLabel(/Téléphone/).fill('06 11 22 33 44');
       await page.getByLabel('Objet').fill('Réfection gouttières');
       await page.getByLabel(/Montant/).fill('1850');
       await page.getByRole('button',{name:'Créer le suivi'}).click();
+      // "C'est suivi": first follow-up date, channel and who sends, with the exact message.
+      await page.waitForSelector('.tracked');
+      const tracked=await page.locator('.tracked').innerText();
+      assert.match(tracked,/Vous pouvez arrêter d’y penser/);
+      assert.match(tracked,/Première relance\s+\w+ \d+ \S+ à 9 h/);
+      assert.match(tracked,/SMS ou appel/);
+      await page.getByText('Voir le message prévu').click();
+      assert.match(await page.locator('.tracked-preview').innerText(),/Bonjour Madame Leroy,/);
+      await page.getByRole('button',{name:'Voir ma journée'}).click();
       await page.waitForSelector('.today-card');
       assert.ok(backend.state.profile.trial_started_at,'trial started at first quote');
       await page.waitForSelector('.trial-banner');
-      assert.match(await page.locator('.trial-banner').innerText(),/Essai Pro : 7 jours restants/);
+      assert.match(await page.locator('.trial-banner').innerText(),/Essai Pro · 7 jours restants/);
+      const bannerHeight=await page.locator('.trial-banner').evaluate(el=>el.getBoundingClientRect().height);
+      assert.ok(bannerHeight<=64,`compact trial banner (${bannerHeight}px)`);
+      assert.equal(backend.state.calls.filter(c=>c.path.startsWith('/admin')).length,0,'no admin route for a normal account');
       results.push(`INFO ${label}: signup → first quote in ${Math.round((Date.now()-started)/1000)} s (scripted)`);
     });
-    await step(`${label}: Relance faite in one gesture advances the step`,async()=>{
+    await step(`${label}: J’ai relancé moi-même advances the step`,async()=>{
       const q=backend.state.quotes[0];q.next_followup_at=new Date().toISOString();
       await page.reload();await page.waitForSelector('.today-card');
       await page.locator('.today-card').first().getByRole('button',{name:'Relancer'}).click();
@@ -117,7 +129,7 @@ async function flows(browser){
       assert.ok(await page.getByRole('link',{name:'SMS'}).isVisible(),'SMS link');
       assert.ok(await page.getByRole('link',{name:'Appeler'}).isVisible(),'tel link');
       await page.locator('.preview-modal textarea').fill('Bonjour, avez-vous pu regarder le devis ?');
-      await page.getByRole('dialog').getByRole('button',{name:'Relance faite'}).click();
+      await page.getByRole('dialog').getByRole('button',{name:'J’ai relancé moi-même'}).click();
       await page.waitForSelector('.preview-modal',{state:'detached'});
       assert.equal(backend.state.quotes[0].followup_step,1);
       await page.getByText('Relance marquée comme faite').waitFor();
@@ -134,8 +146,8 @@ async function flows(browser){
       q.next_followup_at=new Date().toISOString();
       await page.reload();await page.waitForSelector('.today-card');
       const card2=page.locator('.today-card').first();
-      if(label==='mobile')await card2.getByRole('button',{name:'Résultat'}).click();
-      await card2.getByRole('button',{name:'Gagné'}).click();
+      await card2.getByRole('button',{name:/Plus d’actions/}).click();
+      await card2.getByRole('menuitem',{name:'Gagné'}).click();
       await page.waitForTimeout(300);
       assert.equal(backend.state.quotes[0].status,'won');
     });
@@ -155,7 +167,7 @@ async function flows(browser){
         await p5.locator('.today-card').filter({hasText:'Relance 1/3'}).first().getByRole('button',{name:'Relancer'}).tap();taps++;
         await p5.waitForSelector('.preview-modal');
         assert.ok(await p5.getByRole('link',{name:'SMS'}).isVisible());
-        await p5.getByRole('dialog').getByRole('button',{name:'Relance faite'}).tap();taps++;
+        await p5.getByRole('dialog').getByRole('button',{name:'J’ai relancé moi-même'}).tap();taps++;
         await p5.waitForSelector('.preview-modal',{state:'detached'});
       }
       await p5.waitForFunction(()=>!document.body.innerText.includes('Relance 1/3'));
@@ -187,11 +199,57 @@ async function flows(browser){
       const locked=p2.locator('.today-card.locked');
       assert.equal(await locked.count(),2);
       assert.equal(await locked.first().getByRole('button',{name:'Relancer'}).count(),0,'no follow-up on a locked quote');
-      if(label==='mobile')await locked.first().getByRole('button',{name:'Résultat'}).click();
       await locked.first().getByRole('button',{name:'Perdu'}).click();
       await p2.getByText('Devis marqué perdu').waitFor();
       assert.equal(b2.state.quotes.find(q=>q.id==='l0').status,'lost');
       await c2.close();
+    });
+    await step(`${label}: "Le client a répondu" stops the quote, lists it under Réponses reçues, then resumes on demand`,async()=>{
+      const b8=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true}});
+      const c8=await newContext(browser,vp,b8,{loggedIn:true});const p8=await c8.newPage();
+      await p8.goto(BASE+'/');await p8.waitForSelector('.today-card');
+      const card=p8.locator('.today-card',{hasText:'Dupont Toitures'});
+      await card.getByRole('button',{name:/Plus d’actions/}).click();
+      await card.getByRole('menuitem',{name:'Le client a répondu'}).click();
+      await p8.getByText('Relances arrêtées : le client a répondu').waitFor();
+      const replied=p8.locator('#today-replied .today-card',{hasText:'Dupont Toitures'});
+      await replied.waitFor();
+      assert.equal(await replied.getByRole('button',{name:'Relancer'}).count(),0,'no follow-up after a reply');
+      assert.ok(await replied.getByRole('button',{name:'Gagné'}).isVisible());
+      const late=b8.state.quotes.find(q=>q.id==='late');
+      assert.ok(late.reply_received_at);assert.equal(late.next_followup_at,null);
+      await replied.getByRole('button',{name:/Plus d’actions/}).click();
+      await replied.getByRole('menuitem',{name:'Reprendre les relances'}).click();
+      await p8.getByText(/Relances reprises/).waitFor();
+      assert.equal(late.reply_received_at,null);assert.ok(late.next_followup_at);
+      await c8.close();
+    });
+    await step(`${label}: Pro sends through Relanzio after an explicit confirmation`,async()=>{
+      const b9=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true,plan:'pro',subscription_status:'active',stripe_customer_id:'cus_e2e',stripe_subscription_id:'sub_e2e'}});
+      const c9=await newContext(browser,vp,b9,{loggedIn:true});const p9=await c9.newPage();
+      await p9.goto(BASE+'/');await p9.waitForSelector('.today-card');
+      await p9.locator('.today-card',{hasText:'Martin'}).filter({hasText:'Remplacement chauffe-eau'}).getByRole('button',{name:'Relancer'}).click();
+      await p9.waitForSelector('.preview-modal');
+      assert.match(await p9.locator('.preview-text').inputValue(),/^Bonjour,\n\nJe reviens vers vous au sujet du devis « Remplacement chauffe-eau »/,'instant template, no "Bonjour M.,"');
+      await p9.getByRole('button',{name:'Envoyer via Relanzio'}).click();
+      assert.equal(b9.state.calls.filter(c=>c.path.endsWith('/send-followup')).length,0,'nothing sent before confirming');
+      await p9.getByRole('button',{name:'Confirmer l’envoi'}).click();
+      await p9.getByText(/Relance envoyée à martin@example\.test/).waitFor();
+      assert.equal(b9.state.followups.filter(f=>f.channel==='relanzio').length,1);
+      await c9.close();
+    });
+    await step(`${label}: settings never show the morning reminder as active when the service is off`,async()=>{
+      const b10=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true,morning_digest_enabled:true}});
+      const c10=await newContext(browser,vp,b10,{loggedIn:true});const p10=await c10.newPage();
+      await p10.goto(BASE+'/');await p10.waitForSelector('.today-card');
+      if(label==='mobile'){await p10.getByRole('button',{name:/menu/i}).first().click();await p10.locator('.mobile-drawer-nav').getByRole('button',{name:/Paramètres/}).click();}
+      else await p10.getByRole('button',{name:'Paramètres'}).click();
+      const text=await p10.locator('.settings-grid').innerText();
+      assert.match(text,/Pas encore disponible : aucun rappel n’est envoyé/);
+      assert.doesNotMatch(text,/Rappel du matin activé/);
+      assert.doesNotMatch(text,/Relanzio envoie automatiquement/,'automatic option hidden when the server does not offer it');
+      assert.doesNotMatch(text,/mode revue|opt-in/i);
+      await c10.close();
     });
     await step(`${label}: past_due shows the payment banner and opens the Stripe portal`,async()=>{
       const b3=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true,plan:'free',subscription_status:'past_due',stripe_customer_id:'cus_e2e',stripe_subscription_id:'sub_e2e',trial_started_at:new Date(Date.now()-40*DAY).toISOString(),trial_ends_at:new Date(Date.now()-33*DAY).toISOString(),trial_expired_at:new Date(Date.now()-33*DAY).toISOString()}});

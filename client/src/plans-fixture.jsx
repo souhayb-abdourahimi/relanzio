@@ -30,7 +30,7 @@ function Fixture(){
       const twoColumns=window.innerWidth<=760||Boolean(fr&&pr&&Math.abs(fr.top-pr.top)<5&&pr.left>fr.left);
       const copyOk=text.includes('Découverte / Gratuit')&&text.includes('0 €')&&text.includes('Pro')&&text.includes('29 €')&&text.includes('5 devis actifs')&&text.includes('100 devis actifs')&&!text.toLowerCase().includes('illimité');
       const billingStateOk=billing?!button?.disabled:button?.disabled;
-      const trialOk=!trial||(text.includes('Essai Pro : 4 jours restants')&&text.includes('Fin prévue le 18/10/2026'));
+      const trialOk=!trial||(text.includes('Essai Pro · 4 jours restants')&&text.includes('Fin prévue le 18/10/2026'));
       const eligibleOk=!eligible||(!document.querySelector('.app-trial-btn')&&text.includes('démarre automatiquement à l’ajout de votre premier devis'));
       document.body.dataset.plansQa=cards.length===2&&copyOk&&noOverflow&&touchOk&&oneColumn&&twoColumns&&billingStateOk&&trialOk&&eligibleOk?'pass':'fail';
     },100);
