@@ -327,7 +327,7 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
       const autoEligible=effectiveMode!=='none'&&targetStatus==='open'&&hasProAccess(profile)&&profile.email_mode==='automatic';
       const wantsAuto=autoEligible&&Boolean(req.body.auto_send);
       if(wantsAuto&&nextFollowupAt&&new Date(nextFollowupAt).getTime()<=Date.now()){
-        return res.status(409).json({error:'Ce devis est déjà à relancer. Traitez-le ou repoussez sa prochaine date avant d’activer l’automatisation.'});
+        return res.status(409).json({error:'Ce devis est déjà à relancer. Traitez-le ou repoussez sa prochaine date avant d’activer l’envoi automatique.'});
       }
       patch.auto_send=wantsAuto;
     }
@@ -482,15 +482,16 @@ app.post('/api/support/tickets', requireUser, async(req,res)=>{ const subject=sa
 
 app.get('/api/account/export', requireUser, async(req,res)=>{
   try{
-    const [profileResult,quotesResult,followupsResult,ticketsResult]=await Promise.all([
+    const [profileResult,quotesResult,followupsResult,ticketsResult,repliesResult]=await Promise.all([
       db.from('profiles').select('id,email,company_name,role,plan,subscription_status,email_mode,onboarding_completed,marketing_opt_in,activated_at,trial_started_at,trial_ends_at,trial_expired_at,created_at,updated_at').eq('id',req.user.id).single(),
       db.from('quotes').select('*').eq('user_id',req.user.id).order('created_at',{ascending:true}),
       db.from('followups').select('id,quote_id,step,subject,body,status,provider_message_id,sent_at,created_at').eq('user_id',req.user.id).order('created_at',{ascending:true}),
-      db.from('support_tickets').select('id,topic,subject,message,status,priority,created_at,updated_at').eq('user_id',req.user.id).order('created_at',{ascending:true})
+      db.from('support_tickets').select('id,topic,subject,message,status,priority,created_at,updated_at').eq('user_id',req.user.id).order('created_at',{ascending:true}),
+      db.from('quote_replies').select('id,quote_id,source,channel,category,from_email,excerpt,received_at').eq('user_id',req.user.id).order('received_at',{ascending:true})
     ]);
-    for(const result of [profileResult,quotesResult,followupsResult,ticketsResult])if(result.error)throw result.error;
+    for(const result of [profileResult,quotesResult,followupsResult,ticketsResult,repliesResult])if(result.error)throw result.error;
     res.setHeader('Content-Disposition','attachment; filename="relanzio-export.json"');
-    res.json({exported_at:nowIso(),profile:profileResult.data,quotes:quotesResult.data||[],followups:followupsResult.data||[],support_tickets:ticketsResult.data||[]});
+    res.json({exported_at:nowIso(),profile:profileResult.data,quotes:quotesResult.data||[],followups:followupsResult.data||[],client_replies:repliesResult.data||[],support_tickets:ticketsResult.data||[]});
   }catch(e){await reportError('account.export',e,{request_id:req.requestId});res.status(500).json({error:'Impossible de préparer l’export.',request_id:req.requestId})}
 });
 app.get('/api/quotes/export.csv', requireUser, async(req,res)=>{

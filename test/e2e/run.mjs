@@ -309,6 +309,23 @@ async function a11y(browser){
     await page.keyboard.press('Escape');
     await page.goto(BASE+'/?view=plans');await page.waitForSelector('.plans-view');await audit(page,`${label} Formules`);
     await ctx.close();
+    // Reply flow, "⋯" menu, settings.
+    backend=createFakeBackend({seedQuotes:seed(),profile:{company_name:'Toitures Martin',onboarding_completed:true}});
+    ctx=await newContext(browser,vp,backend,{loggedIn:true});page=await ctx.newPage();
+    await page.goto(BASE+'/');await page.waitForSelector('.today-card');
+    const card=page.locator('.today-card').first();
+    await card.getByRole('button',{name:/Plus d’actions/}).click();await audit(page,`${label} menu ⋯ ouvert`);
+    await card.getByRole('menuitem',{name:'Le client a répondu'}).click();await page.waitForSelector('#today-replied');await page.waitForTimeout(300);await audit(page,`${label} Réponses reçues`);
+    if(label==='mobile'){await page.getByRole('button',{name:/menu/i}).first().click();await page.locator('.mobile-drawer-nav').getByRole('button',{name:/Paramètres/}).click();}else await page.getByRole('button',{name:'Paramètres'}).click();
+    await page.waitForSelector('.settings-grid');await audit(page,`${label} Paramètres`);
+    await ctx.close();
+    // New account: onboarding, then "C'est suivi".
+    backend=createFakeBackend();ctx=await newContext(browser,vp,backend,{loggedIn:true});page=await ctx.newPage();
+    await page.goto(BASE+'/');await page.waitForSelector('.onboarding');await audit(page,`${label} onboarding`);
+    await page.getByLabel('Entreprise',{exact:true}).fill('Toitures Martin');await page.getByRole('button',{name:/Continuer/}).click();
+    await page.getByLabel('Client',{exact:true}).fill('M. Durand');await page.getByLabel('Email').fill('d@example.test');await page.getByLabel('Objet').fill('Toiture');await page.getByLabel(/Montant/).fill('4800');
+    await page.getByRole('button',{name:'Créer le suivi'}).click();await page.waitForSelector('.tracked');await audit(page,`${label} C’est suivi`);
+    await ctx.close();
   }
   for(const r of report)console.log(r);
   if(report.some(r=>r.startsWith('FAIL')))process.exitCode=1;
