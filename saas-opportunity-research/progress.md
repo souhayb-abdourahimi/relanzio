@@ -9,9 +9,9 @@
 - [ ] Serveurs MCP design/slack/notion… : échec de connexion (non nécessaires).
 
 ## Phases
-- [ ] Phase 1 — cartographie large (5 analystes sectoriels en parallèle)
+- [x] Phase 1 — cartographie large : 31 familles, 206 opportunités, 246 preuves (5 analystes en parallèle)
 - [ ] Phase 2 — collecte de preuves
-- [ ] Phase 3 — scoring longlist → top 20 → top 5
+- [x] Phase 3 (1re passe) — notation harmonisée de 38 pistes (`_work/scores-bruts.csv` → `03-classement-top20.csv`) ; top 5 : A-23, B-09, D-37, D-20, A-39
 - [ ] Phase 4 — due diligence top 5 (défenseur + contradicteur)
 - [ ] Phase 5 — recommandation, business model, MVP, plan 30 jours
 
