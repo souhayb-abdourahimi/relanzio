@@ -1,3 +1,5 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 7)** — L'objectif du porteur a changé : un micro-SaaS solo, rentable et revendable, et non une grande entreprise. La décision de ce fichier est **remplacée** par `13-micro-saas-decision.md`. Le contenu ci-dessous est conservé pour la traçabilité.
+
 # 12 — Audit critique des conclusions (phase 6)
 
 Date : 2026-10-29 (soir).

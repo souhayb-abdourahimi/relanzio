@@ -14,6 +14,11 @@ patterns = [
     ("audit2-D37-preuves.csv", "audit critique D-37 (phase 6)"),
     ("N[123]-preuves.csv", "nouvelles opportunités (phase 6)"),
     ("redteam2-preuves.csv", "red-team 2 (phase 6)"),
+    ("P7-rescreen-preuves.csv", "phase 7 rescreen micro-SaaS"),
+    ("P7-cession-preuves.csv", "phase 7 cession"),
+    ("P7-fiscal-preuves.csv", "phase 7 fiscal micro-entrepreneur"),
+    ("P7-DD-*-preuves.csv", "phase 7 étude approfondie"),
+    ("redteam3-preuves.csv", "red-team 3 (phase 7)"),
 ]
 out, nfiles = [], 0
 for pattern, phase in patterns:

@@ -25,7 +25,17 @@
 - [x] Interruption par limite d'usage (reset à 17 h UTC), reprise sans perte
 - [x] Fichiers 03b, 05 (addendum), 06 (943 preuves) et 12 créés ou mis à jour ; bandeaux de révision sur 04, 05, 07, 08, 09, 10 et founder/
 
+## Phase 7 — micro-SaaS solo revendable (2026-10-29 nuit)
+- [x] Grille v3 (acquisition 20, revente 15…) ; re-classement de 27 pistes existantes et nouvelles (`_work/P7-rescreen*`)
+- [x] Données de cession (multiples constatés, seuils) et règles micro-entrepreneur 2026 (`_work/P7-cession.md`, `_work/P7-fiscal.md`)
+- [x] 3 études approfondies : C-39 50 ; N04 49,5 ; N06 48,5
+- [x] Simulations reproductibles (`P7-simulations-financieres.md`) ; red team 3, option achat comprise
+- [x] Interruption par limite d'usage (reset à 22 h 10 UTC), reprise sans perte
+- [x] Décision : `13-micro-saas-decision.md`
+
 ## Décisions restant à vérifier (humain)
+- [ ] **J0 : inventaire des contacts décideurs par segment + budget perdable** → règle du fichier 13
+- [ ] Sprint de vente de 30 jours sans code ; GO seulement avec ≥ 3 paiements
 - [ ] **Inventaire de vos accès réels** : secteurs où vous joignez ≥ 20 décideurs (variable la plus discriminante)
 - [ ] Sprint de découverte terrain de 30 jours (§7 du fichier 12) ; critère global : 0 paiement à 90 jours → problème de distribution
 - [ ] (Obsolète depuis la phase 6) Webinaire SYCFI du 4/11/2026 : prix, opérateur et fonctions du « Portail des Formateurs »

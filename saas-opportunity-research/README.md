@@ -2,11 +2,11 @@
 
 Démarrée le 2026-10-29 ; **audit critique (phase 6) le même jour.**
 
-**Statut actuel** : **décision = rechercher une autre opportunité, par le terrain et non par dossier.** Les pistes actuelles sont abandonnées comme projets de plusieurs années.
-- **D-37** (preuves Qualiopi et sous-traitance), ancienne recommandation n° 1 : **abandonnée**. Les concurrents couvrent chaque brique, et aucune obligation nouvelle n'impose un logiciel.
-- **E-13** (relance de devis, Relanzio) : test le moins coûteux, mais potentiel < 1 M€. Gelée.
-- **31 nouvelles pistes à fort potentiel** examinées : aucune au-dessus d'environ 51/100 après red team.
-- **Lire d'abord** : `12-audit-critique.md` (décision, corrections, plan de 30 jours). Ensuite seulement `07-memo-decision.md`, conservé avec un bandeau de révision.
+**Statut actuel (phase 7, objectif : micro-SaaS solo, rentable et revendable)** : **ne rien développer maintenant.** Faire un sprint de vente de 30 jours, sans code, avec une offre payante, sur le segment où le porteur connaît au moins 15 décideurs. Coder seulement après au moins 3 paiements réels.
+- Finalistes après étude approfondie : C-39 (FCC VoIP US) 50, N04 (application Jira R&D) 49,5, N06 (reversements marketplaces FR) 48,5. Aucune ne se détache.
+- E-13 / Relanzio (artisans à 24 €) : **valeur de revente nulle** dans la simulation ; ne pas relancer.
+- Achat d'un micro-SaaS existant : seulement avec un budget perdable ≥ 40 k€.
+- **Lire d'abord** : `13-micro-saas-decision.md`. Historique : `12-audit-critique.md` (phase 6), puis `07-memo-decision.md` (phase 5).
 
 ## Hypothèses de travail (par défaut, non imposées)
 - Créateur solo ou équipe de 1 à 3 personnes, technique ou aidée par l'IA, capital modéré, objectif : clients payants sans levée.
@@ -30,7 +30,8 @@ FAIT OBSERVÉ (sourcé) / ESTIMATION / HYPOTHÈSE / INCONNU. Aucun entretien cli
 - 31 familles de marché, 206 opportunités, 38 notées sur une grille unique.
 - 8 due diligences, 1 vérification de 5 alternatives négligées, 1 red team, 1 conseil founder-board (3 lentilles).
 - Phase 6 : audit de D-37, 3 nouvelles recherches orientées potentiel (31 pistes), 1 red team supplémentaire.
-- 943 preuves sourcées (extraits de recherche : la lecture de pages était bloquée par le réseau).
+- Phase 7 : re-classement de 27 pistes sur une grille micro-SaaS, 3 études approfondies, données de cession, règles micro-entrepreneur 2026, simulations, red team 3.
+- Preuves sourcées (registre complet dans `06-registre-preuves.csv`) ; (extraits de recherche : la lecture de pages était bloquée par le réseau).
 
 ## Fichiers
 Voir la liste en bas de `07-memo-decision.md`, plus `12-audit-critique.md` et `03b-classement-v2-potentiel.csv` (phase 6). Les fichiers de travail (briefs, livrables bruts des analystes, scripts reproductibles) sont dans `_work/`.
