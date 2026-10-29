@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> MVP sans objet : D-37 est abandonné. Aucun produit ne doit être construit (décision du fichier 12).
+
 # 09 — MVP, architecture et difficultés
 
 Date : 2026-10-29. Sujet : recommandation n° 1 (sous-traitance et preuves de réalisation Qualiopi).

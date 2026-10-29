@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> Concurrents découverts après coup : voir l'addendum en fin de fichier.
+
 # 05 — Concurrents et prix vérifiés
 
 Date : 2026-10-29. Sources : fichiers `_work/DD-*-concurrents.csv` des due diligences.
@@ -252,3 +255,21 @@ Total : 192 concurrents, substituts ou offres publiques sur 8 pistes.
 | [Gmail (nudges, snooze)](https://laptopmag.com/articles/how-to-turn-off-gmail-nudge) | substitut | Mondial | 0 EUR (inclus) | Suggestions automatiques de relance des emails envoyés sans réponse ; snooze |  (2018) | PARTIEL |
 | [Freelances n8n/Make (ComeUp)](https://comeup.com/fr/service/547935/automatiser-vos-relances-de-devis-sans-reponse-a-3-jours-7-jours-et-14-jours) | substitut | FR | Prix de base non extrait ; options +29,01 USD (scénario), +116,04 USD (maintenance 30 j) ; guide ComeUp : 15-50 EUR pour un cas simple | Séquence J+3/J+7/J+14 sur tableur, arrêt à la réponse | comeup.com (extrait de recherche) (2026) | PARTIEL |
 | [Travail manuel (agenda, téléphone, tableur, mémoire)](https://www.obat.fr/blog/mail-de-relance-devis/) | substitut | FR | 0 EUR | Relances manuelles selon un guide (48-72 h, 5-10 j, +2 semaines) |  | PARTIEL |
+
+
+---
+
+## Addendum phase 6 (2026-10-29 soir) — concurrents découverts après coup
+
+Ils sont tous issus d'extraits de recherche (pages non ouvertes). Détail : `_work/audit2-D37-matrice.csv`, `_work/N1.md`, `_work/N2.md`, `_work/N3.md`, `_work/redteam2.md`.
+
+| Nom | Piste | Ce qui est vendu | Prix observé | Source (registre) |
+|---|---|---|---|---|
+| Portail des Formateurs (partenaire SYCFI) | D-37 | Dossier formateur partageable entre OF, coffre-fort, alertes, « gestion d'équipe et sous-traitance (ind. 17, 18, 27) » | Inscription gratuite côté formateur ; Équipe Pro 39 € HT/mois (33 € adhérents) selon la source du porteur, **non confirmé par extrait** | AU-P01 à AU-P04 ; https://leportailformateurs.fr/sycfi |
+| Digiforma | D-37 | Contrats de sous-traitance avec signature électronique (option payante), émargement apprenants et formateurs, y compris à distance | 49 € HT/mois + options [tiers] | AU-P08 à AU-P11 |
+| CertiSkool | D-37 | Dossiers sous-traitants (Kbis, URSSAF, RC Pro, CV, contrat), lecture IA des dates, alerte à J-30 | Gratuit jusqu'à 5 dossiers ; 29 €/mois ou 249 €/an | AU-P29 |
+| Edusign (correction) | D-37 | Émargement | **29 €/mois** (et non 39 €) | audit2-D37 |
+| Senef / Progiclean (Oakley Capital, 2026) | N1-V09 propreté | ERP dédié à la propreté ; vise aussi l'aide à domicile et la sécurité | Inconnu ; 6,5 M€ levés en 2023 | RT2-P01 à RT2-P03 |
+| Obat, Tolteck, Qonto, Faktus | E-13 | Devis/facture BTP (Obat : 15 000 clients, 12 M€ levés), paiement, financement (Faktus : 56 M€ levés) | — | N1-P04 à N1-P06 |
+| Cleavr | N3-01 | Agent IA d'encaissement (plus de 100 clients revendiqués) | 8 M€ levés le 6/10/2026 | N3-P05 |
+| DDD Invoices, A-Cube, Invopop, Storecove | N2-01 | API d'e-facturation multi-pays | Invopop dès 500 €/mois | RT2-P19, P23 à P29 |

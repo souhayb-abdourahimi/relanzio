@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> D-37 est re-noté à 47,5/100 sur la grille d'origine et à 38,5/100 sur la grille v2 (audit `_work/audit2-D37.md`). Corrections factuelles : Edusign coûte 29 €/mois ; les indicateurs 14 et 15 visent probablement les CFA.
+
 # 04 — Due diligence des finalistes (5 initiaux + 3 contrôles)
 
 Date : 2026-10-29. Chaque fiche a été rédigée par un analyste distinct sur un brief commun (`_work/brief-phase2.md`). Les 14 sections sont obligatoires : ICP, JTBD, coût de l'inaction, concurrents, différenciation, taille de marché, pricing, intrants économiques, risques, distribution, faisabilité, défendabilité, raisons de ne pas le faire, re-notation. Au moins 30 % des recherches de chaque analyste devaient viser l'invalidation. Toutes les preuves sont des extraits de moteur de recherche : aucune page n'a été ouverte.

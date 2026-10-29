@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> Les scénarios portent sur D-37, désormais abandonné. Ils restent valables comme exemple de calcul ; même le scénario favorable ne rémunérait pas un fondateur en année 1.
+
 # 08 — Business model, hypothèses et scénarios
 
 Date : 2026-10-29. Sujet : la recommandation n° 1 (sous-traitance et preuves de réalisation Qualiopi, nom de travail « Preuvio »), avec un rappel comparatif pour la n° 2 (relance de devis).

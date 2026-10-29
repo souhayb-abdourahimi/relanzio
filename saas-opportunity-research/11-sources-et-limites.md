@@ -104,3 +104,10 @@ Date de consultation : 2026-10-29 pour toutes. Mode d'accès : extrait de recher
   - les obligations Qualiopi et anti-fraude ;
   - la structure juridique ;
   - le RGPD.
+
+
+## 7. Phase 6 (audit critique, 2026-10-29 soir)
+- **Nouvelle tentative de lecture des sources primaires** fournies par le porteur (leportailformateurs.fr/sycfi, deux articles help.digiforma.com, Légifrance JORFTEXT000054608509) : **échec, DNS refusé**. Les vérifications reposent sur des extraits ciblés sur ces domaines.
+- **Registre porté à 943 preuves.** Les preuves de phase 6 se répartissent ainsi : 139 CONTRE, 53 POUR, 60 NEUTRE.
+- **Biais nouveau identifié : les éditeurs multi-verticaux et les sociétés non financées sont invisibles** aux recherches par mot-clé sectoriel. Cela a produit trois fausses lacunes : sous-traitants Qualiopi, Digiforma, Senef pour la propreté. Règle ajoutée (fichier 12, §9).
+- **Limite structurelle confirmée** : la recherche documentaire peut invalider une piste, mais ne peut pas observer la volonté de payer d'un nouvel entrant.

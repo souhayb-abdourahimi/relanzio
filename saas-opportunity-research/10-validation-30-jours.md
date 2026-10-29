@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> Ce plan (tests D-37 + E-13) est **remplacé** par le plan de découverte terrain du §7 du fichier 12 (correction C8).
+
 # 10 — Plan de validation sur 30 jours (tests réels)
 
 Fenêtre : du 2026-10-30 au 2026-11-28.

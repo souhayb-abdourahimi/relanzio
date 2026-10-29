@@ -1,10 +1,12 @@
 # Étude d'opportunités SaaS — exploration mondiale multi-marchés
 
-Démarrée et terminée le 2026-10-29. Statut : **phases 1 à 5 terminées. Conclusion : AUCUNE IDÉE VALIDÉE À CE STADE.**
-- **Recommandation n° 1 (à tester, pas à construire)** : dossier de conformité des formateurs sous-traitants et preuves de réalisation pour les organismes de formation de 2 à 10 personnes certifiés Qualiopi.
-- **n° 2** : relance de devis TPE (Relanzio), en test commercial borné.
-- **n° 3** : conformité FCC pour petits opérateurs VoIP US (parquée).
-- **Lire d'abord** : `07-memo-decision.md`, puis `10-validation-30-jours.md`.
+Démarrée le 2026-10-29 ; **audit critique (phase 6) le même jour.**
+
+**Statut actuel** : **décision = rechercher une autre opportunité, par le terrain et non par dossier.** Les pistes actuelles sont abandonnées comme projets de plusieurs années.
+- **D-37** (preuves Qualiopi et sous-traitance), ancienne recommandation n° 1 : **abandonnée**. Les concurrents couvrent chaque brique, et aucune obligation nouvelle n'impose un logiciel.
+- **E-13** (relance de devis, Relanzio) : test le moins coûteux, mais potentiel < 1 M€. Gelée.
+- **31 nouvelles pistes à fort potentiel** examinées : aucune au-dessus d'environ 51/100 après red team.
+- **Lire d'abord** : `12-audit-critique.md` (décision, corrections, plan de 30 jours). Ensuite seulement `07-memo-decision.md`, conservé avec un bandeau de révision.
 
 ## Hypothèses de travail (par défaut, non imposées)
 - Créateur solo ou équipe de 1 à 3 personnes, technique ou aidée par l'IA, capital modéré, objectif : clients payants sans levée.
@@ -27,7 +29,8 @@ FAIT OBSERVÉ (sourcé) / ESTIMATION / HYPOTHÈSE / INCONNU. Aucun entretien cli
 ## Chiffres clés
 - 31 familles de marché, 206 opportunités, 38 notées sur une grille unique.
 - 8 due diligences, 1 vérification de 5 alternatives négligées, 1 red team, 1 conseil founder-board (3 lentilles).
-- 691 preuves sourcées (extraits de recherche : la lecture de pages était bloquée par le réseau).
+- Phase 6 : audit de D-37, 3 nouvelles recherches orientées potentiel (31 pistes), 1 red team supplémentaire.
+- 943 preuves sourcées (extraits de recherche : la lecture de pages était bloquée par le réseau).
 
 ## Fichiers
-Voir la liste en bas de `07-memo-decision.md`. Les fichiers de travail (briefs, livrables bruts des analystes, scripts reproductibles) sont dans `_work/`.
+Voir la liste en bas de `07-memo-decision.md`, plus `12-audit-critique.md` et `03b-classement-v2-potentiel.csv` (phase 6). Les fichiers de travail (briefs, livrables bruts des analystes, scripts reproductibles) sont dans `_work/`.

@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `../12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> Le risque n° 1 du conseil (« le gratuit et le suffisant », le portail SYCFI) s'est confirmé : D-37 est abandonné.
+
 # Conseil d'administration — synthèse du président
 
 Idée examinée : Preuvio, dossier de preuves Qualiopi et anti-fraude pour petits organismes de formation (`idea.md`, `board/brief.md`).

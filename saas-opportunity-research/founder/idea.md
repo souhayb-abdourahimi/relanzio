@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `../12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> Piste « Preuvio » (D-37) **abandonnée** le 2026-10-29.
+
 # Preuvio (nom de travail) — dossier de preuves Qualiopi & anti-fraude pour petits organismes de formation
 
 - What it is: un SaaS qui collecte au fil de l'eau les preuves de réalisation opposables (émargement apprenants + formateur, traces de connexion du distanciel, certificat de réalisation) et la conformité des formateurs sous-traitants (contrat, CV, veille, déclaration), puis exporte un dossier d'audit Qualiopi (référentiel du décret n° 2026-728, en vigueur au 1/11/2026) et un dossier de contrôle CDC/DGEFP (loi anti-fraude n° 2026-534).

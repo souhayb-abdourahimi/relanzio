@@ -1,0 +1,32 @@
+statut_note,id,titre,note_v2_analyste,note_v2_apres_red_team,potentiel_note_10_ou_ARR,preuve_contraire_decisive,source
+RT2-révisé,N1-V09,Logiciel de gestion pour entreprises de propreté 10-200 agents (FR),60.5,51.0,4 (1-3 M€),"Senef/Progiclean : 6,5 M€ levés puis Oakley Capital (03/2026) ; « aucun éditeur financé » réfuté","_work/N1.md, _work/redteam2.md"
+RT2-révisé,N2-01,API d'e-facturation multi-pays pour éditeurs SaaS (UE),59.0,50.5,4,DDD Invoices et A-Cube financés en 2026 ; Invopop dès 500 €/mois ; transport Peppol gratuit ou open source,"_work/N2.md, _work/redteam2.md"
+RT2-révisé,N3-01,"Agence de recouvrement amiable B2B au succès, native IA (FR)",62.0,49.5,4,Procédure des créances incontestées (décret 20/10/2026) aux frais du débiteur ; Cleavr 8 M€ ; DGCCRF 41 % d'anomalies,"_work/N3.md, _work/redteam2.md"
+analyste,N3-16,Cabinet de récupération de cash natif IA (IJSS puis audit fournisseurs),57.5,—,—,Nibelis intègre la récupération d'IJ ; Yooz/Spendesk détectent les doublons,_work/N3.md
+analyste,N1-V13,Taxis conventionnés et petits ambulanciers (contrôle avant facturation SEFi),55.5,—,4,"Obligation SEFi au 1/1/2027, 60 % déjà équipés, certification Assurance maladie",_work/N1.md
+analyste,N1-V02,Services à la personne (avance immédiate),54.5,—,—,Senef cible aussi ce secteur (RT2),_work/N1.md
+analyste,N1-V10,Sécurité privée,54.5,—,—,Senef cible aussi ce secteur (RT2),_work/N1.md
+analyste,N2-05,Conformité EAA continue pour e-commerce,54.0,—,—,"Marché banalisé (overlays, agences)",_work/N2.md
+analyste,N3-09,CIR/CII et aides au succès,54.0,—,—,"Cabinets en place, risque fiscal",_work/N3.md
+analyste,N3-10,"Audit des comptes fournisseurs (doublons, trop-payés)",54.0,—,—,Fonction intégrée aux outils AP,_work/N3.md
+analyste,N3-US-denials,Contestation des refus d'assurance santé US,52.5,—,—,"Éliminé : US, HIPAA, acteurs financés",_work/N3.md
+analyste,N3-04,Audit des factures de transport,52.0,—,—,—,_work/N3.md
+analyste,N3-AO,Réponses aux appels d'offres publics,52.0,—,—,Éliminé : IA concurrente nombreuse,_work/N3.md
+analyste,N1-V11,Pompes funèbres,51.5,—,—,—,_work/N1.md
+analyste,N3-08,Récupération des indemnités journalières,51.5,—,—,Nibelis l'intègre,_work/N3.md
+analyste,N1-V01,Auto-écoles,49.5,—,—,—,_work/N1.md
+analyste,E-13 / N1-V15,Relance de devis TPE (Relanzio) et chemin BTP,49.5,49.5,2-3 (< 1 M€),"Obat (15 000 clients, 12 M€), Tolteck (Saint-Gobain), ~130 PA, Qonto, Faktus (56 M€)","_work/N1.md, _work/DD-E13.md"
+analyste,N2-02,Passerelle opérateur de dématérialisation pour éditeurs verticaux FR,48.5,—,—,Éliminé,_work/N2.md
+analyste,N2-03,Vérification du bénéficiaire (VoP) et fraude au virement,47.0,—,—,Éliminé : banques obligées de fournir le service,_work/N2.md
+analyste,N3-salestax,Sales tax US PME e-commerce,46.0,—,—,Éliminé,_work/N3.md
+analyste,N3-chargebacks,Litiges et chargebacks e-commerce,45.0,—,—,Éliminé,_work/N3.md
+analyste,N3-energie,Récupération de trop-perçus énergie/télécoms,44.5,—,—,Éliminé,_work/N3.md
+analyste,N3-TVA,Remboursement de TVA étrangère,44.5,—,—,Éliminé,_work/N3.md
+analyste,N2-07,Transparence salariale,43.0,—,—,En attente : transposition FR non adoptée,_work/N2.md
+analyste,N3-taxefonciere,Appels de taxe foncière US,42.5,—,—,Éliminé,_work/N3.md
+analyste,N2-06,"DAC7/8, pilier 2, CBAM (API de données)",42.0,—,—,Éliminé,_work/N2.md
+analyste,N3-ATMP,Taux AT/MP,42.0,—,—,Éliminé : réservé aux avocats,_work/N3.md
+analyste,N2-04,Digital Product Passport,40.5,—,—,Éliminé,_work/N2.md
+audit critique,D-37,Preuves Qualiopi et sous-traitance pour petits OF (FR),38.5,38.5,2 (< 1 M€),"Portail des Formateurs (SYCFI), Digiforma, CertiSkool ; aucune obligation nouvelle en vigueur n'impose un outil",_work/audit2-D37.md
+analyste,N3-IRS,Réponses aux avis IRS,37.0,—,—,Éliminé,_work/N3.md
+analyste,N3-amendes,Contestation des amendes de flotte,32.5,—,—,Éliminé,_work/N3.md

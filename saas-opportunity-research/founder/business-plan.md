@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `../12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> Piste abandonnée ; le verdict « Profitable » ci-dessous est sans objet (correction C11).
+
 > **AVERTISSEMENT DU DIRECTEUR DE RECHERCHE (2026-10-29) — lire avant le verdict.**
 > Le verdict « Profitable » ci-dessous est calculé par `compile.py` sur des **hypothèses non observées**. Rien ne vient d'un client réel : rythme de 3 à 10 nouveaux clients/mois, churn de 3 %, ARPA de 33 € HT.
 > - Le calcul **exclut toute rémunération du fondateur**. Avec 2 000 €/mois de rémunération (`numbers-central-avec-salaire.json`), le même outil donne **« Not yet »**, une perte d'environ 18,5 k€ en année 1 et un point mort à 80 clients actifs.

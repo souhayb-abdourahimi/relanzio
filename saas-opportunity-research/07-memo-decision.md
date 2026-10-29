@@ -1,3 +1,6 @@
+> **⚠ RÉVISION DU 2026-10-29 (phase 6)** — Les conclusions de ce fichier sont **corrigées** par `12-audit-critique.md`. Le contenu d'origine est conservé ci-dessous, sans modification, pour la traçabilité.
+> La recommandation n° 1 (D-37) est **abandonnée** : Portail des Formateurs, Digiforma et CertiSkool couvrent chaque brique ; aucune obligation nouvelle en vigueur n'impose un logiciel ; potentiel < 1 M€. E-13 n'est pas un projet de plusieurs années. **Décision actuelle : rechercher une autre opportunité par le terrain** (plan au §7 du fichier 12). La raison n° 3 ci-dessous (« aucun module sous-traitants ») reposait sur une absence de preuve et est **retirée** (correction C1).
+
 # 07 — Mémo de décision
 
 Date : 2026-10-29. Auteur : directeur de recherche, après 5 analyses sectorielles, 8 due diligences, 1 vérification d'alternatives négligées, 1 red team et 1 conseil founder-board (3 lentilles).

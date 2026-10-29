@@ -17,8 +17,18 @@
 - [x] Phase 3b — notes après recherche contraire et red team ajoutées à `03-classement-top20.csv`
 - [x] Phase 5 — mémo, business model (unit_economics.py), MVP, plan de validation sur 30 jours, sources et limites
 
+## Phase 6 — audit critique (2026-10-29 soir)
+- [x] Relecture des 3 sources primaires du porteur tentée : **échec** (DNS refusé pour leportailformateurs.fr, help.digiforma.com, legifrance.gouv.fr). Vérification par extraits
+- [x] Audit D-37 : matrice de 9 outils, obligations classées (obligatoire / conseillé / commercial), notes 47,5 (grille d'origine) et 38,5 (v2) → **ABANDON**
+- [x] Grille v2 avec critère Potentiel (20 %) ; 3 recherches nouvelles (N1 verticales, N2 infrastructure/API, N3 service-as-software) : 31 pistes
+- [x] Red team 2 : propreté 51,0 ; API e-facture 50,5 ; recouvrement 49,5 → aucune retenue
+- [x] Interruption par limite d'usage (reset à 17 h UTC), reprise sans perte
+- [x] Fichiers 03b, 05 (addendum), 06 (943 preuves) et 12 créés ou mis à jour ; bandeaux de révision sur 04, 05, 07, 08, 09, 10 et founder/
+
 ## Décisions restant à vérifier (humain)
-- [ ] Webinaire SYCFI du 4/11/2026 : prix, opérateur et fonctions du « Portail des Formateurs »
+- [ ] **Inventaire de vos accès réels** : secteurs où vous joignez ≥ 20 décideurs (variable la plus discriminante)
+- [ ] Sprint de découverte terrain de 30 jours (§7 du fichier 12) ; critère global : 0 paiement à 90 jours → problème de distribution
+- [ ] (Obsolète depuis la phase 6) Webinaire SYCFI du 4/11/2026 : prix, opérateur et fonctions du « Portail des Formateurs »
 - [ ] Essais d'une journée : Formiva, Qualiobee, Digiforma (module sous-traitants ?) ; Obat, Tolteck, EBP, Batappli, Extrabat, Abby (relance automatique de devis ?)
 - [ ] Parution du guide de lecture Qualiopi v10 et des arrêtés des indicateurs 19 et 20
 - [ ] Lecture des textes officiels une fois le réseau ouvert (Légifrance : décret 2026-728, loi 2026-534)
