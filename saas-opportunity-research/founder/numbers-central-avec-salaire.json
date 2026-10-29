@@ -1,0 +1,75 @@
+{
+  "unit": "client-mois",
+  "price": 33.0,
+  "variable": [
+    {
+      "label": "IA (classement de pièces, génération de procédures)",
+      "cost": 1.0
+    },
+    {
+      "label": "Hébergement + stockage fichiers (Supabase)",
+      "cost": 1.0
+    },
+    {
+      "label": "Frais Stripe (~1,5 % + 0,25 €)",
+      "cost": 0.75
+    },
+    {
+      "label": "Support (temps valorisé)",
+      "cost": 2.0
+    }
+  ],
+  "fixed_monthly": [
+    {
+      "label": "Outils SaaS (Brevo, Supabase base, domaine, monitoring)",
+      "cost": 80
+    },
+    {
+      "label": "Assurance RC pro + comptabilité",
+      "cost": 90
+    },
+    {
+      "label": "Prospection (enrichissement e-mails, outil d'envoi)",
+      "cost": 80
+    },
+    {
+      "label": "Rémunération fondateur (coût d'opportunité, HYPOTHÈSE)",
+      "cost": 2000
+    }
+  ],
+  "startup": [
+    {
+      "label": "Juriste RGPD/CGV/DPA (ponctuel)",
+      "cost": 800
+    },
+    {
+      "label": "Relecture référentiel par consultant/ex-auditeur Qualiopi",
+      "cost": 600
+    },
+    {
+      "label": "Landing, nom de domaine, identité minimale",
+      "cost": 150
+    },
+    {
+      "label": "Divers (LLM en dev, tests)",
+      "cost": 250
+    }
+  ],
+  "days_per_month": 1,
+  "business": "Preuvio — scénario central (nouveaux/mois [0, 0, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10], churn 3%) + rémunération fondateur 2 000 €/mois",
+  "ramp_per_day": [
+    0.0,
+    0.0,
+    3.0,
+    6.9,
+    11.7,
+    17.4,
+    23.8,
+    31.1,
+    39.2,
+    48.0,
+    56.6,
+    64.9
+  ],
+  "plan_per_day": 64.9
+}

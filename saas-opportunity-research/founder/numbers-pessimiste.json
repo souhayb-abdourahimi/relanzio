@@ -1,0 +1,71 @@
+{
+  "unit": "client-mois",
+  "price": 33.0,
+  "variable": [
+    {
+      "label": "IA (classement de pièces, génération de procédures)",
+      "cost": 1.0
+    },
+    {
+      "label": "Hébergement + stockage fichiers (Supabase)",
+      "cost": 1.0
+    },
+    {
+      "label": "Frais Stripe (~1,5 % + 0,25 €)",
+      "cost": 0.75
+    },
+    {
+      "label": "Support (temps valorisé)",
+      "cost": 2.0
+    }
+  ],
+  "fixed_monthly": [
+    {
+      "label": "Outils SaaS (Brevo, Supabase base, domaine, monitoring)",
+      "cost": 80
+    },
+    {
+      "label": "Assurance RC pro + comptabilité",
+      "cost": 90
+    },
+    {
+      "label": "Prospection (enrichissement e-mails, outil d'envoi)",
+      "cost": 80
+    }
+  ],
+  "startup": [
+    {
+      "label": "Juriste RGPD/CGV/DPA (ponctuel)",
+      "cost": 800
+    },
+    {
+      "label": "Relecture référentiel par consultant/ex-auditeur Qualiopi",
+      "cost": 600
+    },
+    {
+      "label": "Landing, nom de domaine, identité minimale",
+      "cost": 150
+    },
+    {
+      "label": "Divers (LLM en dev, tests)",
+      "cost": 250
+    }
+  ],
+  "days_per_month": 1,
+  "business": "Preuvio — scénario pessimiste (nouveaux/mois [0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3], churn 5%)",
+  "ramp_per_day": [
+    0.0,
+    0.0,
+    1.0,
+    1.9,
+    3.9,
+    5.7,
+    7.4,
+    10.0,
+    12.5,
+    14.9,
+    17.1,
+    19.3
+  ],
+  "plan_per_day": 19.3
+}
