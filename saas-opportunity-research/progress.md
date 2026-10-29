@@ -33,7 +33,14 @@
 - [x] Interruption par limite d'usage (reset à 22 h 10 UTC), reprise sans perte
 - [x] Décision : `13-micro-saas-decision.md`
 
+## Phase 8 — acquisition sans réseau (2026-10-30)
+- [x] Corrections demandées par le porteur : réseau non requis, non validé ≠ mauvais, notes documentaires non éliminatoires, seuils adaptés au modèle
+- [x] 5 pistes choisies par canal ; expérimentations détaillées (`_work/P8-US.md`, `_work/P8-FR.md`)
+- [x] Fiscalité corrigée (`_work/P8-fiscal-corrections.md`) ; multiples recalés sur des transactions conclues (`_work/P8-transactions.md`)
+- [x] Simulations (`P8-simulations-financieres.md`) ; décision dans `14-acquisition-sans-reseau.md`
+
 ## Décisions restant à vérifier (humain)
+- [ ] Accord pour lancer le test N06 (aucun envoi sans accord) ; option : test C-39 avant fin janvier
 - [ ] **J0 : inventaire des contacts décideurs par segment + budget perdable** → règle du fichier 13
 - [ ] Sprint de vente de 30 jours sans code ; GO seulement avec ≥ 3 paiements
 - [ ] **Inventaire de vos accès réels** : secteurs où vous joignez ≥ 20 décideurs (variable la plus discriminante)

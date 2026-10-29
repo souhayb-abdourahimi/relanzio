@@ -1,3 +1,5 @@
+> **⚠ RÉVISION DU 2026-10-30 (phase 8)** — Le porteur a contesté trois hypothèses : réseau personnel requis, piste non validée = mauvaise, notes documentaires éliminatoires. Il a aussi demandé de corriger la fiscalité et les multiples. **La décision est remplacée par `14-acquisition-sans-reseau.md`.** Le contenu ci-dessous est conservé pour la traçabilité.
+
 # 13 — Décision stratégique micro-SaaS : Solo → Bootstrap → Rentabilité → Cession
 
 Date : 2026-10-29 (nuit). Ce document remplace la décision du fichier `12-audit-critique.md` : l'objectif a changé. Il ne s'agit plus d'une grande entreprise, mais d'un **actif numérique rentable, exploité seul et revendable**.

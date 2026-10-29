@@ -2,11 +2,10 @@
 
 Démarrée le 2026-10-29 ; **audit critique (phase 6) le même jour.**
 
-**Statut actuel (phase 7, objectif : micro-SaaS solo, rentable et revendable)** : **ne rien développer maintenant.** Faire un sprint de vente de 30 jours, sans code, avec une offre payante, sur le segment où le porteur connaît au moins 15 décideurs. Coder seulement après au moins 3 paiements réels.
-- Finalistes après étude approfondie : C-39 (FCC VoIP US) 50, N04 (application Jira R&D) 49,5, N06 (reversements marketplaces FR) 48,5. Aucune ne se détache.
-- E-13 / Relanzio (artisans à 24 €) : **valeur de revente nulle** dans la simulation ; ne pas relancer.
-- Achat d'un micro-SaaS existant : seulement avec un budget perdable ≥ 40 k€.
-- **Lire d'abord** : `13-micro-saas-decision.md`. Historique : `12-audit-critique.md` (phase 6), puis `07-memo-decision.md` (phase 5).
+**Statut actuel (phase 8, acquisition sans réseau)** : **piste prioritaire N06**, rapprochement des reversements des marketplaces FR pour **cabinets comptables multi-dossiers**. Entrée par fichiers CSV ; sortie FEC, ACD, Sage, Cegid ou Pennylane ; 149 € HT/mois. **À tester sans code** : un versement rapproché gratuitement, puis un mois prépayé, en 6 à 10 semaines.
+- Cinq pistes retenues pour leurs canaux : N06, C-39, A-38, N04, B-11. Chacune a une expérimentation et des seuils adaptés à son prix.
+- Fiscalité et multiples corrigés (2,0 / 2,5 / 3,5× le bénéfice).
+- **Lire d'abord** : `14-acquisition-sans-reseau.md`. Historique : 13 → 12 → 07.
 
 ## Hypothèses de travail (par défaut, non imposées)
 - Créateur solo ou équipe de 1 à 3 personnes, technique ou aidée par l'IA, capital modéré, objectif : clients payants sans levée.
