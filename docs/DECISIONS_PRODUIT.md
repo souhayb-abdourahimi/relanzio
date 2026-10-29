@@ -27,7 +27,7 @@ Sans ces réglages, rien ne change : le Reply-To reste l’adresse de l’artisa
 
 Garde-fous codés : l’envoi automatique exige `FOLLOWUP_AUTOMATION_ENABLED=true` **et** la détection configurée ; jamais d’envoi, de préparation ni de confirmation après une réponse ; une réponse arrivée pendant un envoi enregistre l’email parti mais ne planifie rien.
 
-Limites connues : une réponse envoyée à une autre adresse que le Reply-To (nouvel email, téléphone) n’est pas vue → bouton « Le client a répondu ». Réponses automatiques (absence) : enregistrées, n’arrêtent pas la séquence. Pièces jointes transmises : PDF, images, Office, ZIP jusqu’à 8 Mo ; les autres sont signalées dans l’email de transfert.
+Limites connues : une réponse envoyée à une autre adresse que le Reply-To (nouvel email, téléphone) n’est pas vue → bouton « Le client a répondu ». Réponses automatiques (absence) : enregistrées, n’arrêtent pas la séquence, mais sont transmises à l’artisan pour information (une vraie réponse mal classée n’est jamais silencieuse). Email non remis : envoi automatique coupé et artisan prévenu. Le titre du devis présent dans l’objet n’est jamais pris pour un signe de réponse automatique. Transfert en échec : réessayé aux relevés suivants, 5 fois au maximum (la réponse reste visible dans l’app). Réponse sur un devis gagné ou perdu : mémorisée, statut inchangé. Pièces jointes transmises : PDF, images, Office, ZIP jusqu’à 8 Mo ; les autres sont signalées dans l’email de transfert.
 
 ## 3. Isolation prospection / produit
 

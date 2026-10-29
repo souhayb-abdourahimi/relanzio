@@ -120,7 +120,7 @@ export function Marketing({onStart=goSignup}){
       <article><b>1</b><h3>Ajoutez le devis envoyé</h3><p>Client, email ou téléphone, objet, montant, date d’envoi. 30 secondes, depuis le téléphone.</p></article>
       <article><b>2</b><h3>Relanzio planifie les relances</h3><p>Trois au maximum, les jours ouvrés à 9 h. Chaque matin, la vue Aujourd’hui vous montre quoi faire.</p></article>
       <article><b>3</b><h3>Un geste par relance</h3><p>Relanzio l’envoie en votre nom (Pro), ou vous l’envoyez par email, SMS ou appel avec le message prêt.</p></article>
-      <article><b>4</b><h3>Le client répond : tout s’arrête</h3><p>{REPLY_STOP_LIVE?'Quand le client répond à une relance envoyée par Relanzio, la séquence s’arrête et sa réponse vous est transmise. Ailleurs (téléphone, SMS), un geste suffit.':'Touchez « Le client a répondu » : plus aucune relance pour ce devis. Puis gagné, perdu, ou relancer plus tard.'}</p></article>
+      <article><b>4</b><h3>{REPLY_STOP_LIVE?'Le client répond : tout s’arrête':'Le client répond : un geste, tout s’arrête'}</h3><p>{REPLY_STOP_LIVE?'Quand le client répond à une relance envoyée par Relanzio, la séquence s’arrête et sa réponse vous est transmise. Ailleurs (téléphone, SMS), un geste suffit.':'Touchez « Le client a répondu » : plus aucune relance pour ce devis. Puis gagné, perdu, ou relancer plus tard.'}</p></article>
     </div></div></section>
     <section className="section container" id="partage">
       <div className="section-head"><span>QUI FAIT QUOI</span><h2>Relanzio fait le suivi. Vous gardez la décision.</h2></div>

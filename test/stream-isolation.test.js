@@ -20,6 +20,7 @@ test('the outreach stream can use its own Brevo key, product keeps the main one;
   assert.match(email,/stream === 'outreach' \? \(process\.env\.OUTREACH_BREVO_API_KEY \|\| process\.env\.BREVO_API_KEY\) : process\.env\.BREVO_API_KEY/);
   assert.match(email,/"api-key": apiKey/);
   assert.match(email,/throw new Error\(`Brevo \$\{r\.status\}: \$\{redactEmails\(await r\.text\(\)\)\}`\)/);
+  assert.match(read('pilot-outreach.js'),/const apiKey = process\.env\.OUTREACH_BREVO_API_KEY \|\| process\.env\.BREVO_API_KEY;/,'pilot preflight checks the outreach account');
   const redact=eval(email.match(/^const redactEmails = (.+);$/m)[1]);
   assert.equal(redact('{"message":"invalid email jean.dupont@example.fr"}'),'{"message":"invalid email [email]"}');
 });

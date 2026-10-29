@@ -19,6 +19,8 @@ export function addParisDaysIso(days,now=new Date(),hour=9,minute=0){
   const key=parisDateKey(now),base=dateNumber(key);
   if(!Number.isFinite(base))return null;
   const d=new Date(base);d.setUTCDate(d.getUTCDate()+Number(days||0));
+  // "Demain" on a Friday means Monday: follow-ups are planned on working days (same rule as the server).
+  const dow=d.getUTCDay();if(dow===6)d.setUTCDate(d.getUTCDate()+2);else if(dow===0)d.setUTCDate(d.getUTCDate()+1);
   return parisLocalDateTimeToIso(`${d.toISOString().slice(0,10)}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
 }
 

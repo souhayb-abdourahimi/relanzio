@@ -334,8 +334,13 @@ app.patch('/api/quotes/:id', requireUser, async(req,res)=>{
     if(targetStatus!=='open')patch.auto_send=false;
     if(!('client_email' in patch?patch.client_email:existing.client_email))patch.auto_send=false;
 
-    const {data,error}=await db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id).select('*').single();
-    if(error)throw error; const bodyKeys=Object.keys(req.body||{}).sort().join(',');
+    // Conditional on the reply state read above: a reply recorded meanwhile is never overwritten by this edit.
+    let update=db.from('quotes').update(patch).eq('id',req.params.id).eq('user_id',req.user.id);
+    update=existing.reply_received_at?update.eq('reply_received_at',existing.reply_received_at):update.is('reply_received_at',null);
+    const {data,error}=await update.select('*').maybeSingle();
+    if(error)throw error;
+    if(!data)return res.status(409).json({error:'Le client vient de répondre : rechargez la page avant de modifier ce devis.',code:'QUOTE_REPLIED'});
+    const bodyKeys=Object.keys(req.body||{}).sort().join(',');
     if(patch.status==='won'&&existing.status!=='won')await db.from('product_events').insert({user_id:req.user.id,event:'quote_won',path:'/app',metadata:{amount:Number(data.amount||0),followups_done:Number(existing.followup_step||0),after_reply:Boolean(existing.reply_received_at)}});
     if(bodyKeys==='followup_schedule_mode,next_followup_at'&&req.body.followup_schedule_mode==='custom')await db.from('product_events').insert({user_id:req.user.id,event:'snoozed',path:'/app'});
     res.json({quote:data});

@@ -22,10 +22,21 @@ const RULES=[
   ['interested',/d['’]accord|ok pour|bon pour accord|on (valide|accepte|signe)|je (valide|accepte|signe)|nous (validons|acceptons|signons)|c['’]est (bon|validé|ok)|on y va|allons-y|quand (pouvez|pourriez|pourrez)-vous|vos disponibilités|date de début|ci-joint (le )?devis signé|devis signé/i]
 ];
 
-// headers: Map of lower-cased header name → values (from parseHeaders).
-export function classifyReply({text='',subject='',from='',headers=new Map(),contentType=''}={}){
+const escapeRegex=v=>v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+// The subject minus what Relanzio wrote in it: the quote title (« … ») must never make a real answer look
+// like an auto-reply or a bounce (e.g. a quote titled « Travaux pendant les congés »).
+export function ownSubject(subject='',title=''){
+  let s=String(subject).replace(/«[^»]*»/g,' ').replace(/"[^"]*"/g,' ');
+  const t=String(title||'').trim();
+  if(t)s=s.replace(new RegExp(escapeRegex(t),'gi'),' ');
+  return s;
+}
+
+// headers: Map of lower-cased header name → values (from parseHeaders). title: the quote's title, if known.
+export function classifyReply({text='',subject='',from='',headers=new Map(),contentType='',title=''}={}){
   const h=name=>(headers.get?.(name)||[]).join(' ').toLowerCase();
-  const f=String(from).toLowerCase(),s=String(subject);
+  const f=String(from).toLowerCase(),s=ownSubject(subject,title);
   if(/^(mailer-daemon|postmaster)@/.test(f)||/multipart\/report|delivery-status/i.test(contentType)||/undeliver|non remis|delivery status notification|échec de (la )?(remise|distribution)|mail delivery failed|returned mail|adresse introuvable/i.test(s))
     return {category:'bounce',effect:'disable_auto'};
   const auto=h('auto-submitted');

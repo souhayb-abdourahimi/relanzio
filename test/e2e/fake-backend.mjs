@@ -64,20 +64,25 @@ export function createFakeBackend({now=()=>new Date(),seedQuotes=[],profile={},c
       if(!q)return json(route,404,{error:'Devis introuvable.'});
       const sub=m[2]||'';
       if(!sub&&method==='PATCH'){
-        if(q.reply_received_at&&['recommended','custom'].includes(body.followup_schedule_mode))q.reply_received_at=null;
+        // Same rule as the server: an explicit plan on an active quote resumes follow-ups after a reply.
+        if(q.reply_received_at&&['recommended','custom'].includes(body.followup_schedule_mode)&&['open','paused'].includes(body.status||q.status))q.reply_received_at=null;
         if(body.followup_schedule_mode==='recommended'&&!body.next_followup_at)body.next_followup_at=nextAt(2);
         Object.assign(q,body);
         if(['won','lost'].includes(q.status)){q.next_followup_at=null;q.followup_schedule_mode='none';}
         return json(route,200,{quote:q});
       }
       if(!sub&&method==='DELETE'){state.quotes=state.quotes.filter(x=>x!==q);return json(route,200,{deleted:true});}
+      if(['/followup-preview','/send-followup','/confirm-manual-followup'].includes(sub)&&q.status!=='open')return json(route,409,{error:'Ce devis n’est pas ouvert.'});
+      if(['/followup-preview','/send-followup','/confirm-manual-followup'].includes(sub)&&q.followup_step>=3)return json(route,409,{error:'Séquence terminée.'});
       if(sub==='/followup-preview'){
         if(q.reply_received_at)return json(route,409,{error:'Le client a répondu : les relances de ce devis sont arrêtées. Repoussez-le pour les reprendre.'});
         return json(route,200,{preview:followupMessage({clientName:q.client_name,title:q.title,companyName:state.profile.company_name},q.followup_step)});
       }
       if(sub==='/client-replied'){
         if(!['open','paused'].includes(q.status))return json(route,409,{error:'Ce devis est déjà marqué gagné ou perdu.'});
-        state.replies.push({id:`r-${state.replies.length+1}`,quote_id:q.id,source:'manual',channel:body.channel||'other',category:'received',effect:'stop',excerpt:null,received_at:now().toISOString()});
+        const key=req.headers()['idempotency-key']||null;
+        if(key&&state.replies.some(r=>r.request_key===key))return json(route,200,{recorded:true,duplicate:true,quote:q});
+        state.replies.push({id:`r-${state.replies.length+1}`,quote_id:q.id,source:'manual',channel:body.channel||'other',category:'received',effect:'stop',excerpt:null,received_at:now().toISOString(),request_key:key});
         Object.assign(q,{reply_received_at:now().toISOString(),next_followup_at:null,followup_schedule_mode:'none',auto_send:false});
         state.events.push('client_reply_received');
         return json(route,200,{recorded:true,quote:q});

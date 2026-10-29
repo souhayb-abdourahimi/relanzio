@@ -29,9 +29,11 @@ begin
   -- 3. After a reply, marking a follow-up as done is refused.
   r:=public.confirm_manual_followup('c7c7c7c7-0000-4000-8000-000000000001','57575757-5757-4757-8757-575757575757',2,'','','k-after-reply','2026-10-29 11:00+00');
   assert not (r->>'ok')::boolean and r->>'code'='QUOTE_REPLIED', r::text;
-  -- 4. Reply on a won quote: recorded, status and dates untouched.
+  -- 4. Reply on a won quote: remembered as answered (reopening cannot follow up), status, step and dates untouched.
   r:=public.apply_quote_reply('c7c7c7c7-0000-4000-8000-000000000002','57575757-5757-4757-8757-575757575757',null,'email','email','received','stop','b@example.test','Merci','email:<m2@x>','2026-10-29 10:00+00');
-  assert (r->>'ok')::boolean and not (r->>'stopped')::boolean and r->'quote'->>'status'='won' and r->'quote'->>'reply_received_at' is null, r::text;
+  assert (r->>'ok')::boolean and not (r->>'stopped')::boolean and r->'quote'->>'status'='won' and r->'quote'->>'reply_received_at' is not null
+    and r->'quote'->>'followup_step'='1' and r->'quote'->>'next_followup_at' is null and (r->'quote'->>'sent_at')::date='2026-10-20', r::text;
+  assert (r->'reply'->>'forward_attempts')::int=0 and r->'reply'->>'notified_at' is null, r::text;
   -- 5. Reply on a paused quote: stops it too (resuming later cannot send to a client who answered).
   r:=public.apply_quote_reply('c7c7c7c7-0000-4000-8000-000000000003','57575757-5757-4757-8757-575757575757',null,'manual','phone','received','stop',null,null,'manual:k5','2026-10-29 10:00+00');
   assert (r->>'stopped')::boolean and r->'quote'->>'status'='paused' and r->'quote'->>'next_followup_at' is null, r::text;

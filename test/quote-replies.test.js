@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { replyConfiguration, newReplyToken, replyAddress, tokenFromRecipients, ingestQuoteReply, pollQuoteReplies, recordManualReply } from '../server/quote-replies.js';
+import { replyConfiguration, newReplyToken, replyAddress, tokenFromRecipients, tokensFromRecipients, dedupeKeyFor, MAX_FORWARD_ATTEMPTS, resetReplyPollCache, ingestQuoteReply, pollQuoteReplies, recordManualReply } from '../server/quote-replies.js';
 import { classifyReply, stripQuotedReply } from '../server/reply-classifier.js';
 import { parseImapReply, extractAttachments, parseHeaders } from '../server/imap-reply-parser.js';
 import { createFakeDb } from './helpers/fake-db.js';
@@ -14,7 +14,8 @@ const CFG=replyConfiguration(ENV);
 const A='00000000-0000-4000-8000-0000000000a1',B='00000000-0000-4000-8000-0000000000b2';
 const TOKEN_A='abcdefghijklmnopqrst',TOKEN_B='bcdefghijklmnopqrstu';
 
-// Mirrors the SQL RPC (covered for real by test/sql/quote_replies.test.sql): dedupe, then effect on open/paused quotes.
+// Mirrors the SQL RPC (covered for real by test/sql/quote_replies.test.sql): dedupe, then effect on open/paused quotes;
+// a stop on a won/lost quote only marks it as answered.
 function harness({forwardFails=false}={}){
   const db=createFakeDb({
     profiles:[{id:A,email:'artisan-a@example.test',company_name:'Toitures A'},{id:B,email:'artisan-b@example.test',company_name:'Plomberie B'}],
@@ -31,17 +32,19 @@ function harness({forwardFails=false}={}){
     if(!quote)return {data:{ok:false,code:'QUOTE_NOT_FOUND'},error:null};
     const replies=db.tables.quote_replies||(db.tables.quote_replies=[]);
     if(replies.some(r=>r.dedupe_key===args.p_dedupe_key))return {data:{ok:true,duplicate:true,stopped:false,quote},error:null};
-    const reply={id:`r${replies.length+1}`,quote_id:quote.id,user_id:quote.user_id,dedupe_key:args.p_dedupe_key,category:args.p_category,effect:args.p_effect,excerpt:args.p_excerpt,source:args.p_source};
+    const reply={id:`r${replies.length+1}`,quote_id:quote.id,user_id:quote.user_id,dedupe_key:args.p_dedupe_key,category:args.p_category,effect:args.p_effect,excerpt:args.p_excerpt,source:args.p_source,notified_at:null,forward_attempts:0};
     replies.push(reply);
     let stopped=false;
     if(['open','paused'].includes(quote.status)&&args.p_effect==='stop'){Object.assign(quote,{reply_received_at:args.p_received_at,auto_send:false,next_followup_at:null});stopped=true;}
     if(['open','paused'].includes(quote.status)&&args.p_effect==='disable_auto')quote.auto_send=false;
+    if(['won','lost'].includes(quote.status)&&args.p_effect==='stop')quote.reply_received_at=quote.reply_received_at||args.p_received_at;
     return {data:{ok:true,duplicate:false,stopped,quote:{...quote},reply},error:null};
   };
   const sent=[],errors=[];
-  const sendEmail=async m=>{if(forwardFails)throw new Error('Brevo 500: upstream');sent.push(m);return {messageId:'<fwd@brevo>'};};
+  const state={forwardFails};
+  const sendEmail=async m=>{if(state.forwardFails)throw new Error('Brevo 500: upstream');sent.push(m);return {messageId:'<fwd@brevo>'};};
   const reportError=async(scope,error,metadata)=>{errors.push({scope,message:String(error.message),metadata});};
-  return {db,rpcCalls,sent,errors,deps:{db,sendEmail,reportError,cfg:CFG}};
+  return {db,rpcCalls,sent,errors,state,deps:{db,sendEmail,reportError,cfg:CFG}};
 }
 const email=(over={})=>({messageId:'<reply-1@client.test>',from:'durand@example.test',to:[`reponses+${TOKEN_A}@relanzio.test`],subject:'Re: Votre devis « Toiture »',receivedAt:'2026-10-30T10:00:00.000Z',headers:new Map(),contentType:'text/plain',text:'Bonjour, c’est d’accord pour moi. Quand pouvez-vous commencer ?\n\nLe 29 oct. 2026, Toitures A a écrit :\n> Je reviens vers vous…',...over});
 
@@ -85,6 +88,11 @@ test('deterministic classification: what the client wrote, not the quoted email'
   assert.equal(c('Bien reçu\n\n> Pouvez-vous me dire où vous en êtes : « oui », « plus tard » ou « non » ?').category,'other','quoted question ignored');
   assert.deepEqual(c('Je suis absent jusqu’au 5 novembre.',{headers:parseHeaders('Auto-Submitted: auto-replied')}),{category:'auto_reply',effect:'record'});
   assert.equal(c('',{subject:'Réponse automatique : absence'}).effect,'record');
+  // Regression: words of the quote title (which Relanzio puts in the subject) never turn a real answer into an auto-reply.
+  assert.deepEqual(c('Oui, c’est d’accord pour moi.',{subject:'Re: Devis « Travaux pendant les congés » : dernier suivi',title:'Travaux pendant les congés'}),{category:'interested',effect:'stop'});
+  assert.equal(c('Merci, je regarde.',{subject:'RE: Votre devis Réparation absence de gouttière',title:'Réparation absence de gouttière'}).effect,'stop');
+  assert.equal(c('Merci',{subject:'Re: Devis « Remise en état après absence »'}).effect,'stop','title in « » ignored even without the title');
+  assert.equal(c('Je suis absent.',{subject:'Absence du bureau : Re: Devis « Toiture »',title:'Toiture'}).effect,'record','a real auto-reply subject still counts');
   assert.deepEqual(c('550 user unknown',{from:'mailer-daemon@mx.example.test',subject:'Undelivered Mail'}),{category:'bounce',effect:'disable_auto'});
   assert.equal(stripQuotedReply('Oui merci\nOn Tue, Oct 28, 2026 at 9:00 AM Toitures A <x@y.z> wrote:\n> old'),'Oui merci');
 });
@@ -127,7 +135,7 @@ test('a token only ever reaches its own quote: two artisans stay isolated',async
   assert.equal(h.sent[0].to,'artisan-b@example.test');
 });
 
-test('STOP in a reply opts the client out for that artisan; out-of-office only records',async()=>{
+test('STOP in a reply opts the client out for that artisan; out-of-office only records but is still shown to the artisan',async()=>{
   const h=harness();
   await ingestQuoteReply(email({text:'STOP merci'}),h.deps);
   assert.deepEqual(h.db.tables.followup_optouts.map(o=>[o.user_id,o.email,o.source]),[[A,'durand@example.test','reply_stop']]);
@@ -135,7 +143,49 @@ test('STOP in a reply opts the client out for that artisan; out-of-office only r
   const r=await ingestQuoteReply(email({subject:'Réponse automatique : absent',text:'Absent jusqu’au 5/11'}),h2.deps);
   assert.deepEqual(r,{status:'recorded',category:'auto_reply'});
   assert.equal(h2.db.tables.quotes.find(q=>q.id==='qa').reply_received_at,null,'sequence continues');
-  assert.equal(h2.sent.length,0,'not forwarded');
+  // Forwarded as information, so a misclassified real answer is never silent.
+  assert.equal(h2.sent.length,1);
+  assert.match(h2.sent[0].subject,/Réponse automatique de M\. Durand/);
+  assert.match(h2.sent[0].text,/Les relances continuent\. Si c’est en fait une vraie réponse, indiquez « Le client a répondu »/);
+  assert.doesNotMatch(h2.sent[0].text,/a arrêté les relances/);
+});
+
+test('a bounce disables automatic sending and tells the artisan, without forwarding the server message',async()=>{
+  const h=harness();
+  const r=await ingestQuoteReply(email({from:'mailer-daemon@mx.example.test',subject:'Undelivered Mail Returned to Sender',text:'550 5.1.1 user unknown'}),h.deps);
+  assert.deepEqual(r,{status:'recorded',category:'bounce'});
+  const q=h.db.tables.quotes.find(x=>x.id==='qa');
+  assert.equal(q.auto_send,false);assert.equal(q.reply_received_at,null);
+  assert.equal(h.sent.length,1);assert.equal(h.sent[0].replyTo,undefined);
+  assert.match(h.sent[0].text,/n’a pas pu être remis à durand@example\.test/);
+  assert.doesNotMatch(h.sent[0].text,/550/);
+});
+
+test('an opt-out that cannot be stored is an error, never silently ignored',async()=>{
+  const h=harness();const from=h.db.from.bind(h.db);
+  h.db.from=t=>t==='followup_optouts'?{upsert:async()=>({data:null,error:{message:'db down'}})}:from(t);
+  await assert.rejects(ingestQuoteReply(email({text:'STOP'}),h.deps),{message:'db down'});
+});
+
+test('a reply on a won quote is remembered without changing its status',async()=>{
+  const h=harness();
+  Object.assign(h.db.tables.quotes.find(q=>q.id==='qa'),{status:'won',auto_send:false,next_followup_at:null});
+  const r=await ingestQuoteReply(email(),h.deps);
+  assert.equal(r.status,'recorded');
+  const q=h.db.tables.quotes.find(x=>x.id==='qa');
+  assert.equal(q.status,'won');assert.ok(q.reply_received_at);
+});
+
+test('one email answering two follow-ups reaches both quotes, each once',async()=>{
+  const h=harness();
+  h.db.tables.followups.push({id:'fa2',quote_id:'qa2',user_id:A,reply_token:'cdefghijklmnopqrstuv'});
+  h.db.tables.quotes.push({id:'qa2',user_id:A,client_name:'M. Durand',client_email:'durand@example.test',title:'Gouttières',status:'open',auto_send:true,next_followup_at:'2026-11-02T08:00:00Z',reply_received_at:null});
+  const to=[`reponses+${TOKEN_A}@relanzio.test`,'reponses+cdefghijklmnopqrstuv@relanzio.test'];
+  assert.deepEqual(tokensFromRecipients([...to,to[0].toUpperCase()],CFG),[TOKEN_A,'cdefghijklmnopqrstuv']);
+  assert.notEqual(dedupeKeyFor({messageId:'<m@x>'},TOKEN_A),dedupeKeyFor({messageId:'<m@x>'},'cdefghijklmnopqrstuv'));
+  for(const token of tokensFromRecipients(to,CFG))assert.equal((await ingestQuoteReply(email({to}),{...h.deps,token})).status,'stopped');
+  assert.ok(h.db.tables.quotes.filter(q=>q.user_id===A).every(q=>q.reply_received_at));
+  assert.equal(h.db.tables.quote_replies.length,2);
 });
 
 test('if the forward fails the stop still holds and the error report contains no message content',async()=>{
@@ -146,6 +196,22 @@ test('if the forward fails the stop still holds and the error report contains no
   assert.equal(h.errors.length,1);
   const dump=JSON.stringify(h.errors[0].metadata);
   assert.doesNotMatch(dump,/accord|durand@|Toiture/);
+});
+
+test('a failed forward is retried on the next poll, a bounded number of times, and never sent twice',async()=>{
+  const h=harness({forwardFails:true});
+  assert.equal((await ingestQuoteReply(email(),h.deps)).status,'stopped_forward_failed');
+  assert.equal(h.db.tables.quote_replies[0].forward_attempts,1);
+  h.state.forwardFails=false;
+  assert.deepEqual(await ingestQuoteReply(email(),h.deps),{status:'forward_retried',category:'interested'});
+  assert.equal(h.sent.length,1);assert.ok(h.db.tables.quote_replies[0].notified_at);
+  assert.deepEqual(await ingestQuoteReply(email(),h.deps),{status:'duplicate'});
+  assert.equal(h.sent.length,1);
+  assert.equal(h.rpcCalls.filter(c=>c.args.p_effect==='stop').length,3,'the stop is idempotent in the database');
+  // Provider down for good: gives up after MAX_FORWARD_ATTEMPTS (the reply stays visible in the app).
+  const h2=harness({forwardFails:true});
+  for(let i=0;i<MAX_FORWARD_ATTEMPTS+3;i++)await ingestQuoteReply(email(),h2.deps);
+  assert.equal(h2.errors.filter(e=>e.scope==='reply.forward').length,MAX_FORWARD_ATTEMPTS);
 });
 
 test('attachments: allowed files forwarded, others announced, never silently dropped',async()=>{
@@ -161,8 +227,9 @@ test('attachments: allowed files forwarded, others announced, never silently dro
 });
 
 test('the reply mailbox poll is read-only, skips other mail and already ingested replies',async()=>{
+  resetReplyPollCache();
   const h=harness();
-  h.db.tables.quote_replies=[{id:'old',dedupe_key:'email:<seen@x>'}];
+  h.db.tables.quote_replies=[{id:'old',dedupe_key:`email:${TOKEN_A}:<seen@x>`,notified_at:'2026-10-29T10:00:00Z',forward_attempts:1}];
   const lit=s=>Buffer.from(`* 1 FETCH (RFC822.SIZE ${s.length} BODY[] {${Buffer.byteLength(s)}}\r\n${s})\r\nA OK\r\n`);
   const mails={
     1:`Message-ID: <seen@x>\r\nTo: reponses+${TOKEN_A}@relanzio.test\r\nFrom: durand@example.test\r\n\r\nDéjà vu`,
@@ -185,6 +252,35 @@ test('the reply mailbox poll is read-only, skips other mail and already ingested
   assert.ok(commands.includes('CLOSE'));
   assert.ok(!commands.some(c=>/STORE|EXPUNGE|DELETE|SELECT /.test(c)));
   assert.ok(h.db.tables.quotes.find(q=>q.id==='qa').reply_received_at);
+  // Second poll (every 2 min): messages already handled or irrelevant are not fetched again.
+  commands.length=0;
+  const again=await pollQuoteReplies({...h.deps,Client:FakeImap,log:()=>{}});
+  assert.deepEqual({i:again.ingested,s:again.skipped},{i:0,s:3});
+  assert.deepEqual(commands.filter(c=>/^(HEAD|RAW)/.test(c)),[],'no fetch at all');
+  assert.equal(h.sent.length,1);
+});
+
+test('the poll fetches a message again only while its forward still has to be retried',async()=>{
+  resetReplyPollCache();
+  const h=harness({forwardFails:true});
+  const lit=s=>Buffer.from(`* 1 FETCH (RFC822.SIZE ${s.length} BODY[] {${Buffer.byteLength(s)}}\r\n${s})\r\nA OK\r\n`);
+  const mail=`Message-ID: <retry@x>\r\nTo: reponses+${TOKEN_A}@relanzio.test\r\nFrom: durand@example.test\r\nSubject: Re: devis\r\n\r\nOui, on y va.`;
+  const commands=[];
+  class FakeImap{
+    async connect(){}
+    async examine(box){return {status:box==='INBOX'?'OK':'NO',response:Buffer.from('* OK [UIDVALIDITY 42]\r\n')};}
+    async searchSince(){return {status:'OK',response:Buffer.from('* SEARCH 7\r\n')};}
+    async fetchHeaders(uid){commands.push('HEAD '+uid);return {status:'OK',response:lit(mail)};}
+    async fetchRaw(uid){commands.push('RAW '+uid);return {status:'OK',response:lit(mail)};}
+    async close(){}
+  }
+  const poll=()=>pollQuoteReplies({...h.deps,Client:FakeImap,log:()=>{}});
+  assert.equal((await poll()).ingested,1);assert.equal(h.sent.length,0);
+  h.state.forwardFails=false;
+  assert.equal((await poll()).retried,1);assert.equal(h.sent.length,1);
+  commands.length=0;
+  assert.equal((await poll()).skipped,1);assert.deepEqual(commands,[]);
+  assert.equal(h.sent.length,1,'forwarded exactly once');
 });
 
 test('"Le client a répondu" (phone, SMS…) stops the quote through the same database rule',async()=>{

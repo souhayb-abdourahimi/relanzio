@@ -33,6 +33,10 @@ test('Today classification uses Paris calendar before and after midnight',()=>{
 
 test('postpone creates a Paris-local 09:00 date across DST',()=>{
   assert.equal(addParisDaysIso(3,new Date('2026-10-23T10:00:00.000Z')),'2026-10-26T08:00:00.000Z');
+  // Friday + 1 day and Friday + 1 week (a Friday) stay on working days; Friday + 1 lands on Monday, not Saturday.
+  assert.equal(addParisDaysIso(1,new Date('2026-10-23T10:00:00.000Z')),'2026-10-26T08:00:00.000Z');
+  assert.equal(addParisDaysIso(2,new Date('2026-10-23T10:00:00.000Z')),'2026-10-26T08:00:00.000Z');
+  assert.equal(addParisDaysIso(7,new Date('2026-10-23T10:00:00.000Z')),'2026-10-30T08:00:00.000Z');
 });
 
 test('100 active quotes group and sort without mutation',()=>{

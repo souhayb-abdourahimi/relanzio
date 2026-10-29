@@ -291,6 +291,8 @@ async function a11y(browser){
   const axe=readFileSync(process.env.AXE_PATH,'utf8');
   const report=[];
   const audit=async(page,name)=>{
+    // Audit the settled screen: mid-animation opacity blends colours and gives random contrast results.
+    await page.waitForFunction(()=>document.getAnimations().every(a=>a.playState!=='running'),null,{timeout:5000}).catch(()=>{});
     await page.addScriptTag({content:axe});
     const r=await page.evaluate(async()=>await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}));
     const bad=r.violations.filter(v=>['serious','critical'].includes(v.impact));

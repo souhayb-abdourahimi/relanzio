@@ -24,6 +24,7 @@ create table if not exists public.quote_replies (
   dedupe_key text not null unique,
   received_at timestamptz not null,
   notified_at timestamptz,
+  forward_attempts integer not null default 0 check (forward_attempts>=0),
   created_at timestamptz not null default now()
 );
 create index if not exists quote_replies_quote_idx on public.quote_replies(quote_id,received_at desc);
@@ -43,7 +44,7 @@ $$;
 --   stop          open/paused quote: reply_received_at set, auto_send off, no next follow-up
 --   disable_auto  auto_send off only (e.g. delivery failure notice)
 --   record        history only (e.g. out-of-office auto-reply)
--- A won or lost quote keeps its status: the reply is only recorded.
+-- A won or lost quote keeps its status and dates; a stop reply still marks it as answered (reply_received_at).
 create or replace function public.apply_quote_reply(
   p_quote_id uuid,
   p_user_id uuid,
@@ -88,6 +89,10 @@ begin
     elsif p_effect='disable_auto' then
       update public.quotes set auto_send=false,updated_at=now() where id=p_quote_id returning * into v_quote;
     end if;
+  elsif p_effect='stop' then
+    update public.quotes
+    set reply_received_at=greatest(coalesce(reply_received_at,v_reply.received_at),v_reply.received_at),updated_at=now()
+    where id=p_quote_id returning * into v_quote;
   end if;
 
   return jsonb_build_object('ok',true,'duplicate',false,'stopped',v_stopped,'quote',to_jsonb(v_quote),'reply',to_jsonb(v_reply));

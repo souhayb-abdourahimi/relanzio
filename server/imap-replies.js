@@ -208,4 +208,4 @@ export async function pollImapReplies({now=new Date()}={}){
 }
 
 // Transport reused by the product reply mailbox (server/quote-replies.js); prospection logic above is unchanged.
-export { ReadOnlyImapClient, extractLiteral, parseSearchUids, parseMessageSize };
+export { ReadOnlyImapClient, extractLiteral, parseSearchUids, parseMessageSize, parseUidValidity };

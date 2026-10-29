@@ -51,7 +51,7 @@ function QuoteActionCard({quote,profile,onPrepare,onPostpone,onStatus,onClientRe
   const edit=onEdit&&!locked&&{label:'Modifier',onClick:()=>onEdit(quote)};
   const btn=(item,primary)=><button className={'mini-btn'+(primary?' primary-action':'')} disabled={busy} onClick={item.onClick}>{item.label}</button>;
   let main,more;
-  if(locked){main=[btn(won),btn(lost)];more=[replied];}
+  if(locked){main=[btn(won),btn(lost)];more=meta.replied?[]:[replied];}
   else if(meta.replied){main=[btn(won,true),btn(lost)];more=[{label:'Relancer plus tard',onClick:later.onClick},{label:'Reprendre les relances',onClick:()=>onResume?.(quote)},edit];}
   else if(meta.terminal){main=[tel?<a className="mini-btn primary-action" href={tel}>Appeler</a>:btn(won,true),btn(tel?won:lost)];more=[tel&&lost,later,replied,edit];}
   else{main=[btn({label:'Relancer',onClick:()=>onPrepare?.(quote)},meta.bucket!=='future'),btn(later)];more=[replied,won,lost,pause,edit];}
