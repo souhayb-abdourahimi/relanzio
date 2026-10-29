@@ -45,9 +45,10 @@ def simuler(o, fiscal, mult, cout_h):
             "heures": heures, "taux_horaire_fondateur": net_fondateur / heures if heures else 0,
             "sde_mensuel": sde_mensuel, "benefice_ajuste": benefice_ajuste,
             "cout_remplacement_churn": remplacement, "benefice_ajuste_net_acq": benefice_ajuste_net_acq,
-            "val_pess": max(0, benefice_ajuste_net_acq * 12 * mult["pessimiste"]),
-            "val_cent": max(0, benefice_ajuste_net_acq * 12 * mult["central"]),
-            "val_fav": max(0, benefice_ajuste_net_acq * 12 * mult["favorable"]),
+            # Convention de marché (P7-cession.md) : multiple x SDE annuel, net du coût d'acquisition de remplacement.
+            "val_pess": max(0, (sde_mensuel - remplacement) * 12 * mult["pessimiste"]),
+            "val_cent": max(0, (sde_mensuel - remplacement) * 12 * mult["central"]),
+            "val_fav": max(0, (sde_mensuel - remplacement) * 12 * mult["favorable"]),
             "clients_perdus_an": n * (1 - (1 - o["churn_mensuel"]) ** 12),
         })
     return lignes
@@ -64,8 +65,8 @@ def main(cfg_path, out_path):
          f"Généré par `_work/micro_saas_sim.py` depuis `{cfg_path}`. **Toutes les entrées sont des estimations** sauf mention contraire.", "",
          f"- Cotisations sociales : {f['taux_cotisations']:.1%} du CA ; CFP : {f['cfp']:.2%} ; versement libératoire de l'IR : {f['taux_vl']:.1%} (source : {f['source']}).",
          f"- Coût d'un opérateur qui remplacerait le fondateur : {ch} €/h.",
-         f"- Multiples appliqués au bénéfice ajusté annuel (net du coût d'acquisition de remplacement) : pessimiste {m['pessimiste']}×, central {m['central']}×, favorable {m['favorable']}× (source : {m['source']}). **Ce ne sont pas des prix garantis.**",
-         "- **Net fondateur** = trésorerie disponible après charges réelles, cotisations et IR libératoire. **Bénéfice ajusté** = bénéfice avant impôts personnels, moins le coût d'un opérateur rémunéré pour les heures d'exploitation. C'est ce qu'un repreneur achète.", ""]
+         f"- Multiples appliqués, selon la convention de marché, au **SDE annuel** (bénéfice avant rémunération du propriétaire), net du coût d'acquisition de remplacement : pessimiste {m['pessimiste']}×, central {m['central']}×, favorable {m['favorable']}× (source : {m['source']}). **Ce ne sont pas des prix garantis.**",
+         "- **Net fondateur** = trésorerie disponible après charges réelles, cotisations et IR libératoire. **Bénéfice ajusté** = bénéfice avant impôts personnels, moins le coût d'un opérateur rémunéré pour les heures d'exploitation. C'est le rendement économique réel ; un acheteur qui ne travaille pas lui-même raisonnera sur ce chiffre et paiera moins.", ""]
     for o in cfg["opportunites"]:
         L += [f"## {o['id']} — {o['titre']}", "",
               f"Prix {o['prix_mensuel_ht']} € HT/mois ; coût variable {o['cout_variable_client_mois']} €/client/mois ; paiement {o['frais_paiement_pct']:.1%} + {o['frais_paiement_fixe']} € ; fixes {o['fixes_mensuels']} €/mois ; "
