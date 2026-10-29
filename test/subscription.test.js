@@ -44,3 +44,35 @@ test('paid Pro user is current and does not get an upgrade CTA',()=>{
   assert.equal(state.paid,true);
   assert.equal(state.upgradeVisible,false);
 });
+
+test('past_due accounts get the portal, not a second checkout',async()=>{
+  const { accountBanner }=await import('../client/src/trial-display.js');
+  const state=subscriptionDisplay({plan:'free',subscription_status:'past_due',pro_access:false,stripe_customer_id:'cus_1'},true,false);
+  assert.equal(state.pastDue,true);
+  assert.equal(state.upgradeVisible,false);
+  assert.equal(state.portalVisible,true);
+  const banner=accountBanner({subscription_status:'past_due',in_payment_grace:true,payment_grace_ends_at:'2026-12-15T00:00:00.000Z'});
+  assert.equal(banner.action,'portal');
+  assert.match(banner.label,/Paiement refusé : mettez à jour votre carte avant le 15\/12\/2026/);
+  assert.match(banner.endText,/Pro reste actif/);
+  const after=accountBanner({subscription_status:'past_due',in_payment_grace:false});
+  assert.match(after.label,/repassé en formule gratuite/);
+  assert.equal(accountBanner({subscription_status:'unpaid'}).action,'portal');
+});
+
+test('cancellation keeps Pro until the end of the paid period and says so',async()=>{
+  const { accountBanner }=await import('../client/src/trial-display.js');
+  const profile={plan:'pro',subscription_status:'active',pro_access:true,is_paid_subscription:true,stripe_customer_id:'cus_1',subscription_cancel_at_period_end:true,subscription_current_period_end:'2026-11-27T10:00:00.000Z'};
+  const state=subscriptionDisplay(profile,true,false);
+  assert.equal(state.canceling,true);
+  assert.equal(state.portalVisible,true);
+  assert.match(accountBanner(profile).label,/Pro jusqu’au 27\/11\/2026/);
+});
+
+test('free accounts above the limit see how many quotes are read-only',async()=>{
+  const { accountBanner }=await import('../client/src/trial-display.js');
+  const b=accountBanner({plan:'free',subscription_status:'none'},3);
+  assert.equal(b.kind,'locked');
+  assert.match(b.label,/3 devis en lecture seule/);
+  assert.equal(accountBanner({plan:'free',subscription_status:'none'},0).kind,null);
+});

@@ -6,7 +6,9 @@ import { billingTransition, planForSubscriptionStatus, shouldIgnoreBillingEvent 
 test('billing access is conservative across renewal failure and cancellation',()=>{
   assert.equal(planForSubscriptionStatus('active'),'pro');
   assert.equal(planForSubscriptionStatus('trialing'),'pro');
-  assert.equal(planForSubscriptionStatus('past_due'),'free');
+  assert.equal(planForSubscriptionStatus('past_due'),'pro','past_due keeps the plan; the grace period decides access');
+  assert.equal(planForSubscriptionStatus('unpaid'),'free');
+  assert.equal(planForSubscriptionStatus('canceled'),'free');
   assert.deepEqual(billingTransition('customer.subscription.deleted',{}, {plan:'pro',subscription_status:'active'}),{plan:'free',subscription_status:'canceled'});
   assert.deepEqual(billingTransition('invoice.paid',{}, {plan:'free',subscription_status:'past_due'}),{plan:'pro',subscription_status:'active'});
   assert.deepEqual(billingTransition('invoice.payment_failed',{}, {plan:'pro',subscription_status:'active'}),{plan:'pro',subscription_status:'past_due'});
@@ -23,9 +25,11 @@ test('Stripe billing event ordering ignores stale or foreign subscription events
 });
 
 test('Stripe webhook idempotency and ordering guards are present in release source',()=>{
-  const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  const server=readFileSync(new URL('../server/stripe-webhook.js',import.meta.url),'utf8');
+  const index=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
+  assert.match(index,/stripe\.webhooks\.constructEvent\(req\.body, req\.headers\['stripe-signature'\], process\.env\.STRIPE_WEBHOOK_SECRET\)/);
   assert.match(server,/stripe_webhook_events'\)\.insert\(\{event_id:event\.id,event_type:event\.type\}\)/);
-  assert.match(server,/claimError\?\.code === '23505'/);
+  assert.match(server,/claimError\?\.code==='23505'/);
   assert.match(server,/shouldIgnoreBillingEvent/);
   assert.match(server,/stripe_state_event_created/);
 });
@@ -44,7 +48,7 @@ test('release source contains required self-service routes and safety gates',()=
   const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
   assert.match(outreach,/ACQUISITION_ENABLED!=='true'/);
   assert.match(controlled,/COMMERCIAL_OUTREACH_SEND_ENABLED!=='true'/);
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   for(const path of ['/pricing','/docs','/faq','/contact','/reset-password'])assert.ok(client.includes(path),path);
   assert.match(client,/updateUser\(\{password:p1\}\)/);
 });
@@ -102,18 +106,20 @@ test('Stripe customer is stable while checkout idempotency is versioned per clai
 
 test('pricing and Stripe checkout stay aligned with VAT-exempt micro-enterprise configuration',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   const subscription=readFileSync(new URL('../client/src/subscription-display.js',import.meta.url),'utf8');
   const legal=readFileSync(new URL('../client/src/LegalPage.jsx',import.meta.url),'utf8');
-  assert.match(server,/TVA non applicable, art\. 293 B du CGI/);
+  const shared=readFileSync(new URL('../shared/plans.js',import.meta.url),'utf8');
+  assert.match(shared,/VAT_NOTICE='TVA non applicable, art\. 293 B du CGI'/);
+  assert.match(server,/import \{ VAT_NOTICE,PRO_PRICE_LABEL[^}]*\} from '\.\.\/shared\/plans\.js'/);
   assert.match(server,/automatic_tax:\{enabled:false\}/);
   assert.match(server,/invoice_settings:\{footer:VAT_NOTICE\}/);
   assert.match(server,/custom_text:\{submit:\{message:PRO_PRICE_LABEL\}\}/);
-  assert.match(client,/TVA non applicable, art\. 293 B du CGI/);
-  assert.match(subscription,/vatNote:'TVA non applicable, art\. 293 B du CGI'/);
+  assert.match(client,/VAT_NOTICE/);
+  assert.match(subscription,/vatNote:VAT_NOTICE/);
   assert.match(plans,/PRO_PLAN\.vatNote/);
-  assert.match(legal,/29 € \/ mois, sans engagement de durée minimale/);
+  assert.match(legal,/\{PRO_PRICE_TEXT\}, sans engagement de durée minimale\. \{VAT_NOTICE\}/);
   assert.match(legal,/Escompte pour paiement anticipé : néant/);
   assert.match(legal,/indemnité forfaitaire de 40 €/);
   assert.doesNotMatch([client,plans,subscription,legal].join('\n'),/29 € \+ TVA|TVA à 20 %|TVA 20 %/i);
@@ -121,7 +127,7 @@ test('pricing and Stripe checkout stay aligned with VAT-exempt micro-enterprise 
 
 test('production capabilities remain independently gated',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   assert.match(server,/BILLING_ENABLED!=='true'/);
   const outreach=readFileSync(new URL('../server/outreach.js',import.meta.url),'utf8');
   const controlled=readFileSync(new URL('../server/controlled-outreach.js',import.meta.url),'utf8');
@@ -133,7 +139,7 @@ test('production capabilities remain independently gated',()=>{
 });
 
 test('public site uses role-based Relanzio contact addresses and no persistent audience id',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const lifecycle=readFileSync(new URL('../server/lifecycle.js',import.meta.url),'utf8');
   assert.match(client,/support@relanzio\.com/);
   assert.match(client,/contact@relanzio\.com/);
@@ -193,11 +199,11 @@ test('launch build uses lockfile installs in CI and Docker',()=>{
 });
 
 test('public launch copy uses explicit account and trial CTAs without inventing payment',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   assert.match(client,/Créer un compte gratuit/);
-  assert.match(plans,/Essayer Pro gratuitement pendant 7 jours/);
-  assert.match(plans,/Sans carte bancaire et sans débit automatique/);
+  assert.match(plans,/il démarre automatiquement à l’ajout de votre premier devis/);
+  assert.doesNotMatch(plans,/onStartTrial/);
   assert.match(client,/Compte, données et facturation/);
   assert.match(client,/mailto:\$\{support\}/);
 });
@@ -210,7 +216,7 @@ test('privacy copy includes direct B2B opposition right',()=>{
 
 
 test('compact mobile navigation remains accessible',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const css=readFileSync(new URL('../client/src/styles.css',import.meta.url),'utf8');
   assert.match(client,/aria-label="Navigation de l’application"/);
   assert.match(client,/aria-label="Tableau de bord"/);
@@ -227,7 +233,7 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   const migration=readFileSync(new URL('../supabase/migrations/006_pro_trial_7d.sql',import.meta.url),'utf8');
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
   const followups=readFileSync(new URL('../server/followups.js',import.meta.url),'utf8');
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   const trialUi=readFileSync(new URL('../client/src/TrialStatus.jsx',import.meta.url),'utf8');
   const trialDisplay=readFileSync(new URL('../client/src/trial-display.js',import.meta.url),'utf8');
   for(const field of ['trial_started_at','trial_ends_at','trial_expired_at']){
@@ -235,17 +241,18 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
     assert.ok(migration.includes(field),field);
   }
   assert.match(schema,/create table if not exists public\.trial_events/);
-  assert.match(server,/app\.post\('\/api\/trial\/start'/);
+  assert.match(server,/async function startTrialOnFirstQuote/);
+  assert.doesNotMatch(server,/app\.post\('\/api\/trial\/start'/);
   assert.match(server,/app\.post\('\/api\/admin\/trials\/grant'/);
   assert.match(server,/expireTrials\(\)/);
   assert.match(server,/hasProAccess\(profile\)/);
   assert.match(followups,/hasProAccess\(profile\)/);
   assert.match(client,/profile\.pro_access/);
-  assert.match(trialUi,/trialDisplay\(profile\)/);
-  assert.match(trialDisplay,/Essai Pro —/);
-  assert.match(trialDisplay,/Passer à Pro — 29 € \/ mois/);
+  assert.match(trialUi,/accountBanner\(profile,lockedCount\)/);
+  assert.match(trialDisplay,/Essai Pro :/);
+  assert.match(trialDisplay,/upgradeLabel:UPGRADE_LABEL/);
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
-  assert.match(plans,/Essayer Pro gratuitement pendant 7 jours/);
+  assert.match(plans,/Essai Pro de \{TRIAL_DAYS\} jours sans carte bancaire/);
 });
 
 test('trial accounts are excluded from paid MRR metrics',()=>{
@@ -278,9 +285,9 @@ test('production SPA fallback serves only known routes and 404s scanner paths',(
 
 
 test('signup pins confirmation redirect and records acceptance metadata',()=>{
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8');
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
   assert.match(client,/emailRedirectTo:location\.origin\+'\/'/);
   assert.match(client,/terms_accepted_at:new Date\(\)\.toISOString\(\)/);
-  assert.match(client,/terms_version:'2026-10-16'/);
+  assert.match(client,/terms_version:'2026-10-28'/);
   assert.match(client,/privacy_acknowledged_at:new Date\(\)\.toISOString\(\)/);
 });

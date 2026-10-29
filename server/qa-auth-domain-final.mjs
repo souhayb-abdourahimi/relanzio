@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { lockedQuoteIds } from '../shared/quota.js';
 
 const stamp=Date.now(),results=[];
 let userA,userB,server,local,app,db,createClient;
@@ -158,6 +159,12 @@ try{
     assert(p.status===200,'onboarding_'+(u===userA?'a':'b'),'HTTP '+p.status);
   }
 
+  // Product rule: the 7-day Pro trial starts automatically with the account's first quote.
+  // userA is the trial account; userB is prepared below as a Free account whose trial is already used.
+  const beforeFirstQuote=await api(userA.token,'/api/profile');
+  const fresh=beforeFirstQuote.data?.profile;
+  assert(beforeFirstQuote.status===200&&!fresh?.trial_started_at&&fresh?.trial_active===false&&fresh?.pro_access===false&&fresh?.trial_eligible===true,'no_trial_before_first_quote',JSON.stringify({status:beforeFirstQuote.status,trial_started_at:fresh?.trial_started_at||null,pro_access:fresh?.pro_access}));
+
   const sentAt=new Date().toISOString().slice(0,10);
   const customAt=new Date(Date.now()+48*3600000).toISOString();
   const idem='cert-a-'+stamp;
@@ -165,6 +172,10 @@ try{
   const created=await api(userA.token,'/api/quotes',{method:'POST',body:quotePayload,headers:{'Idempotency-Key':idem}});
   assert(created.status===201&&created.data.quote?.followup_schedule_mode==='custom','custom_followup_created','HTTP '+created.status);
   const q=created.data.quote;
+  const trialProfile=created.data.profile||{};
+  const trialStartedAt=trialProfile.trial_started_at,trialEndsAt=trialProfile.trial_ends_at;
+  const t0=new Date(trialStartedAt||0).getTime(),t1=new Date(trialEndsAt||0).getTime();
+  assert(Boolean(trialStartedAt)&&trialProfile.trial_active===true&&trialProfile.pro_access===true&&t1-t0===7*24*3600000,'first_quote_starts_trial_exact_7d',JSON.stringify({pro_access:trialProfile.pro_access,trial_started_at:trialStartedAt||null,trial_ends_at:trialEndsAt||null,span_ms:t1-t0}));
   const duplicate=await api(userA.token,'/api/quotes',{method:'POST',body:quotePayload,headers:{'Idempotency-Key':idem}});
   assert(duplicate.status===200&&duplicate.data.idempotent===true&&duplicate.data.quote?.id===q.id,'quote_idempotency');
 
@@ -182,19 +193,26 @@ try{
   const recommended=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'recommended'}});
   assert(recommended.status===200&&Boolean(recommended.data.quote.next_followup_at),'resume_recommended_schedule');
 
-  for(let i=0;i<3;i++){
-    const r=await api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Concurrence '+i,client_email:'race+'+i+'@example.com',title:'Préparation quota '+i,amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-race-seed-'+stamp+'-'+i}});
-    assert(r.status===201,'concurrency_seed_'+i,'HTTP '+r.status);
-  }
-  const concurrent=await Promise.all([0,1].map(i=>api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Course '+i,client_email:'race-final+'+i+'@example.com',title:'Création concurrente '+i,amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-race-final-'+stamp+'-'+i}})));
-  const concurrentStatuses=concurrent.map(x=>x.status).sort();
-  assert(concurrentStatuses[0]===201&&concurrentStatuses[1]===403,'atomic_free_quota_under_concurrent_create',JSON.stringify(concurrentStatuses));
+  // Free quota account: a real post-trial state (trial used and expired, never subscribed), prepared before
+  // its first quote so the automatic first-quote trial does not apply. Auto-trial stays enabled in production.
+  const usedTrialEnd=new Date(Date.now()-24*3600000).toISOString();
+  const {error:freeSeedError}=await db.from('profiles').update({plan:'free',subscription_status:'none',trial_started_at:new Date(Date.now()-8*24*3600000).toISOString(),trial_ends_at:usedTrialEnd,trial_expired_at:usedTrialEnd}).eq('id',userB.id);
+  if(freeSeedError)throw freeSeedError;
+  const freeProfile=await api(userB.token,'/api/profile');
+  const fp=freeProfile.data?.profile;
+  assert(freeProfile.status===200&&fp?.effective_plan==='free'&&fp?.pro_access===false&&fp?.trial_active===false&&fp?.trial_eligible===false,'free_qa_user_prepared',JSON.stringify({status:freeProfile.status,effective_plan:fp?.effective_plan,trial_eligible:fp?.trial_eligible}));
 
   const seeded=[];
-  for(let i=0;i<5;i++){
-    const r=await api(userB.token,'/api/quotes',{method:'POST',body:{client_name:'Client '+i,client_email:'client+'+i+'@example.com',title:'Quota '+i,amount:i===0?'0':'29',sent_at:sentAt,followup_schedule_mode:'recommended'},headers:{'Idempotency-Key':'cert-b-'+stamp+'-'+i}});
-    assert(r.status===201,'free_quota_seed_'+i,'HTTP '+r.status);seeded.push(r.data.quote);
+  for(let i=0;i<4;i++){
+    const r=await api(userB.token,'/api/quotes',{method:'POST',body:{client_name:'Client '+i,client_email:'client+'+i+'@example.com',title:'Quota '+i,amount:i===0?'0':'29',sent_at:sentAt,followup_schedule_mode:i%2?'none':'recommended'},headers:{'Idempotency-Key':'cert-b-'+stamp+'-'+i}});
+    assert(r.status===201&&r.data.profile?.pro_access===false,'free_quota_seed_'+i,'HTTP '+r.status+' pro_access='+r.data.profile?.pro_access);seeded.push(r.data.quote);
   }
+  const concurrent=await Promise.all([0,1].map(i=>api(userB.token,'/api/quotes',{method:'POST',body:{client_name:'Course '+i,client_email:'race-final+'+i+'@example.com',title:'Création concurrente '+i,amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-race-final-'+stamp+'-'+i}})));
+  const concurrentStatuses=concurrent.map(x=>x.status).sort();
+  const {count:activeAfterRace,error:activeAfterRaceError}=await db.from('quotes').select('*',{count:'exact',head:true}).eq('user_id',userB.id).in('status',['open','paused']);
+  if(activeAfterRaceError)throw activeAfterRaceError;
+  assert(concurrentStatuses[0]===201&&concurrentStatuses[1]===403&&activeAfterRace===5,'atomic_free_quota_under_concurrent_create',JSON.stringify({statuses:concurrentStatuses,active:activeAfterRace}));
+
   const pauseB=await api(userB.token,'/api/quotes/'+seeded[0].id,{method:'PATCH',body:{status:'paused'}});
   assert(pauseB.status===200,'free_pause_seed');
   const sixth=await api(userB.token,'/api/quotes',{method:'POST',body:{client_name:'Sixième',client_email:'six@example.com',title:'Doit être bloqué',amount:'999',sent_at:sentAt,followup_schedule_mode:'recommended'},headers:{'Idempotency-Key':'cert-b-six-'+stamp}});
@@ -204,14 +222,14 @@ try{
   const sixthOk=await api(userB.token,'/api/quotes',{method:'POST',body:{client_name:'Sixième autorisé',client_email:'six-ok@example.com',title:'Autorisé',amount:'999',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-b-six-ok-'+stamp}});
   assert(sixthOk.status===201,'free_limit_releases_after_close');
 
-  const trial=await api(userA.token,'/api/trial/start',{method:'POST',body:{}});
-  const t0=new Date(trial.data?.profile?.trial_started_at||0).getTime(),t1=new Date(trial.data?.profile?.trial_ends_at||0).getTime();
-  assert(trial.status===201&&trial.data.profile?.pro_access===true&&t1-t0===7*24*3600000,'self_service_trial_exact_7d',JSON.stringify({status:trial.status,pro_access:trial.data.profile?.pro_access,trial_started_at:trial.data.profile?.trial_started_at,trial_ends_at:trial.data.profile?.trial_ends_at,span_ms:t1-t0,body:trial.data?.error||null}));
+  // One trial per account: later quotes and the retired self-service endpoint never start a second one.
+  const laterQuote=await api(userA.token,'/api/quotes',{method:'POST',body:{client_name:'Deuxième devis',client_email:'second@example.com',title:'Pendant l’essai',amount:'29',sent_at:sentAt,followup_schedule_mode:'none'},headers:{'Idempotency-Key':'cert-a-second-'+stamp}});
+  assert(laterQuote.status===201&&laterQuote.data.profile?.trial_started_at===trialStartedAt&&laterQuote.data.profile?.trial_ends_at===trialEndsAt,'second_quote_keeps_same_trial');
   const trialAgain=await api(userA.token,'/api/trial/start',{method:'POST',body:{}});
-  assert(trialAgain.status===409,'trial_one_time_only');
-
   const profileRefresh=await api(userA.token,'/api/profile');
-  assert(profileRefresh.status===200&&profileRefresh.data.profile?.trial_active===true&&profileRefresh.data.profile?.trial_days_remaining===7,'trial_survives_refresh');
+  const pr=profileRefresh.data?.profile;
+  assert(trialAgain.status!==201&&pr?.trial_started_at===trialStartedAt&&pr?.trial_ends_at===trialEndsAt&&pr?.trial_eligible===false,'trial_one_time_only',JSON.stringify({trial_start_status:trialAgain.status}));
+  assert(profileRefresh.status===200&&pr?.trial_active===true&&pr?.pro_access===true&&pr?.trial_days_remaining===7,'trial_survives_refresh');
 
   const oldSessionToken=userA.token;
   const signOut=await userA.client.auth.signOut();
@@ -222,7 +240,7 @@ try{
   assert(!signBack.error&&Boolean(signBack.data.session),'client_login_after_logout');
   userA.token=signBack.data.session.access_token;
   const profileAfterLogin=await api(userA.token,'/api/profile');
-  assert(profileAfterLogin.status===200&&profileAfterLogin.data.profile?.trial_active===true,'trial_survives_logout_login');
+  assert(profileAfterLogin.status===200&&profileAfterLogin.data.profile?.trial_active===true&&profileAfterLogin.data.profile?.trial_started_at===trialStartedAt,'trial_survives_logout_login');
   const quotesAfterLogin=await api(userA.token,'/api/quotes');
   const persistedQuote=quotesAfterLogin.data?.quotes?.find(x=>x.id===q.id);
   assert(quotesAfterLogin.status===200&&persistedQuote&&persistedQuote.followup_schedule_mode==='recommended'&&Boolean(persistedQuote.next_followup_at),'quote_persists_refresh_logout_login');
@@ -276,9 +294,16 @@ try{
   const reopenAfterDowngrade=await api(userA.token,'/api/quotes/'+hundredth.data.quote.id,{method:'PATCH',body:{status:'open'}});
   assert(reopenAfterDowngrade.status===403,'downgrade_blocks_reopen_over_free_quota');
   const thirdTrial=await api(userA.token,'/api/trial/start',{method:'POST',body:{}});
-  assert(thirdTrial.status===409,'expired_trial_cannot_restart');
+  const afterExpiry=(await api(userA.token,'/api/profile')).data?.profile;
+  assert(thirdTrial.status!==201&&afterExpiry?.trial_eligible===false&&afterExpiry?.pro_access===false&&afterExpiry?.trial_started_at===trialStartedAt,'expired_trial_cannot_restart',JSON.stringify({trial_start_status:thirdTrial.status}));
 
-  const claimedQuote=(await db.from('quotes').select('*').eq('user_id',userA.id).eq('status','open').limit(1).single()).data;
+  // userA is Free again with 99 active quotes: only the 5 most recent stay editable (shared/quota.js), the
+  // others answer 423 (read-only). The in-flight send guard is checked on an editable quote.
+  const {data:activeA,error:activeAError}=await db.from('quotes').select('id,status,created_at').eq('user_id',userA.id).in('status',['open','paused']);
+  if(activeAError)throw activeAError;
+  const lockedA=lockedQuoteIds(activeA||[],false);
+  const editableId=(activeA||[]).find(x=>x.status==='open'&&!lockedA.has(x.id))?.id;
+  const claimedQuote=editableId?(await db.from('quotes').select('*').eq('id',editableId).single()).data:null;
   if(!claimedQuote)throw new Error('claimed quote missing');
   const {error:claimSeedError}=await db.from('quotes').update({send_claimed_at:new Date().toISOString()}).eq('id',claimedQuote.id);
   if(claimSeedError)throw claimSeedError;

@@ -1,12 +1,13 @@
 import { trialDisplay } from './trial-display.js';
+import { FREE_ACTIVE_QUOTES_LIMIT,PRO_ACTIVE_QUOTES_LIMIT,PRO_MONTHLY_PRICE,VAT_NOTICE,FREE_LIMIT_TEXT,PRO_LIMIT_TEXT,UPGRADE_LABEL } from '../../shared/plans.js';
 
 export const FREE_PLAN = Object.freeze({
   id:'free',
   name:'Découverte / Gratuit',
   price:'0 €',
-  limit:5,
+  limit:FREE_ACTIVE_QUOTES_LIMIT,
   features:[
-    '5 devis actifs',
+    FREE_LIMIT_TEXT,
     'Tableau de bord',
     'Planning J+2 / J+5 / J+10',
     'Mode revue',
@@ -17,12 +18,12 @@ export const FREE_PLAN = Object.freeze({
 export const PRO_PLAN = Object.freeze({
   id:'pro',
   name:'Pro',
-  price:'29 €',
+  price:`${PRO_MONTHLY_PRICE} €`,
   period:'/ mois',
-  vatNote:'TVA non applicable, art. 293 B du CGI',
-  limit:100,
+  vatNote:VAT_NOTICE,
+  limit:PRO_ACTIVE_QUOTES_LIMIT,
   features:[
-    '100 devis actifs',
+    PRO_LIMIT_TEXT,
     'Envoi via Relanzio',
     'Mode automatique opt-in devis par devis',
     'Personnalisation IA',
@@ -37,7 +38,12 @@ export function subscriptionDisplay(profile={}, billingEnabled=false, checkoutBu
   const paid=Boolean(profile?.is_paid_subscription || (profile?.plan==='pro' && profile?.subscription_status==='active'));
   const stripeManaged=Boolean(profile?.stripe_customer_id);
   const trialEligible=Boolean(profile?.trial_eligible && !trial.visible && !paid);
-  const upgradeVisible=currentPlan==='free' || trial.visible;
+  const status=profile?.subscription_status||'none';
+  const pastDue=['past_due','unpaid'].includes(status);
+  const canceling=status==='active'&&Boolean(profile?.subscription_cancel_at_period_end);
+  // Card update, invoices and cancellation live in the Stripe portal, also while a payment is failing.
+  const portalVisible=stripeManaged&&['active','past_due','unpaid','canceled'].includes(status);
+  const upgradeVisible=!pastDue&&(currentPlan==='free' || trial.visible);
   const upgradeDisabled=!billingEnabled || checkoutBusy || paid;
   let upgradeHint='';
   if(!billingEnabled)upgradeHint='La souscription Pro n’est pas disponible pour le moment. Votre formule actuelle reste active.';
@@ -48,9 +54,12 @@ export function subscriptionDisplay(profile={}, billingEnabled=false, checkoutBu
     stripeManaged,
     trial,
     trialEligible,
+    pastDue,
+    canceling,
+    portalVisible,
     upgradeVisible,
     upgradeDisabled,
     upgradeHint,
-    upgradeLabel:'Passer à Pro — 29 € / mois'
+    upgradeLabel:UPGRADE_LABEL
   };
 }
