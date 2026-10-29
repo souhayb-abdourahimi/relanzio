@@ -1,6 +1,10 @@
 # Étude d'opportunités SaaS — exploration mondiale multi-marchés
 
-Démarrée le 2026-10-29. Statut : **en cours** (voir `progress.md`).
+Démarrée et terminée le 2026-10-29. Statut : **phases 1 à 5 terminées. Conclusion : AUCUNE IDÉE VALIDÉE À CE STADE.**
+- **Recommandation n° 1 (à tester, pas à construire)** : dossier de conformité des formateurs sous-traitants et preuves de réalisation pour les organismes de formation de 2 à 10 personnes certifiés Qualiopi.
+- **n° 2** : relance de devis TPE (Relanzio), en test commercial borné.
+- **n° 3** : conformité FCC pour petits opérateurs VoIP US (parquée).
+- **Lire d'abord** : `07-memo-decision.md`, puis `10-validation-30-jours.md`.
 
 ## Hypothèses de travail (par défaut, non imposées)
 - Créateur solo ou équipe de 1 à 3 personnes, technique ou aidée par l'IA, capital modéré, objectif : clients payants sans levée.
@@ -20,5 +24,10 @@ Démarrée le 2026-10-29. Statut : **en cours** (voir `progress.md`).
 ## Étiquetage
 FAIT OBSERVÉ (sourcé) / ESTIMATION / HYPOTHÈSE / INCONNU. Aucun entretien client réel n'a été mené. Toute « validation » reste à obtenir sur le terrain.
 
+## Chiffres clés
+- 31 familles de marché, 206 opportunités, 38 notées sur une grille unique.
+- 8 due diligences, 1 vérification de 5 alternatives négligées, 1 red team, 1 conseil founder-board (3 lentilles).
+- 691 preuves sourcées (extraits de recherche : la lecture de pages était bloquée par le réseau).
+
 ## Fichiers
-Voir la liste finale en bas de `07-memo-decision.md`. Les fichiers de travail des analystes sont dans `_work/`.
+Voir la liste en bas de `07-memo-decision.md`. Les fichiers de travail (briefs, livrables bruts des analystes, scripts reproductibles) sont dans `_work/`.

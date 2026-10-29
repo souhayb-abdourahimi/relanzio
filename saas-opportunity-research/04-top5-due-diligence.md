@@ -11,20 +11,20 @@ Date : 2026-10-29. Chaque fiche a été rédigée par un analyste distinct sur u
 
 | Critère (poids) | D-37 Qualiopi | D-20 Impayés e-facture | A-23 MFP pharmacies US | A-39 Courtiers | B-11 Backflow US | B-09/B-10 Fluides (FR) | E-13 Relance devis | E-01 Questionnaires sécu |
 |---|---|---|---|---|---|---|---|---|
-| Douleur & budget (20) | 6 | 7 | 7 | 5 | voir fiche | 4 | voir fiche | voir fiche |
-| Fréquence (10) | 7 | 8 | 8 | 7 | ″ | 7 | ″ | ″ |
-| Preuves (15) | 6 | 6 | 6 | 5 | ″ | 6 | ″ | ″ |
-| Distribution (15) | 7 | 4 | 3 | 6 | ″ | 6 | ″ | ″ |
-| Lacune (10) | 3 | 2 | 3 | 2 | ″ | 2 | ″ | ″ |
-| Faisabilité (10) | 8 | 6 | 6 | 8 | ″ | 7 | ″ | ″ |
-| Marge (5) | 8 | 7 | 7 | 7 | ″ | 6 | ″ | ″ |
-| Timing (5) | 8 | 6 | 8 | 6 | ″ | 6 | ″ | ″ |
-| Défendabilité (5) | 3 | 2 | 3 | 2 | ″ | 3 | ″ | ″ |
-| Risques (5) | 7 | 6 | 3 | 4 | ″ | 5 | ″ | ″ |
+| Douleur & budget (20) | 6 | 7 | 7 | 5 | 5 | 4 | 5 | 6 |
+| Fréquence (10) | 7 | 8 | 8 | 7 | 8 | 7 | 8 | 6 |
+| Preuves (15) | 6 | 6 | 6 | 5 | 5 | 6 | 4 | 5 |
+| Distribution (15) | 7 | 4 | 3 | 6 | 5,5 | 6 | 5 | 4 |
+| Lacune (10) | 3 | 2 | 3 | 2 | 3 | 2 | 3 | 2 |
+| Faisabilité (10) | 8 | 6 | 6 | 8 | 6 | 7 | 8 | 8 |
+| Marge (5) | 8 | 7 | 7 | 7 | 8 | 6 | 7 | 7 |
+| Timing (5) | 8 | 6 | 8 | 6 | 4 | 6 | 3 | 6 |
+| Défendabilité (5) | 3 | 2 | 3 | 2 | 3 | 3 | 2 | 2 |
+| Risques (5) | 7 | 6 | 3 | 4 | 5 | 5 | 7 | 5 |
 | **Total phase 1 → DD** | **68 → 62,5** | **67 → 56** | **72,5 → 55** | **66 → 53** | **66 → 53** | **64 → 52** (US : 68 → 46) | **59 → 52** | **66 → 51,5** |
 | Verdict de l'analyste | GO faible, conditionnel au wedge « preuves de réalisation + sous-traitance » | Pas un produit autonome ; module éventuel de Relanzio | NO-GO pour un fondateur en France ; possible via partenaire PSAO US | NO-GO en l'état | NO-GO en l'état | NO-GO (outil gratuit de l'État en FR, règle EPA instable aux US) | Aucun investissement produit ; test commercial borné de 4 à 6 semaines | NO-GO en l'état |
 
-« voir fiche » : le détail par critère figure au §14 de chaque fiche ci-dessous.
+Le détail et la cause de chaque changement figurent au §14 de chaque fiche ci-dessous. Après la red team (`_work/redteam.md`), les notes indicatives deviennent : D-37 ≈ 56, E-13 ≈ 50-51, A-23 ≈ 52-54.
 
 ## Ce qui a fait chuter les notes (causes communes)
 1. **Un gratuit existe presque partout**, qu'il vienne de l'État, d'un concurrent ou d'une plateforme imposée :

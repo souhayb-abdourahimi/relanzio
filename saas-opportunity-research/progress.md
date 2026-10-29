@@ -1,22 +1,26 @@
-# Progress — étude d'opportunités SaaS (démarrée le 2026-10-29)
+# Progress — étude d'opportunités SaaS (2026-10-29)
 
-## Audit environnement (2026-10-29)
-- [x] Modèle configuré : identifiant de session (non répété ici) ; WebSearch + WebFetch chargés et opérationnels
-- [x] Python 3.13 disponible ; écriture fichiers OK ; sous-agents (Agent tool) disponibles
-- [x] Founder Skill : NON installé comme skill/plugin. Archive `founder-skill-main.zip` fournie → extraite dans le scratchpad, 11 SKILL.md lus, 4 scripts Python audités (stdlib uniquement, aucun accès réseau). Méthodologie appliquée manuellement ; `unit_economics.py` exécuté sur intrants SaaS.
-  - Installation officielle : `/plugin marketplace add Jakeschincariol/founder-skill` puis `/plugin install founder-skill@founder-skill` (commandes `/founder-skill:founder-*`), ou copie de `skills/founder-*` dans `~/.claude/skills/`.
-- [x] Dépôt : Relanzio v0.4 (relance de devis TPE, pré-pilotes). Étude isolée dans `saas-opportunity-research/`.
-- [ ] Serveurs MCP design/slack/notion… : échec de connexion (non nécessaires).
+## Audit de l'environnement
+- [x] WebSearch opérationnel ; **WebFetch bloqué** par la politique réseau (voir `11-sources-et-limites.md` §1)
+- [x] Python 3.13, écriture de fichiers et sous-agents disponibles
+- [x] Founder Skill : non installé comme skill/plugin. Archive fournie extraite dans le scratchpad (hors dépôt), 11 SKILL.md lus, 4 scripts audités (bibliothèque standard, aucun accès réseau). founder-board, founder-cfo et founder-plan ont été appliqués.
+  - Installation officielle : `/plugin marketplace add Jakeschincariol/founder-skill` puis `/plugin install founder-skill@founder-skill`
+- [x] Dépôt hôte : Relanzio v0.4 ; étude isolée dans `saas-opportunity-research/`
+- [x] Interruption par limite d'usage (vers 11 h 50 UTC) ; reprise sans perte
 
 ## Phases
-- [x] Phase 1 — cartographie large : 31 familles, 206 opportunités, 246 preuves (5 analystes en parallèle)
-- [ ] Phase 2 — collecte de preuves
-- [x] Phase 3 (1re passe) — notation harmonisée de 38 pistes (`_work/scores-bruts.csv` → `03-classement-top20.csv`) ; top 5 : A-23, B-09, D-37, D-20, A-39
-- [ ] Phase 4 — due diligence top 5 (défenseur + contradicteur)
-- [ ] Phase 5 — recommandation, business model, MVP, plan 30 jours
+- [x] Phase 1 — cartographie : 31 familles, 206 opportunités, 246 preuves (5 analystes)
+- [x] Phase 3a — notation harmonisée de 38 pistes (`_work/score.py`) → `03-classement-top20.csv`
+- [x] Phase 2/4 — 8 due diligences (5 finalistes + B-11, E-01 + contrôle E-13) avec recherche contraire
+- [x] Vérification de 5 alternatives négligées (C-39, C-01, C-14, D-15, E-21) : aucune au-dessus de 62,5
+- [x] Red team distincte + conseil founder-board (2 FUND IF, 1 PASS, 3,7/10)
+- [x] Phase 3b — notes après recherche contraire et red team ajoutées à `03-classement-top20.csv`
+- [x] Phase 5 — mémo, business model (unit_economics.py), MVP, plan de validation sur 30 jours, sources et limites
 
-## Limite réseau constatée (2026-10-29)
-- WebSearch fonctionne (titres + URL + extraits). WebFetch / curl vers sites externes **bloqués** par la politique réseau de l'environnement
-  (testés : economie.gouv.fr, impots.gouv.fr, eur-lex.europa.eu, gov.uk, reddit.com, g2.com, capterra.com).
-- Conséquence : les preuves reposent sur les extraits renvoyés par le moteur ; aucune page n'a été lue en intégralité. Les preuves sont marquées en conséquence.
-- Pour lever la limite : paramètres de l'environnement cloud → Network access → niveau plus large ou domaines autorisés. https://code.claude.com/docs/en/cloud-environments#network-access
+## Décisions restant à vérifier (humain)
+- [ ] Webinaire SYCFI du 4/11/2026 : prix, opérateur et fonctions du « Portail des Formateurs »
+- [ ] Essais d'une journée : Formiva, Qualiobee, Digiforma (module sous-traitants ?) ; Obat, Tolteck, EBP, Batappli, Extrabat, Abby (relance automatique de devis ?)
+- [ ] Parution du guide de lecture Qualiopi v10 et des arrêtés des indicateurs 19 et 20
+- [ ] Lecture des textes officiels une fois le réseau ouvert (Légifrance : décret 2026-728, loi 2026-534)
+- [ ] Accord du porteur avant tout contact commercial (aucun message envoyé)
+- [ ] Comité de décision à J30 (matrice dans `10-validation-30-jours.md`)

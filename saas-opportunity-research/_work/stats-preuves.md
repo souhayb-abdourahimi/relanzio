@@ -1,0 +1,7 @@
+- Total : **691 preuves**, 469 domaines distincts.
+- Par phase : due-diligence 353, phase-1 246, alternatives 51, red-team 41
+- Par type : secondaire 288, primaire 233, comparateur 24, presse 23, éditeur 22, témoignage 16
+- Par confiance : moyenne 370, élevée 186, faible 123, faible (absence de preuve) 3, moyenne (enquête d'association de défense) 1, faible (fournisseur, base hospitalière/340b) 1
+- Par sens (due diligence, red team, alternatives) : non renseigné 246, contre 199, pour 141, neutre 105
+- Sans URL : 2
+- 20 domaines les plus cités : cms.gov (11), lafabriquedunet.fr (11), certiforma.fr (11), appvizer.fr (9), ncpa.org (8), centre-inffo.fr (8), plenful.com (6), economie.gouv.fr (6), capeb.fr (6), capterra.com (6), blogdumoderateur.com (6), acpr.banque-france.fr (5), epa.gov (5), secureframe.com (5), assemblee-nationale.fr (5), helloasso.com (5), taxation-customs.ec.europa.eu (4), questions.assemblee-nationale.fr (4), impots.gouv.fr (4), blog.avocats.deloitte.fr (4)
