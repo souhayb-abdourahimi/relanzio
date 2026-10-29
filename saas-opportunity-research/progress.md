@@ -14,3 +14,9 @@
 - [ ] Phase 3 — scoring longlist → top 20 → top 5
 - [ ] Phase 4 — due diligence top 5 (défenseur + contradicteur)
 - [ ] Phase 5 — recommandation, business model, MVP, plan 30 jours
+
+## Limite réseau constatée (2026-10-29)
+- WebSearch fonctionne (titres + URL + extraits). WebFetch / curl vers sites externes **bloqués** par la politique réseau de l'environnement
+  (testés : economie.gouv.fr, impots.gouv.fr, eur-lex.europa.eu, gov.uk, reddit.com, g2.com, capterra.com).
+- Conséquence : les preuves reposent sur les extraits renvoyés par le moteur ; aucune page n'a été lue en intégralité. Les preuves sont marquées en conséquence.
+- Pour lever la limite : paramètres de l'environnement cloud → Network access → niveau plus large ou domaines autorisés. https://code.claude.com/docs/en/cloud-environments#network-access
