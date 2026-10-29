@@ -11,6 +11,7 @@ Preuves : `_work/P8-fiscal-preuves.csv` (ids P8X-P01 à P8X-P45).
 - **WebFetch** a été essayé une fois, sur autoentrepreneur.urssaf.fr. Il a échoué (`getaddrinfo ENOTFOUND`) : l'hôte n'est pas autorisé dans cette session. **Aucune page n'a été lue en entier.** Pour lire les textes complets, il faut autoriser ces domaines dans les réglages réseau de la session.
 - J'ai fait **32 recherches WebSearch**, limitées aux domaines officiels : urssaf.fr, autoentrepreneur.urssaf.fr, impots.gouv.fr, bofip.impots.gouv.fr, legifrance.gouv.fr, service-public.fr, entreprendre.service-public.fr et economie.gouv.fr. Une seule recherche a aussi visé cci.fr, mais le taux de la TFC est confirmé par Légifrance.
 - Toutes les sources ont été consultées le **2026-10-29 ou le 2026-10-30**. La date de publication vient de l'identifiant BOFiP (par exemple `-20260701`) ou du millésime du document. Quand elle n'est pas connue, la colonne indique « n.c. ».
+- Dans le CSV, la colonne `sens` indique le rapport de la source à l'hypothèse d'origine : **POUR** si elle la confirme, **CONTRE** si elle la corrige ou la nuance, **NEUTRE** si elle apporte du contexte.
 - Statuts : **CONFIRMÉE** = la source officielle donne la même valeur ; **CORRIGÉE** = la valeur ou sa portée change ; **NON VÉRIFIABLE** = aucun texte officiel trouvé, une valeur prudente est alors proposée. Les mentions [E] signalent un raisonnement de ma part à partir de règles sourcées, et [H] une hypothèse.
 
 ---
