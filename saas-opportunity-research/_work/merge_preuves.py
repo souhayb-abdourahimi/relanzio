@@ -5,9 +5,10 @@ src, dst = sys.argv[1], sys.argv[2]
 cols = ["id","opportunite_id","affirmation","url","titre","auteur_organisme","date_publication",
         "date_consultation","extrait_ou_paraphrase","type","pertinence","fraicheur","confiance","sens","phase","mode_acces"]
 out = []
-files = sorted(glob.glob(os.path.join(src, "[A-E]-preuves.csv"))) + sorted(glob.glob(os.path.join(src, "DD-*-preuves.csv")))
+files = sorted(glob.glob(os.path.join(src, "[A-E]-preuves.csv"))) + sorted(glob.glob(os.path.join(src, "DD-*-preuves.csv"))) + sorted(glob.glob(os.path.join(src, "alternatives-preuves.csv"))) + sorted(glob.glob(os.path.join(src, "redteam-preuves.csv")))
 for f in files:
-    phase = "due-diligence" if os.path.basename(f).startswith("DD-") else "phase-1"
+    b = os.path.basename(f)
+    phase = "due-diligence" if b.startswith("DD-") else ("alternatives" if b.startswith("alternatives") else ("red-team" if b.startswith("redteam") else "phase-1"))
     with open(f, newline="", encoding="utf-8") as h:
         for r in csv.DictReader(h):
             r = {k: (v or "").strip() for k, v in r.items() if k}
