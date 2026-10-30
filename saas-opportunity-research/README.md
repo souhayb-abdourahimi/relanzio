@@ -2,10 +2,11 @@
 
 Démarrée le 2026-10-29 ; **audit critique (phase 6) le même jour.**
 
-**Statut actuel (phase 8, acquisition sans réseau)** : **piste prioritaire N06**, rapprochement des reversements des marketplaces FR pour **cabinets comptables multi-dossiers**. Entrée par fichiers CSV ; sortie FEC, ACD, Sage, Cegid ou Pennylane ; 149 € HT/mois. **À tester sans code** : un versement rapproché gratuitement, puis un mois prépayé, en 6 à 10 semaines.
-- Cinq pistes retenues pour leurs canaux : N06, C-39, A-38, N04, B-11. Chacune a une expérimentation et des seuils adaptés à son prix.
-- Fiscalité et multiples corrigés (2,0 / 2,5 / 3,5× le bénéfice).
-- **Lire d'abord** : `14-acquisition-sans-reseau.md`. Historique : 13 → 12 → 07.
+**Statut actuel (phase 9, validation de N06)** : **avant tout contact**, trois essais : Order Invoicer en offre gratuite, démo Pennylane Collaboratif, Link My Books. Si une vue cabinet multi-dossiers existe déjà, N06 s'arrête.
+- Ce qui reste à valider : un **« cockpit cabinet »** (versements non rapprochés de tous les dossiers, clôture groupée, onboarding en série).
+- Le pilote devient un **pilote outil** : le cabinet paramètre, exécute et importe. Le pilote manuel est exposé au monopole de l'expertise comptable.
+- Kit prêt et **non envoyé** : 22 cabinets vérifiés sur 30, questionnaire, offre, page `p9-landing/index.html`, messages, protocoles, critères de décision.
+- **Lire d'abord** : `15-validation-n06.md`. Historique : 14 → 13 → 12 → 07.
 
 ## Hypothèses de travail (par défaut, non imposées)
 - Créateur solo ou équipe de 1 à 3 personnes, technique ou aidée par l'IA, capital modéré, objectif : clients payants sans levée.

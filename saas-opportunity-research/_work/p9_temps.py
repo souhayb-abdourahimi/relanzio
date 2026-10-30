@@ -36,7 +36,7 @@ def calc(p):
 
 def main():
     print("# P9 — Modèle bottom-up du temps d'exploitation N06 à 21 cabinets\n")
-    print("Généré par `_work/p9_temps.py`. **Estimations [E] et hypothèses [H] à remplacer par les mesures du protocole de chronométrage** (`15-validation-n06.md` §7).\n")
+    print("Généré par `_work/p9_temps.py`. **Estimations [E] et hypothèses [H] à remplacer par les mesures du protocole de chronométrage** (`15-validation-n06.md` §9).\n")
     print("Modèle précédent (P8) : 8,8 h/semaine, soit 31 h d'exploitation + 7,2 h d'acquisition par mois, calculé **par client**. Ce modèle-ci le recalcule **par versement**, car la charge réelle dépend du volume de versements et du taux d'exceptions.\n")
     rows = {}
     for nom, p in SCENARIOS.items():

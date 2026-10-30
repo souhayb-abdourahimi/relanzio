@@ -39,7 +39,18 @@
 - [x] Fiscalité corrigée (`_work/P8-fiscal-corrections.md`) ; multiples recalés sur des transactions conclues (`_work/P8-transactions.md`)
 - [x] Simulations (`P8-simulations-financieres.md`) ; décision dans `14-acquisition-sans-reseau.md`
 
+## Phase 9 — validation commerciale de N06 (2026-10-30)
+- [x] Risque 1 : matrice concurrentielle (`_work/P9-concurrents*`). Order Invoicer couvre 18+ marketplaces et Cegid/ACD ; reste le cockpit multi-dossiers
+- [x] Risque 2 : formats (`_work/P9-formats.md`). Le FEC n'est pas universel ; sortie FEC 18 colonnes + un format natif choisi en entretien
+- [x] Risque 3 : juridique (`_work/P9-juridique.md`). Pilote outil seulement ; documents et validation par un avocat avant toute donnée réelle
+- [x] Risque 4 : modèle de temps (`P9-modele-temps.md`). 3,4 / 7,8 / 22,6 h/semaine selon l'automatisation et le taux d'exceptions
+- [x] Kit de validation (`15-validation-n06.md`, `p9-landing/index.html`, `_work/P9-cabinets.csv`)
+- [x] Interruption par limite d'usage (reset à 3 h 10 UTC), reprise sans perte
+
 ## Décisions restant à vérifier (humain)
+- [ ] Étape 0 : essais Order Invoicer, Pennylane Collaboratif, Link My Books (sans contact commercial)
+- [ ] Relevé manuel des coordonnées des 22 cabinets ; vérification de l'Ordre ; compléter jusqu'à 30
+- [ ] Accord explicite avant tout envoi du message 1
 - [ ] Accord pour lancer le test N06 (aucun envoi sans accord) ; option : test C-39 avant fin janvier
 - [ ] **J0 : inventaire des contacts décideurs par segment + budget perdable** → règle du fichier 13
 - [ ] Sprint de vente de 30 jours sans code ; GO seulement avec ≥ 3 paiements

@@ -23,6 +23,7 @@ patterns = [
     ("P8-FR-preuves.csv", "phase 8 canaux FR"),
     ("P8-fiscal-preuves.csv", "phase 8 corrections fiscales"),
     ("P8-transactions-preuves.csv", "phase 8 transactions confirmées"),
+    ("P9*-preuves.csv", "phase 9 validation N06"),
 ]
 out, nfiles = [], 0
 for pattern, phase in patterns:

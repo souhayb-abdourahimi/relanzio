@@ -1,3 +1,5 @@
+> **⚠ RÉVISION DU 2026-10-30 (phase 9)** — Pour N06, voir `15-validation-n06.md`. Les créneaux « Mirakl secondaires » et « hors Pennylane » sont affaiblis par Order Invoicer, et le pilote « concierge » ainsi que le bras « vendeurs » sont juridiquement exposés (monopole de l'expertise comptable). Le contenu ci-dessous est conservé pour la traçabilité.
+
 # 14 — Opportunités accessibles sans réseau personnel (phase 8)
 
 Date : 2026-10-30.
