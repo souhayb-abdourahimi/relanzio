@@ -2,11 +2,10 @@
 
 Démarrée le 2026-10-29 ; **audit critique (phase 6) le même jour.**
 
-**Statut actuel (phase 9, validation de N06)** : **avant tout contact**, trois essais : Order Invoicer en offre gratuite, démo Pennylane Collaboratif, Link My Books. Si une vue cabinet multi-dossiers existe déjà, N06 s'arrête.
-- Ce qui reste à valider : un **« cockpit cabinet »** (versements non rapprochés de tous les dossiers, clôture groupée, onboarding en série).
-- Le pilote devient un **pilote outil** : le cabinet paramètre, exécute et importe. Le pilote manuel est exposé au monopole de l'expertise comptable.
-- Kit prêt et **non envoyé** : 22 cabinets vérifiés sur 30, questionnaire, offre, page `p9-landing/index.html`, messages, protocoles, critères de décision.
-- **Lire d'abord** : `15-validation-n06.md`. Historique : 14 → 13 → 12 → 07.
+**Statut actuel (phase 10, découverte par les problèmes)** : aucun déséquilibre de marché fort n'a été trouvé. 36 pistes, 12 vérifiées de façon contradictoire, décote moyenne de −10 points.
+- **Recommandation : tester P10-D1-02.** Les tarifs fournisseurs PDF ou Excel deviennent un fichier d'import ERP, pour les négoces B2B indépendants (57/100). Premier test technique sans aucun contact, sur des tarifs publics.
+- Gagnants par stratégie : A = D1-02 ; B = contrôle des ARC (D1-01), en extension ; C = certificat de consentement transférable (D3-01, sous le seuil, en veille).
+- **Lire d'abord** : `17-decouverte-resultats.md` (méthode : `16-methodologie-decouverte.md`). Historique : 15 → 14 → 13 → 12 → 07.
 
 ## Hypothèses de travail (par défaut, non imposées)
 - Créateur solo ou équipe de 1 à 3 personnes, technique ou aidée par l'IA, capital modéré, objectif : clients payants sans levée.

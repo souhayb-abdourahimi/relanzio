@@ -24,6 +24,8 @@ patterns = [
     ("P8-fiscal-preuves.csv", "phase 8 corrections fiscales"),
     ("P8-transactions-preuves.csv", "phase 8 transactions confirmées"),
     ("P9*-preuves.csv", "phase 9 validation N06"),
+    ("P10-D*-preuves.csv", "phase 10 découverte"),
+    ("P10-V*-preuves.csv", "phase 10 vérification contradictoire"),
 ]
 out, nfiles = [], 0
 for pattern, phase in patterns:

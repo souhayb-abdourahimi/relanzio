@@ -47,7 +47,15 @@
 - [x] Kit de validation (`15-validation-n06.md`, `p9-landing/index.html`, `_work/P9-cabinets.csv`)
 - [x] Interruption par limite d'usage (reset à 3 h 10 UTC), reprise sans perte
 
+## Phase 10 — découverte par les problèmes (2026-10-30 → 2026-11-03)
+- [x] Méthode (`16-methodologie-decouverte.md`), grille v4, règles de preuve [F/O/H/E/M]
+- [x] 4 angles de découverte (D1-D4), 36 pistes ; 3 vérifications contradictoires (V1-V3), 12 pistes ; décote moyenne de −10,1
+- [x] TOP 15 (`17-top-pistes.csv`), top 5, 3 gagnants, recommandation, plans de validation (`17-decouverte-resultats.md`)
+- [x] Interruptions par limites d'usage (dont la limite hebdomadaire jusqu'au 3/11), reprises sans perte
+
 ## Décisions restant à vérifier (humain)
+- [ ] Test technique D1-02 sur 20 tarifs publics (aucun contact) : votre accord pour construire un **prototype local de mesure**, qui n'est pas un produit
+- [ ] Budget Google Ads 400-600 € et page de pilote à 290 € (aucune publication sans accord)
 - [ ] Étape 0 : essais Order Invoicer, Pennylane Collaboratif, Link My Books (sans contact commercial)
 - [ ] Relevé manuel des coordonnées des 22 cabinets ; vérification de l'Ordre ; compléter jusqu'à 30
 - [ ] Accord explicite avant tout envoi du message 1
