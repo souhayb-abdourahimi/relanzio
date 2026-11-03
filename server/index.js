@@ -28,13 +28,13 @@ import { stageCommercialCandidates, runCommercialQueueFeeder } from './commercia
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { pollImapReplies } from './imap-replies.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt, parseQuoteContact, sanitizeNote } from './quote-rules.js';
-import { shouldArmInitialAutoSend, initialRecommendedFollowupAt, nextRecommendedAfterAction, parisBusinessDate } from './followup-policy.js';
+import { shouldArmInitialAutoSend, initialRecommendedFollowupAt, nextRecommendedAfterAction, parisBusinessDate, skipWeekendDateKey } from './followup-policy.js';
 import { effectiveOffsets, normalizeFollowupOffsets } from '../shared/followup-cadence.js';
 import { verifyEmailLink } from './email-links.js';
 import { parisLocalDateTimeToIso } from './logic.js';
 
 // "Planning recommandé" for an existing quote: relance 1 from the sent date, later ones from the last
-// follow-up actually done. Never in the past: an overdue recommendation is proposed for today.
+// follow-up actually done. Never in the past: an overdue recommendation is proposed for today (Monday at the weekend).
 async function recommendedNextFollowupAt(quote,sentDate,profile,now=new Date()){
   const step=Number(quote.followup_step||0),offsets=effectiveOffsets(profile);
   if(step>=3)return null;
@@ -42,7 +42,7 @@ async function recommendedNextFollowupAt(quote,sentDate,profile,now=new Date()){
   const {data:last,error}=await db.from('followups').select('sent_at,created_at').eq('quote_id',quote.id).eq('user_id',quote.user_id).in('status',['sent','delivered','opened','clicked','bounced']).order('step',{ascending:false}).limit(1).maybeSingle();
   if(error)throw error;
   const next=nextRecommendedAfterAction(last?.sent_at||last?.created_at||now.toISOString(),step,offsets);
-  const today=parisLocalDateTimeToIso(parisBusinessDate(now),9,0);
+  const today=parisLocalDateTimeToIso(skipWeekendDateKey(parisBusinessDate(now)),9,0);
   return next<today?today:next;
 }
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';

@@ -300,6 +300,8 @@ test('no send path can go out after a reply',()=>{
   assert.match(src,/if\(quote\.reply_received_at\)throw new Error\('QUOTE_REPLIED'\);\n  if\(!quote\.client_email\)/,'send');
   assert.match(src,/\.eq\('followup_step',quote\.followup_step\)\.is\('reply_received_at',null\)/,'atomic claim');
   assert.match(src,/\.lt\('followup_step',3\)\.is\('reply_received_at',null\)/,'cron query');
+  // Re-checked after the claim and the draft, before any provider call: a reply recorded meanwhile aborts the send.
+  assert.match(src,/if\(latest\.reply_received_at\)throw new Error\('QUOTE_REPLIED'\);\n    providerAttempted=true;/,'re-check before provider');
   assert.match(src,/if \(!replyConfiguration\(\)\.configured\) return \[\{ skipped:'reply_detection_not_configured' \}\]/,'no automatic send without reply detection');
   assert.match(src,/reply_token:replyToken/);assert.match(src,/replyTo:\(replyToken&&replyAddress\(replyToken\)\)\|\|profile\.email/);
   assert.match(server,/if\(quote\.reply_received_at\)return res\.status\(409\)\.json\(\{error:REPLIED_MESSAGE,code:'QUOTE_REPLIED'\}\);if\(await isQuoteLocked/,'preview route');

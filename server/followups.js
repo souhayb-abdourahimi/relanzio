@@ -136,6 +136,10 @@ export async function sendQuoteFollowup(quote, profile, requestKey=null, options
       throw draftError;
     }
     followupId=draft.id;
+    // A reply recorded since the claim ("Le client a répondu" pressed meanwhile): nothing leaves; the draft is dropped below.
+    const {data:latest,error:latestError}=await db.from('quotes').select('reply_received_at').eq('id',claimed.id).eq('user_id',claimed.user_id).single();
+    if(latestError)throw latestError;
+    if(latest.reply_received_at)throw new Error('QUOTE_REPLIED');
     providerAttempted=true;
     const sent = await sendEmail({
       to:claimed.client_email, subject:preview.subject,
