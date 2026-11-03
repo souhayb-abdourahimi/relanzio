@@ -193,6 +193,34 @@ try{
   const recommended=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'recommended'}});
   assert(recommended.status===200&&Boolean(recommended.data.quote.next_followup_at),'resume_recommended_schedule');
 
+  // Client replies: instant fixed-template preview, postpone, "Le client a répondu" stops everything, then resume.
+  // Product automation stays off unless its flag AND the reply mailbox are configured.
+  const caps=(await api(userA.token,'/api/profile')).data?.profile?.capabilities||{};
+  assert(caps.automatic_sending===(process.env.FOLLOWUP_AUTOMATION_ENABLED==='true'&&caps.reply_detection===true),'automatic_sending_follows_flags',JSON.stringify(caps));
+  if(!caps.automatic_sending){
+    const autoMode=await api(userA.token,'/api/profile',{method:'PATCH',body:{email_mode:'automatic'}});
+    assert(autoMode.status===409,'automatic_mode_refused_while_unavailable','HTTP '+autoMode.status);
+  }
+  const preview=await timedRequest(userA.token,'/api/quotes/'+q.id+'/followup-preview');
+  const previewBody=String(preview.data?.preview?.body||'');
+  assert(preview.status===200&&preview.ms<1500&&previewBody.startsWith('Bonjour Élodie d’Azur,')&&!/Bonjour M\.,/.test(previewBody),'preview_instant_fixed_template',JSON.stringify({status:preview.status,ms:preview.ms}));
+  const postponeAt=new Date(Date.now()+3*24*3600000).toISOString();
+  const postponed=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'custom',next_followup_at:postponeAt}});
+  assert(postponed.status===200&&postponed.data.quote.followup_schedule_mode==='custom'&&new Date(postponed.data.quote.next_followup_at).getTime()===new Date(postponeAt).getTime(),'postpone_custom_date');
+  const replyKey='cert-reply-'+stamp;
+  const replied=await api(userA.token,'/api/quotes/'+q.id+'/client-replied',{method:'POST',body:{channel:'phone'},headers:{'Idempotency-Key':replyKey}});
+  assert(replied.status===200&&Boolean(replied.data.quote?.reply_received_at)&&replied.data.quote?.next_followup_at===null&&replied.data.quote?.auto_send===false,'client_replied_stops_quote','HTTP '+replied.status);
+  const repliedAgain=await api(userA.token,'/api/quotes/'+q.id+'/client-replied',{method:'POST',body:{channel:'phone'},headers:{'Idempotency-Key':replyKey}});
+  assert(repliedAgain.status===200&&repliedAgain.data.duplicate===true,'client_replied_idempotent');
+  const previewAfterReply=await api(userA.token,'/api/quotes/'+q.id+'/followup-preview');
+  assert(previewAfterReply.status===409&&previewAfterReply.data.code==='QUOTE_REPLIED','no_followup_after_reply','HTTP '+previewAfterReply.status);
+  const listedReplies=(await api(userA.token,'/api/quotes')).data?.quotes?.find(x=>x.id===q.id)?.replies||[];
+  assert(listedReplies.length===1&&listedReplies[0].source==='manual'&&listedReplies[0].channel==='phone','reply_recorded_once');
+  const resumedAfterReply=await api(userA.token,'/api/quotes/'+q.id,{method:'PATCH',body:{followup_schedule_mode:'recommended'}});
+  assert(resumedAfterReply.status===200&&resumedAfterReply.data.quote.reply_received_at===null&&Boolean(resumedAfterReply.data.quote.next_followup_at),'resume_after_reply','HTTP '+resumedAfterReply.status);
+  const previewAfterResume=await api(userA.token,'/api/quotes/'+q.id+'/followup-preview');
+  assert(previewAfterResume.status===200,'preview_after_resume');
+
   // Free quota account: a real post-trial state (trial used and expired, never subscribed), prepared before
   // its first quote so the automatic first-quote trial does not apply. Auto-trial stays enabled in production.
   const usedTrialEnd=new Date(Date.now()-24*3600000).toISOString();
