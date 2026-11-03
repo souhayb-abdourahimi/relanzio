@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relevés marketplaces — outil pour cabinets</title>
+<meta name="description" content="Outil de conversion des relevés de versement marketplace en fichier d'import, paramétré et contrôlé par votre cabinet. Pilote sur données fictives.">
+<!-- PAGE DE TEST (phase 9). NE PAS PUBLIER sans l'accord du porteur.
+     Les champs [entre crochets] doivent être complétés : identité, SIREN, adresse, URL du formulaire.
+     Aucune promesse de format ou de marketplace non vérifiée : seuls Amazon (Settlement V2) et les opérateurs Mirakl (export TL02)
+     sont documentés publiquement ; les autres sont présentés comme « à étudier sur demande ». -->
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1d1d1b; --muted: #5d5b55; --card: #ffffff; --line: #e4e1da;
+    --accent: #1f5f8b; --accent-fg: #ffffff; --note: #f3efe4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151515; --fg: #ecebe7; --muted: #a9a69e; --card: #1e1e1e; --line: #33322f;
+      --accent: #6fb0dc; --accent-fg: #0d1b25; --note: #24221d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151515; --fg: #ecebe7; --muted: #a9a69e; --card: #1e1e1e; --line: #33322f;
+    --accent: #6fb0dc; --accent-fg: #0d1b25; --note: #24221d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: clamp(1.6rem, 4.5vw, 2.2rem); line-height: 1.2; margin: 0 0 12px; }
+  h2 { font-size: 1.2rem; margin: 36px 0 10px; }
+  p, li { color: var(--fg); }
+  .lead { color: var(--muted); font-size: 1.05rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin: 14px 0; }
+  .note { background: var(--note); border-radius: 8px; padding: 12px 14px; font-size: .95rem; }
+  ol, ul { padding-left: 1.2em; }
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .cta { display: inline-block; background: var(--accent); color: var(--accent-fg); text-decoration: none;
+         padding: 12px 18px; border-radius: 8px; font-weight: 600; margin-top: 8px; }
+  .small { font-size: .85rem; color: var(--muted); }
+  footer { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Vos collaborateurs passent du temps sur les relevés de versement des marketplaces ?</h1>
+  <p class="lead">Un outil qui décompose les relevés Amazon et des marketplaces Mirakl (Leroy Merlin, Boulanger, Darty…) en un fichier d'import, <strong>paramétré par votre cabinet</strong> et <strong>contrôlé par vos équipes</strong> avant import dans votre logiciel.</p>
+
+  <div class="note">Projet en phase de test auprès de cabinets d'expertise comptable. Nous cherchons à comprendre comment vous traitez ces dossiers aujourd'hui avant de construire quoi que ce soit.</div>
+
+  <h2>Le problème que nous voulons vérifier avec vous</h2>
+  <ul>
+    <li>Chaque versement mélange ventes, commissions, frais, retours et retenues.</li>
+    <li>Les formats diffèrent d'une marketplace à l'autre.</li>
+    <li>Le rapprochement avec le virement bancaire se fait souvent à la main, dossier par dossier.</li>
+  </ul>
+
+  <h2>Ce que ferait l'outil</h2>
+  <ol>
+    <li><strong>Lecture des exports</strong> fournis par la marketplace : rapport de règlement Amazon, export de transactions Mirakl. Les autres marketplaces sont à étudier sur demande.</li>
+    <li><strong>Application des règles de ventilation définies par votre cabinet</strong> : comptes, journaux, codes TVA.</li>
+    <li><strong>Génération d'un fichier d'import</strong> au gabarit FEC (18 colonnes) et d'un récapitulatif Excel. D'autres formats d'import sont à étudier selon votre logiciel.</li>
+    <li><strong>Une vue unique de tous vos dossiers marketplace</strong> : versements traités ou en attente, écarts entre le montant versé et le détail des lignes, dossiers en retard avant la clôture.</li>
+  </ol>
+  <p class="small">Votre équipe paramètre, exécute, vérifie et importe. L'outil ne remplace pas le travail de l'expert-comptable et ne réalise aucune mission de tenue de comptabilité.</p>
+
+  <h2>Le pilote proposé</h2>
+  <div class="card">
+    <table>
+      <tr><th>Étape 1</th><td>Démonstration de 20 minutes sur un <strong>jeu de données fictives</strong>. Aucune donnée client n'est demandée.</td></tr>
+      <tr><th>Étape 2</th><td>Si l'outil vous semble utile : réservation d'une place de pilote. <strong>Tarif fondateur : à partir de 99 € HT/mois</strong> pour un cabinet, jusqu'à 8 dossiers. Remboursé si le pilote ne démarre pas.</td></tr>
+      <tr><th>Étape 3</th><td>Pilote d'un mois sur 1 ou 2 dossiers, exécuté par vos collaborateurs, sous accord de confidentialité et contrat de sous-traitance RGPD. Les données sont hébergées dans l'UE et supprimées à la fin du pilote.</td></tr>
+    </table>
+  </div>
+  <a class="cta" href="[URL_DU_FORMULAIRE]">Réserver une démonstration sur données fictives</a>
+  <p class="small">Le formulaire demande : nom du cabinet, logiciel de production, nombre approximatif de dossiers marketplace, marketplaces concernées.</p>
+
+  <h2>Questions fréquentes</h2>
+  <p><strong>Quels logiciels comptables ?</strong> Le gabarit FEC est accepté à l'import par plusieurs logiciels. Nous vérifions avec vous si c'est le cas du vôtre, et quel format natif serait préférable. Aucun format n'est promis avant cette vérification.</p>
+  <p><strong>Utilisez-vous l'intelligence artificielle sur nos données ?</strong> Non. Aucune donnée réelle n'est traitée par un service d'IA.</p>
+  <p><strong>Qui est derrière ce projet ?</strong> [Prénom Nom], développeur indépendant, éditeur d'outils logiciels. Ce n'est pas un cabinet comptable.</p>
+
+  <footer class="small">
+    <p>[Prénom Nom] — micro-entreprise, SIREN [xxx xxx xxx], [adresse]. Contact : [adresse e-mail].</p>
+    <p>Données du formulaire : traitées pour répondre à votre demande et organiser la démonstration, sur la base de l'intérêt légitime ; conservées 3 ans au plus après le dernier contact. Droits d'accès, de rectification, d'opposition et d'effacement : [adresse e-mail]. Réclamation possible auprès de la CNIL.</p>
+  </footer>
+</main>
+</body>
+</html>

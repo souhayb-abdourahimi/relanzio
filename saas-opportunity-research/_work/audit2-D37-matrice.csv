@@ -1,0 +1,100 @@
+outil,fonction,valeur,source_url,mode_acces,date,notes
+Portail des Formateurs (SYCFI),"dossier formateur/sous-traitant (pièces, CV, diplômes)",Oui,https://leportailformateurs.fr/sycfi,extrait WebSearch (site éditeur),2026-10-29,"Centralise justificatifs, CV, diplômes, documents pro dans un coffre-fort ; génère un dossier formateur Qualiopi. Affirmation de l'éditeur"
+Portail des Formateurs (SYCFI),contrat de sous-traitance + signature électronique,Non trouvé,https://leportailformateurs.fr/,extrait WebSearch (site éditeur),2026-10-29,"« Gestion d'équipe et sous-traitance (ind. 17, 18, 27) » listée, mais aucune mention de contrat ni de signature électronique"
+Portail des Formateurs (SYCFI),attestations URSSAF/vigilance + alertes d'expiration,Inconnu,https://leportailformateurs.fr/,extrait WebSearch (site éditeur),2026-10-29,Alertes « avant les expirations » de documents : Oui (générique). Attestation URSSAF/vigilance non citée explicitement
+Portail des Formateurs (SYCFI),émargement apprenant,Non trouvé,,aucune source trouvée,2026-10-29,"Outil documentaire, pas de gestion de session"
+Portail des Formateurs (SYCFI),émargement formateur,Non trouvé,,aucune source trouvée,2026-10-29,
+Portail des Formateurs (SYCFI),traces du distanciel,Non trouvé,,aucune source trouvée,2026-10-29,
+Portail des Formateurs (SYCFI),export dossier d'audit par indicateur,Oui,https://leportailformateurs.fr/,extrait WebSearch (site éditeur),2026-10-29,"Dossier formateur conforme aux indicateurs 17, 18, 21 à 25 et 27 (périmètre formateur seulement, pas tout le référentiel)"
+Portail des Formateurs (SYCFI),réutilisation d'un dossier formateur entre plusieurs OF,Oui,https://leportailformateurs.fr/,extrait WebSearch (site éditeur),2026-10-29,"« Partageable avec plusieurs organismes de formation », lien de partage sécurisé, « pour tous vos organismes »"
+Portail des Formateurs (SYCFI),vérification automatique des attestations (API URSSAF),Non trouvé,,aucune source trouvée,2026-10-29,
+Portail des Formateurs (SYCFI),mise à jour référentiel V10,Inconnu,https://www.helloasso.com/associations/sycfi/evenements/qualiopi-v10-identifiez-et-integrez-les-evolutions-applicables-au-1-10-2026,extrait WebSearch (tiers),2026-10-29,Le SYCFI a tenu un webinaire V10 le 28/10/2026 ; mise à jour de l'outil non documentée
+Portail des Formateurs (SYCFI),prix d'entrée,Oui,https://leportailformateurs.fr/,extrait WebSearch (site éditeur),2026-10-29,"Inscription « 100 % gratuite », sans engagement ni carte bancaire. Tarif Équipe Pro 39 € HT / 33 € adhérents SYCFI : NON CONFIRMÉ (absent des extraits, ni infirmé)"
+Digiforma,"dossier formateur/sous-traitant (pièces, CV, diplômes)",Oui,https://www.digiforma.com/certification-qualiopi/,extrait WebSearch (site éditeur),2026-10-29,"Preuves de compétences (biographie, diplômes, CV, procédure de recrutement) stockées dans la base Intervenants ; extranet intervenant"
+Digiforma,contrat de sous-traitance + signature électronique,Oui,https://help.digiforma.com/fr/articles/6608830-comment-signer-ses-contrats-de-sous-traitance-electroniquement-avec-digiforma,extrait WebSearch (site éditeur),2026-10-29,Contrat généré depuis la fiche intervenant (Données > Intervenants > Contrat) ; signature électronique en OPTION payante ; code SMS/e-mail ; certificat de preuve. Contrat cadre téléchargeable (art. 3702148)
+Digiforma,attestations URSSAF/vigilance + alertes d'expiration,Non trouvé,,aucune source trouvée,2026-10-29,Aucune mention d'attestation de vigilance ni d'alerte d'expiration
+Digiforma,émargement apprenant,Oui,https://help.digiforma.com/fr/articles/4556113-comment-fonctionne-l-emargement-numerique,extrait WebSearch (tiers),2026-10-29,Émargement numérique ; émargement sécurisé (double authentification) distinct ; option 29 € HT/mois selon tiers (lonasante)
+Digiforma,émargement formateur,Oui,https://help.digiforma.com/fr/articles/4210028-emargements-numeriques-comment-faire-signer-mon-intervenant,extrait WebSearch (site éditeur),2026-10-29,Le formateur émarge depuis son espace intervenant (« Suivi des émargements numériques »)
+Digiforma,traces du distanciel,Oui,https://help.digiforma.com/fr/articles/4556113-comment-fonctionne-l-emargement-numerique,extrait WebSearch (tiers),2026-10-29,Signature à distance et double authentification des apprenants en classe virtuelle ; journaux de connexion LMS : inconnu
+Digiforma,export dossier d'audit par indicateur,Inconnu,https://www.digiforma.com/certification-qualiopi/,extrait WebSearch (site éditeur),2026-10-29,« Stockage des éléments de preuve par indicateur » évoqué ; exports Excel/API ; format d'export d'audit non documenté
+Digiforma,réutilisation d'un dossier formateur entre plusieurs OF,Non trouvé,,aucune source trouvée,2026-10-29,Le dossier intervenant vit dans le compte de l'OF
+Digiforma,vérification automatique des attestations (API URSSAF),Non trouvé,,aucune source trouvée,2026-10-29,
+Digiforma,mise à jour référentiel V10,Inconnu,https://www.digiforma.com/certification-qualiopi/qualiopi-v10-decryptage-des-nouveautes-et-plan-de-conformite/,extrait WebSearch (site éditeur),2026-10-29,"Page « Qualiopi V10 : décryptage et calendrier » (contenu éditorial) ; annonce un changement de grille au 1/1/2027 avec tolérance, en contradiction avec les autres sources (1/11/2026)"
+Digiforma,prix d'entrée,Oui,https://www.lonasante.com/digiforma/,extrait WebSearch (tiers),2026-10-29,Indep 49 € HT/mois (annuel) selon tiers ; signature électronique et émargement sécurisé en options
+Qualiobee,"dossier formateur/sous-traitant (pièces, CV, diplômes)",Inconnu,,aucune source trouvée,2026-10-29,Aucun extrait sur les fiches formateurs
+Qualiobee,contrat de sous-traitance + signature électronique,Inconnu,https://www.appvizer.fr/education/formation-elearning/qualiobee,extrait WebSearch (tiers),2026-10-29,"« Signature électronique » listée par Appvizer, documents concernés inconnus"
+Qualiobee,attestations URSSAF/vigilance + alertes d'expiration,Non trouvé,,aucune source trouvée,2026-10-29,
+Qualiobee,émargement apprenant,Oui,https://www.appvizer.fr/education/formation-elearning/qualiobee,extrait WebSearch (tiers),2026-10-29,"Émargement listé (Appvizer, RT-P06)"
+Qualiobee,émargement formateur,Inconnu,,aucune source trouvée,2026-10-29,
+Qualiobee,traces du distanciel,Inconnu,,aucune source trouvée,2026-10-29,
+Qualiobee,export dossier d'audit par indicateur,Inconnu,https://www.lafabriquedunet.fr/logiciel/qualiobee,extrait WebSearch (tiers),2026-10-29,"« Préparation automatique des audits », tableau des indicateurs ; format d'export inconnu"
+Qualiobee,réutilisation d'un dossier formateur entre plusieurs OF,Non trouvé,,aucune source trouvée,2026-10-29,
+Qualiobee,vérification automatique des attestations (API URSSAF),Non trouvé,,aucune source trouvée,2026-10-29,
+Qualiobee,mise à jour référentiel V10,Inconnu,,aucune source trouvée,2026-10-29,
+Qualiobee,prix d'entrée,Oui,https://www.appvizer.fr/education/formation-elearning/qualiobee,extrait WebSearch (tiers),2026-10-29,"Indépendant 49 €/mois, Équipe 79 €, Organisme 139 € (Appvizer) ; un autre agrégateur ne montre qu'un palier Enterprise (RT-P07)"
+Formiva,"dossier formateur/sous-traitant (pièces, CV, diplômes)",Oui,https://hunted.space/product/formiva,extrait WebSearch (tiers),2026-10-29,Fiches formateurs (hunted.space) ; pièces gérées non détaillées ; rien sur les formateurs externes
+Formiva,contrat de sous-traitance + signature électronique,Non trouvé,,aucune source trouvée,2026-10-29,
+Formiva,attestations URSSAF/vigilance + alertes d'expiration,Non trouvé,,aucune source trouvée,2026-10-29,
+Formiva,émargement apprenant,Inconnu,,aucune source trouvée,2026-10-29,
+Formiva,émargement formateur,Inconnu,,aucune source trouvée,2026-10-29,
+Formiva,traces du distanciel,Inconnu,,aucune source trouvée,2026-10-29,
+Formiva,export dossier d'audit par indicateur,Inconnu,https://certiforma.fr/formiva-plateforme-gestion-organisme-formation/,extrait WebSearch (tiers),2026-10-29,"Suivi des indicateurs, centralisation des preuves, « agent d'audit IA » (source Certiforma, même fondateur)"
+Formiva,réutilisation d'un dossier formateur entre plusieurs OF,Non trouvé,,aucune source trouvée,2026-10-29,
+Formiva,vérification automatique des attestations (API URSSAF),Non trouvé,,aucune source trouvée,2026-10-29,
+Formiva,mise à jour référentiel V10,Inconnu,https://formiva.fr/blog/indicateur-27-qualiopi,extrait WebSearch (site éditeur),2026-10-29,Contenu de blog sur l'indicateur 27 ; mise à jour produit V10 non documentée
+Formiva,prix d'entrée,Oui,https://certiforma.fr/formiva-plateforme-gestion-organisme-formation/,extrait WebSearch (tiers),2026-10-29,"Gratuit (50 apprenants/an, 1 formateur), puis 39 et 99 €/mois (source intéressée)"
+Dendreo,"dossier formateur/sous-traitant (pièces, CV, diplômes)",Oui,https://doc.dendreo.com/article/165-espace-de-stockage,extrait WebSearch (site éditeur),2026-10-29,CV et contrat de sous-traitance déposables dans la fiche CRM du formateur ; espace de stockage partagé
+Dendreo,contrat de sous-traitance + signature électronique,Oui,https://doc.dendreo.com/article/250-mon-extranet-formateur,extrait WebSearch (site éditeur),2026-10-29,Onglet « Documents à signer » dans l'extranet formateur ; contrat de sous-traitance rangé dans la fiche CRM
+Dendreo,attestations URSSAF/vigilance + alertes d'expiration,Non trouvé,,aucune source trouvée,2026-10-29,
+Dendreo,émargement apprenant,Oui,https://doc.dendreo.com/article/250-mon-extranet-formateur,extrait WebSearch (site éditeur),2026-10-29,Émargements électroniques
+Dendreo,émargement formateur,Oui,https://doc.dendreo.com/article/250-mon-extranet-formateur,extrait WebSearch (site éditeur),2026-10-29,Le formateur certifie électroniquement les émargements en émargeant lui-même
+Dendreo,traces du distanciel,Inconnu,,aucune source trouvée,2026-10-29,
+Dendreo,export dossier d'audit par indicateur,Inconnu,,aucune source trouvée,2026-10-29,
+Dendreo,réutilisation d'un dossier formateur entre plusieurs OF,Non trouvé,,aucune source trouvée,2026-10-29,
+Dendreo,vérification automatique des attestations (API URSSAF),Non trouvé,,aucune source trouvée,2026-10-29,
+Dendreo,mise à jour référentiel V10,Inconnu,,aucune source trouvée,2026-10-29,
+Dendreo,prix d'entrée,Oui,https://www.lafabriquedunet.fr/logiciel/dendreo,extrait WebSearch (tiers),2026-10-29,225 à 992 € HT/mois (tiers)
+SmartOF,"dossier formateur/sous-traitant (pièces, CV, diplômes)",Oui,https://www.smartof.tech/article/gestion-documentaire,extrait WebSearch (site éditeur),2026-10-29,"Centralise CV, diplômes, pièces d'identité, rattachés à la session ou à la société"
+SmartOF,contrat de sous-traitance + signature électronique,Oui,https://www.smartof.tech/article/gestion-documentaire,extrait WebSearch (site éditeur),2026-10-29,"Génère les contrats de sous-traitance, les dépose sur l'extranet formateur et les fait signer électroniquement"
+SmartOF,attestations URSSAF/vigilance + alertes d'expiration,Non trouvé,,aucune source trouvée,2026-10-29,Aucune date d'expiration ni alerte trouvée sur les pages SmartOF
+SmartOF,émargement apprenant,Oui,https://www.smartof.tech/solution/emargements-numeriques,extrait WebSearch (site éditeur),2026-10-29,Page « Émargements numériques »
+SmartOF,émargement formateur,Inconnu,,aucune source trouvée,2026-10-29,
+SmartOF,traces du distanciel,Inconnu,,aucune source trouvée,2026-10-29,
+SmartOF,export dossier d'audit par indicateur,Inconnu,https://www.smartof.tech/logiciel-qualiopi,extrait WebSearch (site éditeur),2026-10-29,Page « Logiciel Qualiopi » ; format d'export inconnu
+SmartOF,réutilisation d'un dossier formateur entre plusieurs OF,Non trouvé,,aucune source trouvée,2026-10-29,
+SmartOF,vérification automatique des attestations (API URSSAF),Non trouvé,,aucune source trouvée,2026-10-29,
+SmartOF,mise à jour référentiel V10,Inconnu,,aucune source trouvée,2026-10-29,
+SmartOF,prix d'entrée,Oui,https://www.lafabriquedunet.fr/logiciel/smartof,extrait WebSearch (tiers),2026-10-29,75 à 449 € HT/mois (tiers)
+Edusign,"dossier formateur/sous-traitant (pièces, CV, diplômes)",Non trouvé,,aucune source trouvée,2026-10-29,
+Edusign,contrat de sous-traitance + signature électronique,Non trouvé,,aucune source trouvée,2026-10-29,
+Edusign,attestations URSSAF/vigilance + alertes d'expiration,Non trouvé,,aucune source trouvée,2026-10-29,
+Edusign,émargement apprenant,Oui,https://edusign.com/fr/tarifs,extrait WebSearch (site éditeur),2026-10-29,"Émargement horodaté, nominatif"
+Edusign,émargement formateur,Oui,https://www.capterra.com/p/200773/Edusign/reviews/,extrait WebSearch (tiers),2026-10-29,"Signature de l'intervenant (avis Capterra, RT-P14) ; « intervenants illimités » au plan Indépendant"
+Edusign,traces du distanciel,Oui,https://edusign.com/fr/tarifs,extrait WebSearch (site éditeur),2026-10-29,"Lien par e-mail, signature pendant Zoom/Teams ; journal de connexion du formateur non documenté"
+Edusign,export dossier d'audit par indicateur,Non trouvé,,aucune source trouvée,2026-10-29,
+Edusign,réutilisation d'un dossier formateur entre plusieurs OF,Non trouvé,,aucune source trouvée,2026-10-29,
+Edusign,vérification automatique des attestations (API URSSAF),Non trouvé,,aucune source trouvée,2026-10-29,
+Edusign,mise à jour référentiel V10,Inconnu,,aucune source trouvée,2026-10-29,Sans objet direct (outil d'émargement)
+Edusign,prix d'entrée,Oui,https://edusign.com/fr/tarifs,extrait WebSearch (site éditeur),2026-10-29,"Indépendant 29 €/mois (348 €/an), 200 émargements/mois puis 0,50 €. Le DD indiquait 39 € (BDM) : à corriger"
+Google Drive + modèles gratuits,"dossier formateur/sous-traitant (pièces, CV, diplômes)",Oui,https://certiforma.fr/exemple-dossier-qualiopi-pdf/,extrait WebSearch (tiers),2026-10-29,Manuel : 7 dossiers par critère et sous-dossiers par indicateur (méthode Certiforma)
+Google Drive + modèles gratuits,contrat de sous-traitance + signature électronique,Inconnu,https://help.digiforma.com/fr/articles/3702148-ou-et-comment-telecharger-le-contrat-cadre-de-sous-traitance-et-la-convention-d-intervention-pour-vos-intervenants-externes,extrait WebSearch (site éditeur),2026-10-29,"Modèles de contrat disponibles (ex. contrat cadre Digiforma, modèles Certiforma) ; signature électronique native de Drive non vérifiée"
+Google Drive + modèles gratuits,attestations URSSAF/vigilance + alertes d'expiration,Non trouvé,,aucune source trouvée,2026-10-29,Suivi manuel (calendrier) ; aucune alerte native
+Google Drive + modèles gratuits,émargement apprenant,Oui,https://centre-inffo.fr/content/uploads/2024/03/modle-de-feuille-dmargement.pdf,extrait WebSearch (tiers),2026-10-29,Feuille papier ou PDF ; modèle Centre Inffo (réf. D6353-4)
+Google Drive + modèles gratuits,émargement formateur,Oui,https://centre-inffo.fr/content/uploads/2024/03/modle-de-feuille-dmargement.pdf,extrait WebSearch (tiers),2026-10-29,Le modèle Centre Inffo prévoit « Signature du ou des formateurs »
+Google Drive + modèles gratuits,traces du distanciel,Non trouvé,,aucune source trouvée,2026-10-29,Export manuel des relevés de visio/LMS
+Google Drive + modèles gratuits,export dossier d'audit par indicateur,Oui,https://certiforma.fr/exemple-dossier-qualiopi-pdf/,extrait WebSearch (tiers),2026-10-29,"Manuel, par arborescence d'indicateurs"
+Google Drive + modèles gratuits,réutilisation d'un dossier formateur entre plusieurs OF,Inconnu,,aucune source trouvée,2026-10-29,Partage de dossier techniquement possible ; aucune source spécifique
+Google Drive + modèles gratuits,vérification automatique des attestations (API URSSAF),Non trouvé,,aucune source trouvée,2026-10-29,Vérification manuelle par code de sécurité sur le site URSSAF
+Google Drive + modèles gratuits,mise à jour référentiel V10,Oui,https://certiforma.fr/wp-content/uploads/2026/09/33-indicateurs-qualiopi-certiforma-2026-09-12.pdf,extrait WebSearch (tiers),2026-10-29,"Liste gratuite des 33 indicateurs (Certiforma, 12/09/2026) ; guide v10 absent"
+Google Drive + modèles gratuits,prix d'entrée,Oui,,déduction,2026-10-29,0 €
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)","dossier formateur/sous-traitant (pièces, CV, diplômes)",Oui,https://certiskool.fr/solutions/formation,extrait WebSearch (site éditeur),2026-10-29,"Kbis, attestation URSSAF, RC Pro, CV, contrat de prestation des formateurs et sous-traitants ; « Qualiopi critère 4 »"
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",contrat de sous-traitance + signature électronique,Inconnu,https://certiskool.fr/solutions/formation/contrat-sous-traitance,extrait WebSearch (site éditeur),2026-10-29,Contrat de sous-traitance suivi comme pièce ; signature électronique non mentionnée
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",attestations URSSAF/vigilance + alertes d'expiration,Oui,https://certiskool.fr/fonctionnalites,extrait WebSearch (site éditeur),2026-10-29,L'IA lit les dates ; validité calculée depuis la date d'émission (URSSAF) ; alerte 30 jours avant échéance (configurable selon une autre page)
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",émargement apprenant,Non trouvé,,aucune source trouvée,2026-10-29,
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",émargement formateur,Non trouvé,,aucune source trouvée,2026-10-29,
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",traces du distanciel,Non trouvé,,aucune source trouvée,2026-10-29,
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",export dossier d'audit par indicateur,Oui,https://certiskool.fr/solutions/formation,extrait WebSearch (site éditeur),2026-10-29,« Dossier prêt à présenter » (périmètre documents formateurs)
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",réutilisation d'un dossier formateur entre plusieurs OF,Non trouvé,,aucune source trouvée,2026-10-29,
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",vérification automatique des attestations (API URSSAF),Non trouvé,https://certiskool.fr/solutions/formation/attestation-vigilance-urssaf,extrait WebSearch (site éditeur),2026-10-29,"Vérification d'authenticité « sur le site URSSAF » via le code de sécurité, a priori manuelle ; aucune API citée"
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",mise à jour référentiel V10,Inconnu,https://certiskool.fr/blog/gestion-documents-recyclage-formateurs-qualiopi-2026,extrait WebSearch (site éditeur),2026-10-29,Article « Qualiopi 2026 »
+"CertiSkool (ajout auditeur, concurrent non cité dans DD)",prix d'entrée,Oui,https://certiskool.fr/pricing,extrait WebSearch (site éditeur),2026-10-29,"29 €/mois ou 249 €/an, intervenants illimités ; gratuit jusqu'à 5 dossiers"

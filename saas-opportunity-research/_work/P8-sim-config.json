@@ -1,0 +1,14 @@
+{
+  "fiscal": {"taux_cotisations": 0.212, "cfp": 0.00144, "taux_vl": 0.017,
+             "source": "P8-fiscal-corrections.md : BIC prestations de services 2026 confirmée sous réserve (variante prudente BNC 25,6 %), CFP 0,1 % (activité commerciale) + TFC 0,044 %, VL 1,7 %. Franchise TVA calculée sur le CA réalisé en France : clients B2B US hors champ (art. 259-1 CGI)"},
+  "multiples": {"pessimiste": 2.0, "central": 2.5, "favorable": 3.5, "base": "SDE annuel",
+                "source": "P8-transactions.md : 4 ventes confirmées 1-5 k$ MRR (médiane 2,37x ARR, soit environ 2,6-2,8x le bénéfice) ; Flippa 2,2-2,5x ; Empire Flippers 3,2x ; Acquire 3,9x déclaré. Ces multiples supposent que la vente aboutisse (probabilité de 50 à 70 % en 6 mois [H])"},
+  "cout_horaire_operateur": 35,
+  "opportunites": [
+    {"id":"C-39","titre":"FCC VoIP US — audit RMD gratuit puis abonnement annuel 490-790 $ (P8-US ; montants $ traités ≈ €)","prix_mensuel_ht":50,"cout_variable_client_mois":1.5,"frais_paiement_pct":0.06,"frais_paiement_fixe":0.02,"fixes_mensuels":335,"heures_fixes_mois":12,"heures_par_client_mois":0.4,"churn_mensuel":0.024,"cac":400},
+    {"id":"A-38","titre":"Rapprochement des commissions, agences IARD US hors Applied Epic (P8-US ; $ ≈ €)","prix_mensuel_ht":135,"cout_variable_client_mois":5,"frais_paiement_pct":0.06,"frais_paiement_fixe":0.25,"fixes_mensuels":360,"heures_fixes_mois":16,"heures_par_client_mois":1.0,"churn_mensuel":0.025,"cac":600},
+    {"id":"B-11","titre":"Testeurs backflow US — rappels clients et dépôts (P8-US ; $ ≈ €)","prix_mensuel_ht":55,"cout_variable_client_mois":3,"frais_paiement_pct":0.06,"frais_paiement_fixe":0.25,"fixes_mensuels":160,"heures_fixes_mois":14,"heures_par_client_mois":0.6,"churn_mensuel":0.035,"cac":350},
+    {"id":"N06","titre":"Reversements marketplaces → compta, offre cabinets multi-dossiers 149 €/mois (P8-FR)","prix_mensuel_ht":149,"cout_variable_client_mois":5,"frais_paiement_pct":0.015,"frais_paiement_fixe":0.25,"fixes_mensuels":70,"heures_fixes_mois":10,"heures_par_client_mois":1.0,"churn_mensuel":0.02,"cac":600},
+    {"id":"N04","titre":"Justification du temps R&D CIR depuis Jira, 490 €/an (P8-FR)","prix_mensuel_ht":41,"cout_variable_client_mois":1,"frais_paiement_pct":0.02,"frais_paiement_fixe":0,"fixes_mensuels":60,"heures_fixes_mois":10,"heures_par_client_mois":0.3,"churn_mensuel":0.03,"cac":250}
+  ]
+}

@@ -1,0 +1,321 @@
+solution,fonction,valeur,source_url,mode_acces,date,notes
+Order Invoicer,1a. Marketplace Amazon,Oui,https://www.orderinvoicer.com/en/amazon-seller/pennylane ; https://www.orderinvoicer.com/en/marketplaces/amazon,extrait WebSearch (WebFetch refusé),2026-10-30,"page Amazon Seller ; connecteur vers Pennylane [P7DN06-P08, P9C-P05]"
+Order Invoicer,1b. Marketplace Cdiscount/Octopia,Oui,https://www.orderinvoicer.com/en/marketplaces/cdiscount ; https://www.orderinvoicer.com/en/cdiscount/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,"ventilation Cdiscount non décrite dans les extraits [P7DN06-P05, P7DN06-P07]"
+Order Invoicer,1c. Marketplace ManoMano,Oui,https://www.orderinvoicer.com/en/marketplaces/manomano,extrait WebSearch (WebFetch refusé),2026-10-30,ManoMano n'expose pas les règlements par API (P9C-P37) : mode d'entrée réel à tester [P7DN06-P04]
+Order Invoicer,1d. Marketplace Mirakl (opérateurs),Oui,https://www.orderinvoicer.com/en/mirakl ; https://www.orderinvoicer.com/en/marketplaces/leroy-merlin ; https://www.orderinvoicer.com/en/changelog,extrait WebSearch (WebFetch refusé),2026-10-30,"connecteur Mirakl générique + pages Leroy Merlin, Castorama, Decathlon, Leclerc, Brico Marché ; Boulanger/Darty non trouvés [P9C-P08, P9C-P03, P9C-P09]"
+Order Invoicer,1e. Marketplace Fnac,Oui,https://www.orderinvoicer.com/en/marketplaces/fnac,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P06]
+Order Invoicer,1f. Marketplace Rakuten,Non trouvé,https://www.orderinvoicer.com/en/mirakl,extrait WebSearch (WebFetch refusé),2026-10-30,Rakuten absent des extraits [P9C-P08]
+Order Invoicer,2. Mode d'entrée,Oui (API),https://www.orderinvoicer.com/en/changelog ; https://www.orderinvoicer.com/fr/faq,extrait WebSearch (WebFetch refusé),2026-10-30,"connecteurs API ; import CSV non trouvé [P9C-P09, P9C-P10]"
+Order Invoicer,3. Décomposition d'un versement,Oui (annoncé),https://www.orderinvoicer.com/en/marketplaces/leroy-merlin ; https://www.orderinvoicer.com/en/marketplaces/manomano,extrait WebSearch (WebFetch refusé),2026-10-30,"ventes, commissions, port, ajustements ; discours commercial [P9C-P04, P7DN06-P04]"
+Order Invoicer,4. Rapprochement versement-virement,Oui (annoncé),https://www.orderinvoicer.com/en/marketplaces/leroy-merlin ; https://docs.orderinvoicer.com/pennylane/reconciliation,extrait WebSearch (WebFetch refusé),2026-10-30,"documentation détaillée seulement pour Shopify Payments → Pennylane [P9C-P04, P9C-P12]"
+Order Invoicer,5. Gestion TVA (taux/OSS/deemed supplier),"Oui (taux, écarts d'arrondi)",https://docs.orderinvoicer.com/tva,extrait WebSearch (WebFetch refusé),2026-10-30,OSS et deemed supplier non trouvés [P9C-P13]
+Order Invoicer,6. Sortie comptable,Oui,https://docs.orderinvoicer.com/workflows/orders-to-invoices ; https://www.orderinvoicer.com/en/ebp ; https://www.orderinvoicer.com/en/mirakl ; https://www.orderinvoicer.com/en/cdiscount/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,"Pennylane, Cegid, ACD, EBP, Abby, Sellsy, Axonaut, Evoliz, Odoo, NetSuite, Qonto, bexio ; Quadra, Sage FR, FEC générique non trouvés [P9C-P06, P9C-P07, P9C-P08, P7DN06-P07]"
+Order Invoicer,7. Multi-dossiers / espace cabinet,Non trouvé,https://www.orderinvoicer.com/fr/faq ; https://docs.orderinvoicer.com/pennylane/connexion ; https://www.comparatif-facture-electronique.fr/facturation-electronique-expert-comptable/,extrait WebSearch (WebFetch refusé),2026-10-30,"plusieurs connecteurs par organisation + lien comptable Pennylane par société ; aucune vue cabinet multi-dossiers trouvée [P9C-P10, P9C-P11, P9C-P44]"
+Order Invoicer,8. Tableau des écarts/exceptions,Non trouvé,https://www.orderinvoicer.com/en/marketplaces/leroy-merlin,extrait WebSearch (WebFetch refusé),2026-10-30,« écritures prêtes à valider » ; aucun tableau d'exceptions décrit [P9C-P04]
+Order Invoicer,9. Facturation par dossier ou par cabinet,Oui (par connexion),https://www.orderinvoicer.com/fr/faq,extrait WebSearch (WebFetch refusé),2026-10-30,forfait par connexion ; aucune offre cabinet trouvée [P9C-P10]
+Order Invoicer,10. Prix publics,Oui,https://www.orderinvoicer.com/en/pricing ; https://www.orderinvoicer.com/en/ankorstore/pennylane ; https://www.orderinvoicer.com/en/cdiscount/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,"0/12/59/149/299 €/mois, crédits ; pages contradictoires [P9C-P01, P9C-P02, P7DN06-P07]"
+Order Invoicer,11. Avis/témoignages publics,Oui (faible),https://apps.shopify.com/pennylane-order-invoicer ; https://appnavigator.io/app/pennylane-order-invoicer/ ; https://de.wix.com/app-market/64084146-192e-4110-a600-a934cf2cf5e9,extrait WebSearch (WebFetch refusé),2026-10-30,"2 ou 52 avis Shopify selon agrégateur ; Wix sans avis [P9C-P14, P7DN06-P10, P8F-P16]"
+Synchron.io,1a. Marketplace Amazon,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Synchron.io,1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Synchron.io,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Synchron.io,1d. Marketplace Mirakl (opérateurs),Oui,https://synchron.io/en/apps/mirakl/pennylane ; https://synchron.io/en/apps/mirakl/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,"Mirakl générique ; Coin, IBS.it [P7DN06-P02, P9C-P16]"
+Synchron.io,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Synchron.io,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Synchron.io,2. Mode d'entrée,Oui (API),https://synchron.io/en/apps/mirakl/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,synchronisation temps réel [P9C-P16]
+Synchron.io,3. Décomposition d'un versement,Non trouvé,https://synchron.io/en/apps/mirakl/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,"commandes, avoirs, factures ; pas de versement [P9C-P16]"
+Synchron.io,4. Rapprochement versement-virement,Non trouvé,https://synchron.io/en/apps/mirakl/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P16]
+Synchron.io,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Synchron.io,6. Sortie comptable,Oui (Pennylane),https://synchron.io/en/apps/mirakl/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P16]
+Synchron.io,7. Multi-dossiers / espace cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Synchron.io,8. Tableau des écarts/exceptions,Partiel,https://synchron.io/en/apps/mirakl/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,"tableau de bord et relances manuelles des synchros, pas d'écarts comptables [P9C-P16]"
+Synchron.io,9. Facturation par dossier ou par cabinet,Oui (par intégration),https://www.g2.com/products/synchron-io/pricing,extrait WebSearch (WebFetch refusé),2026-10-30,une intégration par plan [P7DN06-P03]
+Synchron.io,10. Prix publics,Oui,https://www.g2.com/products/synchron-io/pricing ; https://synchron.io/en/apps/sellsy/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,"150-350 €/mois ; prix Mirakl+Pennylane non trouvé [P7DN06-P03, P9C-P17]"
+Synchron.io,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,1a. Marketplace Amazon,Oui,https://acomim.com/fr/pour-qui/pour-les-vendeurs-damazon-et-de-cdiscount,extrait WebSearch (WebFetch refusé),2026-10-30,rapports de règlement Amazon [P7DN06-P11]
+Acomim,1b. Marketplace Cdiscount/Octopia,Oui,https://acomim.com/fr/pour-qui/pour-les-vendeurs-damazon-et-de-cdiscount,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P11]
+Acomim,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,2. Mode d'entrée,Oui (API),https://acomim.com/fr/pour-qui/pour-les-vendeurs-damazon-et-de-cdiscount,extrait WebSearch (WebFetch refusé),2026-10-30,récupération automatique [P7DN06-P11]
+Acomim,3. Décomposition d'un versement,Oui (partiel),https://acomim.com/fr/pour-qui/pour-les-vendeurs-damazon-et-de-cdiscount,extrait WebSearch (WebFetch refusé),2026-10-30,"frais, remboursements [P7DN06-P11]"
+Acomim,4. Rapprochement versement-virement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,6. Sortie comptable,"Oui (Pennylane, Abby)",https://acomim.com/fr/pour-qui/pour-les-vendeurs-damazon-et-de-cdiscount,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P11]
+Acomim,7. Multi-dossiers / espace cabinet,Non trouvé,https://acomim.com/fr/blog/les-5-meilleures-alternatives-a-a2x-pour-les-vendeurs-de-commerce-en-france,extrait WebSearch (WebFetch refusé),2026-10-30,« support des comptables locaux » revendiqué sans fonction cabinet décrite [P9C-P19]
+Acomim,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Acomim,10. Prix publics,Oui,https://acomim.com/pricing,extrait WebSearch (WebFetch refusé),2026-10-30,"gratuit <50 transactions ; 9 €, 29 €, 149 $, 249 $ : contradictoire, ancien [P9C-P18]"
+Acomim,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Pennylane (connecteurs natifs),1a. Marketplace Amazon,Non trouvé,https://www.pennylane.com/fr/integrations/amazon-business ; https://community.pennylane.com/discussions/forum-integrations/int%C3%A9gration-amazon-seller/37097,extrait WebSearch (WebFetch refusé),2026-10-30,"connecteur Amazon Seller en pause ; Amazon Business = achats [P9C-P20, P7DN06-P17]"
+Pennylane (connecteurs natifs),1b. Marketplace Cdiscount/Octopia,Non trouvé,https://invoicedataextraction.com/blog/importer-factures-fournisseurs-lot-pennylane-batch-excel ; https://www.pennylane.com/fr/integrations/categorie/ecommerce,extrait WebSearch (WebFetch refusé),2026-10-30,"portail Cdiscount Pro = factures d'achat [P7DN06-P19, P9C-P22]"
+Pennylane (connecteurs natifs),1c. Marketplace ManoMano,Non trouvé,https://invoicedataextraction.com/blog/importer-factures-fournisseurs-lot-pennylane-batch-excel ; https://www.pennylane.com/fr/integrations/categorie/ecommerce,extrait WebSearch (WebFetch refusé),2026-10-30,"portail ManoMano Pro = factures d'achat [P7DN06-P19, P9C-P22]"
+Pennylane (connecteurs natifs),1d. Marketplace Mirakl (opérateurs),Non trouvé,https://www.pennylane.com/fr/integrations/categorie/ecommerce,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P22]
+Pennylane (connecteurs natifs),1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Pennylane (connecteurs natifs),1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Pennylane (connecteurs natifs),2. Mode d'entrée,"Oui (API Shopify, Stripe, PayPal)",https://www.pennylane.com/fr/blog/produit/shopify-prestashop-woocommerce-nouvelles-integrations,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P21]
+Pennylane (connecteurs natifs),3. Décomposition d'un versement,Partiel (Stripe/PayPal),https://www.pennylane.com/fr/blog/produit/shopify-prestashop-woocommerce-nouvelles-integrations,extrait WebSearch (WebFetch refusé),2026-10-30,commissions Stripe/PayPal calculées [P9C-P21]
+Pennylane (connecteurs natifs),4. Rapprochement versement-virement,Inconnu,https://www.pennylane.com/fr/blog/produit/shopify-prestashop-woocommerce-nouvelles-integrations,extrait WebSearch (WebFetch refusé),2026-10-30,rapprochement natif Shopify Payments non trouvé [P9C-P21]
+Pennylane (connecteurs natifs),5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Pennylane (connecteurs natifs),6. Sortie comptable,Oui (Pennylane),https://www.pennylane.com/fr/blog/produit/shopify-prestashop-woocommerce-nouvelles-integrations,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P21]
+Pennylane (connecteurs natifs),7. Multi-dossiers / espace cabinet,Oui (logiciel cabinet),https://docs.orderinvoicer.com/pennylane/connexion,extrait WebSearch (WebFetch refusé),2026-10-30,plan Collaboratif côté cabinet ; pas une vue marketplaces [P9C-P11]
+Pennylane (connecteurs natifs),8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Pennylane (connecteurs natifs),9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Pennylane (connecteurs natifs),10. Prix publics,Oui,https://meetergo.com/fr/blog/pennylane,extrait WebSearch (WebFetch refusé),2026-10-30,7-79 €/mois entreprise [P7DN06-P49]
+Pennylane (connecteurs natifs),11. Avis/témoignages publics,Oui,https://capterra.com/p/218672/Pennylane/reviews,extrait WebSearch (WebFetch refusé),2026-10-30,avis Capterra : connexion Amazon non fonctionnelle (2024) [P7DN06-P18]
+Sellsy (app Mirakl et intégrations),1a. Marketplace Amazon,Oui (multi-connecteur),https://go.sellsy.com/applications/woocommerce,extrait WebSearch (WebFetch refusé),2026-10-30,fiche Amazon gratuite via multi-connecteur [P9C-P23]
+Sellsy (app Mirakl et intégrations),1b. Marketplace Cdiscount/Octopia,Partiel,https://go.sellsy.com/applications/woocommerce,extrait WebSearch (WebFetch refusé),2026-10-30,centralisation via WooCommerce/PrestaShop [P9C-P23]
+Sellsy (app Mirakl et intégrations),1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Sellsy (app Mirakl et intégrations),1d. Marketplace Mirakl (opérateurs),Oui,https://go.sellsy.com/applications/mirakl,extrait WebSearch (WebFetch refusé),2026-10-30,"app partenaire, commandes ; Leroy Merlin cité [P7DN06-P01]"
+Sellsy (app Mirakl et intégrations),1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Sellsy (app Mirakl et intégrations),1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Sellsy (app Mirakl et intégrations),2. Mode d'entrée,Oui (API partenaire),https://go.sellsy.com/applications/mirakl,extrait WebSearch (WebFetch refusé),2026-10-30,synchro horaire [P7DN06-P01]
+Sellsy (app Mirakl et intégrations),3. Décomposition d'un versement,Non trouvé,https://go.sellsy.com/applications/woocommerce,extrait WebSearch (WebFetch refusé),2026-10-30,commissions non décrites [P9C-P23]
+Sellsy (app Mirakl et intégrations),4. Rapprochement versement-virement,Partiel,https://go.sellsy.com/applications/woocommerce,extrait WebSearch (WebFetch refusé),2026-10-30,"rapprochement bancaire général, compte dédié par marketplace [P9C-P23]"
+Sellsy (app Mirakl et intégrations),5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Sellsy (app Mirakl et intégrations),6. Sortie comptable,"Oui (FEC, CSV)",https://go.sellsy.com/applications/woocommerce ; https://go.sellsy.com/applications/mirakl,extrait WebSearch (WebFetch refusé),2026-10-30,"« FEC correctement ventilé » [P9C-P23, P7DN06-P01]"
+Sellsy (app Mirakl et intégrations),7. Multi-dossiers / espace cabinet,Inconnu,https://go.sellsy.com/blog/sellsy-facturation-les-benefices-de-lacces-gratuit-pour-les-experts-comptables,extrait WebSearch (WebFetch refusé),2026-10-30,accès gratuit experts-comptables ; multi-dossiers non vérifié [P9C-P24]
+Sellsy (app Mirakl et intégrations),8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Sellsy (app Mirakl et intégrations),9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Sellsy (app Mirakl et intégrations),10. Prix publics,Non trouvé,https://go.sellsy.com/applications/mirakl,extrait WebSearch (WebFetch refusé),2026-10-30,"intégration gratuite, abonnement partenaire non affiché [P7DN06-P01]"
+Sellsy (app Mirakl et intégrations),11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,1a. Marketplace Amazon,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,2. Mode d'entrée,"Oui (Stripe, GoCardless, Make)",https://roadmap.tiime.fr/c/308-shopify-recuperation-des-journaux-de-ventes-et-pieces-comptables,extrait WebSearch (WebFetch refusé),2026-10-30,aucun connecteur marketplace [P9C-P25]
+Tiime,3. Décomposition d'un versement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,4. Rapprochement versement-virement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,6. Sortie comptable,Oui (Tiime),https://roadmap.tiime.fr/c/308-shopify-recuperation-des-journaux-de-ventes-et-pieces-comptables,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P25]
+Tiime,7. Multi-dossiers / espace cabinet,Inconnu,,—,2026-10-30,non recherché nominativement
+Tiime,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Tiime,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,1a. Marketplace Amazon,Partiel (saisie manuelle),https://wikicompta.indy.fr/fr/articles/8046507-je-suis-e-commercant-comment-remplir-mon-bilan-de-commerce,extrait WebSearch (WebFetch refusé),2026-10-30,synchro Amazon annoncée [P9C-P26]
+Indy,1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,2. Mode d'entrée,Import manuel ; API Stripe,https://wikicompta.indy.fr/fr/articles/8046507-je-suis-e-commercant-comment-remplir-mon-bilan-de-commerce,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P26]
+Indy,3. Décomposition d'un versement,Partiel (manuel),https://wikicompta.indy.fr/fr/articles/8046507-je-suis-e-commercant-comment-remplir-mon-bilan-de-commerce,extrait WebSearch (WebFetch refusé),2026-10-30,ventes et commissions saisies [P9C-P26]
+Indy,4. Rapprochement versement-virement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,6. Sortie comptable,Oui (Indy),https://wikicompta.indy.fr/fr/articles/8046507-je-suis-e-commercant-comment-remplir-mon-bilan-de-commerce,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P26]
+Indy,7. Multi-dossiers / espace cabinet,Inconnu,,—,2026-10-30,non recherché nominativement
+Indy,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Indy,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,1a. Marketplace Amazon,Oui,https://www.globenewswire.com/news-release/2021/08/03/2273316/0/en/dext-launches-new-product-to-make-managing-sales-data-simpler-dext-commerce.html,extrait WebSearch (WebFetch refusé),2026-10-30,2021 [P9C-P27]
+Dext Commerce,1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,2. Mode d'entrée,Oui (API),https://www.globenewswire.com/news-release/2021/08/03/2273316/0/en/dext-launches-new-product-to-make-managing-sales-data-simpler-dext-commerce.html,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P27]
+Dext Commerce,3. Décomposition d'un versement,Oui,https://www.globenewswire.com/news-release/2021/08/03/2273316/0/en/dext-launches-new-product-to-make-managing-sales-data-simpler-dext-commerce.html,extrait WebSearch (WebFetch refusé),2026-10-30,"ventes, frais, remboursements ligne à ligne [P9C-P27]"
+Dext Commerce,4. Rapprochement versement-virement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,6. Sortie comptable,"Oui (Xero, QBO)",https://www.globenewswire.com/news-release/2021/08/03/2273316/0/en/dext-launches-new-product-to-make-managing-sales-data-simpler-dext-commerce.html,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P27]
+Dext Commerce,7. Multi-dossiers / espace cabinet,Oui (cible comptables),https://www.globenewswire.com/news-release/2021/08/03/2273316/0/en/dext-launches-new-product-to-make-managing-sales-data-simpler-dext-commerce.html,extrait WebSearch (WebFetch refusé),2026-10-30,France non confirmée [P9C-P27]
+Dext Commerce,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Dext Commerce,10. Prix publics,Non trouvé,https://www.globenewswire.com/news-release/2021/08/03/2273316/0/en/dext-launches-new-product-to-make-managing-sales-data-simpler-dext-commerce.html,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P27]
+Dext Commerce,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+A2X,1a. Marketplace Amazon,Oui,https://erpresearch.com/erp-add-ons/connectors/a2x,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P21]
+A2X,1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+A2X,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+A2X,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+A2X,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+A2X,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+A2X,2. Mode d'entrée,Oui (API),https://erpresearch.com/erp-add-ons/connectors/a2x,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P21]
+A2X,3. Décomposition d'un versement,Oui,https://erpresearch.com/erp-add-ons/connectors/a2x,extrait WebSearch (WebFetch refusé),2026-10-30,cœur du produit (rescreen P7) [P7DN06-P21]
+A2X,4. Rapprochement versement-virement,Oui,https://erpresearch.com/erp-add-ons/connectors/a2x,extrait WebSearch (WebFetch refusé),2026-10-30,lettrage dans Xero/QBO [P7DN06-P21]
+A2X,5. Gestion TVA (taux/OSS/deemed supplier),Partiel,https://www.lafabriquedunet.fr/logiciels/gestion/comptabilite/e-commerce,extrait WebSearch (WebFetch refusé),2026-10-30,TVA/OSS laissés au paramétrage du comptable (source tierce) [P9C-P41]
+A2X,6. Sortie comptable,"Oui (QBO, Xero, NetSuite, Sage)",https://erpresearch.com/erp-add-ons/connectors/a2x,extrait WebSearch (WebFetch refusé),2026-10-30,Pennylane non trouvé [P7DN06-P21]
+A2X,7. Multi-dossiers / espace cabinet,Oui (Partner Dashboard),https://support.a2xaccounting.com/en/articles/8250812-partner-dashboard,extrait WebSearch (WebFetch refusé),2026-10-30,"suivi abonnements, comptes inactifs 30 j [P9C-P30]"
+A2X,8. Tableau des écarts/exceptions,Partiel,https://support.a2xaccounting.com/en/articles/8250812-partner-dashboard,extrait WebSearch (WebFetch refusé),2026-10-30,alerte comptes sans écriture [P9C-P30]
+A2X,9. Facturation par dossier ou par cabinet,"Oui (par client, remises cabinet)",https://www.a2xaccounting.com/accountants ; https://support.a2xaccounting.com/en/articles/5472701-a2x-multi-channel-pricing-for-accountants-and-bookkeepers,extrait WebSearch (WebFetch refusé),2026-10-30,"[P9C-P28, P9C-P29]"
+A2X,10. Prix publics,Oui,https://www.a2xaccounting.com/accountants ; https://taxomate.com/a2x-vs-taxomate-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,"Multi 95-249 $ (source concurrente) [P9C-P28, P9C-P34]"
+A2X,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Link My Books,1a. Marketplace Amazon,Oui (dont Amazon.fr),https://help.linkmybooks.com/en/articles/2477301-setup-step-2-connect-to-your-accounts ; https://linkmybooks.com/pricing,extrait WebSearch (WebFetch refusé),2026-10-30,"[P7DN06-P22, P9C-P33]"
+Link My Books,1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Link My Books,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Link My Books,1d. Marketplace Mirakl (opérateurs),Partiel (via Shopify),https://linkmybooks.com/pricing,extrait WebSearch (WebFetch refusé),2026-10-30,découpage des ventes Mirakl importées dans Shopify [P9C-P33]
+Link My Books,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Link My Books,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Link My Books,2. Mode d'entrée,Oui (API) ; CSV manuel hors canaux,https://linkmybooks.com/pricing,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P33]
+Link My Books,3. Décomposition d'un versement,Oui,https://linkmybooks.com/blog/ecommerce-client-dashboard-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,règlements [P9C-P32]
+Link My Books,4. Rapprochement versement-virement,Oui,https://linkmybooks.com/blog/ecommerce-client-dashboard-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,statut « règlements à revoir » [P9C-P32]
+Link My Books,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Link My Books,6. Sortie comptable,"Oui (Xero, QBO)",https://linkmybooks.com/pricing,extrait WebSearch (WebFetch refusé),2026-10-30,Pennylane non trouvé [P9C-P33]
+Link My Books,7. Multi-dossiers / espace cabinet,Oui (Accountant Portal),https://help.linkmybooks.com/en/articles/16145781-introducing-the-accountant-portal-manage-every-client-from-one-place ; https://linkmybooks.com/blog/ecommerce-client-dashboard-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,"[P9C-P31, P9C-P32]"
+Link My Books,8. Tableau des écarts/exceptions,Oui,https://help.linkmybooks.com/en/articles/16145781-introducing-the-accountant-portal-manage-every-client-from-one-place ; https://linkmybooks.com/blog/ecommerce-client-dashboard-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,"éléments urgents, statut de clôture par client [P9C-P31, P9C-P32]"
+Link My Books,9. Facturation par dossier ou par cabinet,Oui (directe ou consolidée),https://linkmybooks.com/blog/ecommerce-client-dashboard-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P32]
+Link My Books,10. Prix publics,Oui,https://linkmybooks.com/pricing,extrait WebSearch (WebFetch refusé),2026-10-30,page tarifs [P9C-P33]
+Link My Books,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,1a. Marketplace Amazon,Oui (dont UE),https://www.capterra.com/p/187763/taxomate/reviews/,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P35]
+Taxomate,1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,2. Mode d'entrée,Oui (API),https://www.capterra.com/p/187763/taxomate/reviews/,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P35]
+Taxomate,3. Décomposition d'un versement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,4. Rapprochement versement-virement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,6. Sortie comptable,"Oui (QBO, Xero, Wave)",https://taxomate.com/a2x-vs-taxomate-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P34]
+Taxomate,7. Multi-dossiers / espace cabinet,Oui (tableau de bord partenaire),https://taxomate.com/a2x-vs-taxomate-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,source éditeur [P9C-P34]
+Taxomate,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Taxomate,9. Facturation par dossier ou par cabinet,Oui (choix du payeur),https://taxomate.com/a2x-vs-taxomate-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P34]
+Taxomate,10. Prix publics,Oui,https://taxomate.com/a2x-vs-taxomate-for-accountants,extrait WebSearch (WebFetch refusé),2026-10-30,Multi 59 $ [P9C-P34]
+Taxomate,11. Avis/témoignages publics,Oui,https://www.capterra.com/p/187763/taxomate/reviews/,extrait WebSearch (WebFetch refusé),2026-10-30,Capterra [P9C-P35]
+ChannelEngine (Settlements),1a. Marketplace Amazon,Oui,https://www.channelengine.com/settlements,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P36]
+ChannelEngine (Settlements),1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+ChannelEngine (Settlements),1c. Marketplace ManoMano,Oui (import CSV),https://support.channelengine.com/hc/en-us/articles/27559163780637,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P37]
+ChannelEngine (Settlements),1d. Marketplace Mirakl (opérateurs),Oui,https://www.channelengine.com/settlements,extrait WebSearch (WebFetch refusé),2026-10-30,auto [P9C-P36]
+ChannelEngine (Settlements),1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+ChannelEngine (Settlements),1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+ChannelEngine (Settlements),2. Mode d'entrée,API + import CSV,https://www.channelengine.com/settlements ; https://support.channelengine.com/hc/en-us/articles/27559163780637,extrait WebSearch (WebFetch refusé),2026-10-30,"[P9C-P36, P9C-P37]"
+ChannelEngine (Settlements),3. Décomposition d'un versement,Oui,https://www.channelengine.com/settlements,extrait WebSearch (WebFetch refusé),2026-10-30,champs de frais détaillés [P9C-P36]
+ChannelEngine (Settlements),4. Rapprochement versement-virement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+ChannelEngine (Settlements),5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+ChannelEngine (Settlements),6. Sortie comptable,Export e-mail/FTP,https://www.channelengine.com/settlements,extrait WebSearch (WebFetch refusé),2026-10-30,logiciel comptable cible non précisé [P9C-P36]
+ChannelEngine (Settlements),7. Multi-dossiers / espace cabinet,Non trouvé,https://www.channelengine.com/settlements,extrait WebSearch (WebFetch refusé),2026-10-30,"cible marques, pas cabinets [P9C-P36]"
+ChannelEngine (Settlements),8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+ChannelEngine (Settlements),9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+ChannelEngine (Settlements),10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+ChannelEngine (Settlements),11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,1a. Marketplace Amazon,Oui (flux/commandes),https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,diffusion catalogue [P9C-P39]
+Lengow,1b. Marketplace Cdiscount/Octopia,Oui (flux/commandes),https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P39]
+Lengow,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,2. Mode d'entrée,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,3. Décomposition d'un versement,Non trouvé,https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,aucune donnée de versement trouvée [P9C-P39]
+Lengow,4. Rapprochement versement-virement,Non trouvé,https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P39]
+Lengow,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,6. Sortie comptable,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,7. Multi-dossiers / espace cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Lengow,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,1a. Marketplace Amazon,Oui (flux/commandes),https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,diffusion catalogue [P9C-P39]
+Shopping Feed,1b. Marketplace Cdiscount/Octopia,Oui (flux/commandes),https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P39]
+Shopping Feed,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,2. Mode d'entrée,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,3. Décomposition d'un versement,Non trouvé,https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,aucune donnée de versement trouvée [P9C-P39]
+Shopping Feed,4. Rapprochement versement-virement,Non trouvé,https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P39]
+Shopping Feed,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,6. Sortie comptable,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,7. Multi-dossiers / espace cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Shopping Feed,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,1a. Marketplace Amazon,Oui (flux/commandes),https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,diffusion catalogue [P9C-P39]
+Channable,1b. Marketplace Cdiscount/Octopia,Oui (flux/commandes),https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P39]
+Channable,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,1d. Marketplace Mirakl (opérateurs),Oui (flux),https://helpcenter.channable.com/list-advertise/sell-on-marketplaces/mirakl-marketplaces,extrait WebSearch (WebFetch refusé),2026-10-30,"Fnac/Darty, Leroy Merlin, Carrefour [P7DN06-P50]"
+Channable,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,2. Mode d'entrée,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,3. Décomposition d'un versement,Non trouvé,https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,aucune donnée de versement trouvée [P9C-P39]
+Channable,4. Rapprochement versement-virement,Non trouvé,https://apps.shopify.com/lengow-connector,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P39]
+Channable,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,6. Sortie comptable,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,7. Multi-dossiers / espace cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Channable,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,1a. Marketplace Amazon,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,2. Mode d'entrée,API commandes,https://jentic.com/apis/beezup.com/beezup.md,extrait WebSearch (WebFetch refusé),2026-10-30,[P9C-P38]
+BeezUP,3. Décomposition d'un versement,Non trouvé,https://jentic.com/apis/beezup.com/beezup.md,extrait WebSearch (WebFetch refusé),2026-10-30,pas de traitement des paiements [P9C-P38]
+BeezUP,4. Rapprochement versement-virement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,6. Sortie comptable,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,7. Multi-dossiers / espace cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+BeezUP,11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),1a. Marketplace Amazon,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),2. Mode d'entrée,Oui (API),https://help.boostmyshop.com/portal/en/kb/articles/pennylane-integration,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P44]
+Boostmyshop (myFulfillment),3. Décomposition d'un versement,Non trouvé,https://help.boostmyshop.com/portal/en/kb/articles/pennylane-integration,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P44]
+Boostmyshop (myFulfillment),4. Rapprochement versement-virement,Partiel,https://help.boostmyshop.com/portal/en/kb/articles/pennylane-integration,extrait WebSearch (WebFetch refusé),2026-10-30,lettrage par n° de commande / ID paiement [P7DN06-P44]
+Boostmyshop (myFulfillment),5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),6. Sortie comptable,Oui (Pennylane),https://help.boostmyshop.com/portal/en/kb/articles/pennylane-integration,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P44]
+Boostmyshop (myFulfillment),7. Multi-dossiers / espace cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Boostmyshop (myFulfillment),11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),1a. Marketplace Amazon,Non trouvé,https://zynk.com/articles/streamlining-operations-with-amazon-and-sage-integration,extrait WebSearch (WebFetch refusé),2026-10-30,seulement intégrateurs UK Sage 200/Intacct [P9C-P40]
+Cegid / Sage (France),1b. Marketplace Cdiscount/Octopia,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),1c. Marketplace ManoMano,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),1e. Marketplace Fnac,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),2. Mode d'entrée,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),3. Décomposition d'un versement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),4. Rapprochement versement-virement,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),5. Gestion TVA (taux/OSS/deemed supplier),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),6. Sortie comptable,Oui (natif Cegid/Sage),https://www.spendesk.com/fr/comment-automatiser-son-export-comptable-vers-sage-et-cegid/,extrait WebSearch (WebFetch refusé),2026-10-30,format Cegid TRA [P9C-P43]
+Cegid / Sage (France),7. Multi-dossiers / espace cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),10. Prix publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Cegid / Sage (France),11. Avis/témoignages publics,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+Qashflo,1a. Marketplace Amazon,Inconnu,,—,2026-10-30,
+Qashflo,1b. Marketplace Cdiscount/Octopia,Inconnu,,—,2026-10-30,
+Qashflo,1c. Marketplace ManoMano,Inconnu,,—,2026-10-30,
+Qashflo,1d. Marketplace Mirakl (opérateurs),Inconnu,,—,2026-10-30,
+Qashflo,1e. Marketplace Fnac,Inconnu,,—,2026-10-30,
+Qashflo,1f. Marketplace Rakuten,Inconnu,,—,2026-10-30,
+Qashflo,2. Mode d'entrée,Inconnu,,—,2026-10-30,
+Qashflo,3. Décomposition d'un versement,Inconnu,,—,2026-10-30,
+Qashflo,4. Rapprochement versement-virement,Oui (vue de rapprochement),https://qashflo.eu/tarifs/,extrait WebSearch (WebFetch refusé),2026-10-30,produit cœur = financement [P7DN06-P12]
+Qashflo,5. Gestion TVA (taux/OSS/deemed supplier),Inconnu,,—,2026-10-30,
+Qashflo,6. Sortie comptable,Export Excel,https://qashflo.eu/tarifs/,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P12]
+Qashflo,7. Multi-dossiers / espace cabinet,Inconnu,,—,2026-10-30,
+Qashflo,8. Tableau des écarts/exceptions,Inconnu,,—,2026-10-30,
+Qashflo,9. Facturation par dossier ou par cabinet,Inconnu,,—,2026-10-30,
+Qashflo,10. Prix publics,Oui,https://qashflo.eu/tarifs/,extrait WebSearch (WebFetch refusé),2026-10-30,79-299 €/mois [P7DN06-P12]
+Qashflo,11. Avis/témoignages publics,Inconnu,,—,2026-10-30,
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",1a. Marketplace Amazon,Oui (service),https://hayot-expertise.fr/secteurs/expert-comptable-marketplaces ; https://www.eurofiscalis.com/expert-comptable-amazon/,extrait WebSearch (WebFetch refusé),2026-10-30,"[P8F-P22, P9C-P42]"
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",1b. Marketplace Cdiscount/Octopia,Oui (service),https://hayot-expertise.fr/secteurs/expert-comptable-marketplaces ; https://www.hr-associes.fr/blog/rapprochement-comptable-cdiscount-fnac,extrait WebSearch (WebFetch refusé),2026-10-30,"[P7DN06-P15, P7DN06-P13]"
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",1c. Marketplace ManoMano,Oui (service),https://hayot-expertise.fr/secteurs/expert-comptable-marketplaces ; https://www.eurofiscalis.com/?p=19676,extrait WebSearch (WebFetch refusé),2026-10-30,"[P7DN06-P15, P8F-P23]"
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",1d. Marketplace Mirakl (opérateurs),Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",1e. Marketplace Fnac,Oui (service),https://www.hr-associes.fr/blog/rapprochement-comptable-cdiscount-fnac,extrait WebSearch (WebFetch refusé),2026-10-30,HR Associés [P7DN06-P13]
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",1f. Marketplace Rakuten,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",2. Mode d'entrée,Exports + n8n (Hayot),https://hayot-expertise.fr/secteurs/expert-comptable-marketplaces,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P15]
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",3. Décomposition d'un versement,Oui (service),https://hayot-expertise.fr/secteurs/expert-comptable-marketplaces,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P15]
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",4. Rapprochement versement-virement,Oui (service),https://hayot-expertise.fr/secteurs/expert-comptable-marketplaces ; https://www.lafabriquedunet.fr/logiciels/gestion/comptabilite/e-commerce,extrait WebSearch (WebFetch refusé),2026-10-30,"compte d'attente 512220 ; Dougs : module e-commerce [P7DN06-P15, P9C-P41]"
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",5. Gestion TVA (taux/OSS/deemed supplier),Oui (service),https://www.eurofiscalis.com/?p=19676 ; https://www.lafabriquedunet.fr/logiciels/gestion/comptabilite/e-commerce,extrait WebSearch (WebFetch refusé),2026-10-30,"OSS/IOSS [P8F-P23, P9C-P41]"
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",6. Sortie comptable,Pennylane (Hayot),https://hayot-expertise.fr/secteurs/expert-comptable-marketplaces,extrait WebSearch (WebFetch refusé),2026-10-30,[P7DN06-P15]
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",7. Multi-dossiers / espace cabinet,Interne au cabinet,https://hayot-expertise.fr/secteurs/expert-comptable-marketplaces,extrait WebSearch (WebFetch refusé),2026-10-30,"outils internes, non commercialisés [P7DN06-P15]"
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",8. Tableau des écarts/exceptions,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",9. Facturation par dossier ou par cabinet,Non trouvé,,—,2026-10-30,absent des extraits consultés ; ≠ absent
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",10. Prix publics,Non trouvé,https://www.ecommerce-nation.fr/excilio/,extrait WebSearch (WebFetch refusé),2026-10-30,sur devis [P7DN06-P16]
+"Cabinets e-commerce (Hayot, HR Associés, Eurofiscalis, Dougs, Keobiz)",11. Avis/témoignages publics,Oui (cas commerciaux),https://www.hr-associes.fr/blog/rapprochement-comptable-cdiscount-fnac,extrait WebSearch (WebFetch refusé),2026-10-30,non vérifiables [P7DN06-P14]

@@ -1,0 +1,7 @@
+id,titre,categorie,demande_25,insuffisance_20,concurrence_faible_15,acquisition_15,solo_10,rentabilite_10,revente_5,total_100,total_decouvreur,confiance_demande,confiance_globale,innovation_0_5,verdict
+P10-D1-02,Intégration des tarifs fournisseurs hétérogènes (Excel/PDF) dans l'ERP des négoces B2B FR,A,7,5,5,6,5,5,6,57.0,62.5,moyenne,moyenne,2,APPROFONDIR (ICP resserré : négoces hors groupement et hors FAB-DIS)
+P10-D1-01,Contrôle et relance des ARC fournisseurs pour PME industrielles FR,A,7,4,3,6,4,6,5,51.5,58.0,moyenne,moyenne,2,ECARTER en produit seul ; module d'extension possible de la 02
+P10-D1-04,Contrôle des factures transporteurs pour PME chargeuses FR,A,5,4,3,5,4,6,5,45.0,57.5,faible,moyenne,1,"ECARTER (DataFret, Sightness, Fretly, Lox déjà présents)"
+P10-D1-05,Suivi des RFA et ristournes pour négoces et fournisseurs FR,A,4,5,5,5,5,6,5,48.5,56.0,faible,faible,1,"ECARTER (fonction comptable, demande limitée aux grands groupes)"
+P10-V1-C1,Offre combinée assistant achats et ADV (01+04+05),A,8,4,3,6,3,7,5,54.0,,moyenne,faible,2,"NE PAS DEMARRER ainsi ; seul le couple 02+01 est cohérent, en extension"
+P10-D1-03,"Compilation du DOE pour PME de second oeuvre (CVC, plomberie, électricité)",A,6,4,4,6,6,4,5,50.5,59.5,moyenne,moyenne,1,ECARTER (Keepéo couvre le coeur du besoin)

@@ -1,0 +1,72 @@
+# Progress — étude d'opportunités SaaS (2026-10-29)
+
+## Audit de l'environnement
+- [x] WebSearch opérationnel ; **WebFetch bloqué** par la politique réseau (voir `11-sources-et-limites.md` §1)
+- [x] Python 3.13, écriture de fichiers et sous-agents disponibles
+- [x] Founder Skill : non installé comme skill/plugin. Archive fournie extraite dans le scratchpad (hors dépôt), 11 SKILL.md lus, 4 scripts audités (bibliothèque standard, aucun accès réseau). founder-board, founder-cfo et founder-plan ont été appliqués.
+  - Installation officielle : `/plugin marketplace add Jakeschincariol/founder-skill` puis `/plugin install founder-skill@founder-skill`
+- [x] Dépôt hôte : Relanzio v0.4 ; étude isolée dans `saas-opportunity-research/`
+- [x] Interruption par limite d'usage (vers 11 h 50 UTC) ; reprise sans perte
+
+## Phases
+- [x] Phase 1 — cartographie : 31 familles, 206 opportunités, 246 preuves (5 analystes)
+- [x] Phase 3a — notation harmonisée de 38 pistes (`_work/score.py`) → `03-classement-top20.csv`
+- [x] Phase 2/4 — 8 due diligences (5 finalistes + B-11, E-01 + contrôle E-13) avec recherche contraire
+- [x] Vérification de 5 alternatives négligées (C-39, C-01, C-14, D-15, E-21) : aucune au-dessus de 62,5
+- [x] Red team distincte + conseil founder-board (2 FUND IF, 1 PASS, 3,7/10)
+- [x] Phase 3b — notes après recherche contraire et red team ajoutées à `03-classement-top20.csv`
+- [x] Phase 5 — mémo, business model (unit_economics.py), MVP, plan de validation sur 30 jours, sources et limites
+
+## Phase 6 — audit critique (2026-10-29 soir)
+- [x] Relecture des 3 sources primaires du porteur tentée : **échec** (DNS refusé pour leportailformateurs.fr, help.digiforma.com, legifrance.gouv.fr). Vérification par extraits
+- [x] Audit D-37 : matrice de 9 outils, obligations classées (obligatoire / conseillé / commercial), notes 47,5 (grille d'origine) et 38,5 (v2) → **ABANDON**
+- [x] Grille v2 avec critère Potentiel (20 %) ; 3 recherches nouvelles (N1 verticales, N2 infrastructure/API, N3 service-as-software) : 31 pistes
+- [x] Red team 2 : propreté 51,0 ; API e-facture 50,5 ; recouvrement 49,5 → aucune retenue
+- [x] Interruption par limite d'usage (reset à 17 h UTC), reprise sans perte
+- [x] Fichiers 03b, 05 (addendum), 06 (943 preuves) et 12 créés ou mis à jour ; bandeaux de révision sur 04, 05, 07, 08, 09, 10 et founder/
+
+## Phase 7 — micro-SaaS solo revendable (2026-10-29 nuit)
+- [x] Grille v3 (acquisition 20, revente 15…) ; re-classement de 27 pistes existantes et nouvelles (`_work/P7-rescreen*`)
+- [x] Données de cession (multiples constatés, seuils) et règles micro-entrepreneur 2026 (`_work/P7-cession.md`, `_work/P7-fiscal.md`)
+- [x] 3 études approfondies : C-39 50 ; N04 49,5 ; N06 48,5
+- [x] Simulations reproductibles (`P7-simulations-financieres.md`) ; red team 3, option achat comprise
+- [x] Interruption par limite d'usage (reset à 22 h 10 UTC), reprise sans perte
+- [x] Décision : `13-micro-saas-decision.md`
+
+## Phase 8 — acquisition sans réseau (2026-10-30)
+- [x] Corrections demandées par le porteur : réseau non requis, non validé ≠ mauvais, notes documentaires non éliminatoires, seuils adaptés au modèle
+- [x] 5 pistes choisies par canal ; expérimentations détaillées (`_work/P8-US.md`, `_work/P8-FR.md`)
+- [x] Fiscalité corrigée (`_work/P8-fiscal-corrections.md`) ; multiples recalés sur des transactions conclues (`_work/P8-transactions.md`)
+- [x] Simulations (`P8-simulations-financieres.md`) ; décision dans `14-acquisition-sans-reseau.md`
+
+## Phase 9 — validation commerciale de N06 (2026-10-30)
+- [x] Risque 1 : matrice concurrentielle (`_work/P9-concurrents*`). Order Invoicer couvre 18+ marketplaces et Cegid/ACD ; reste le cockpit multi-dossiers
+- [x] Risque 2 : formats (`_work/P9-formats.md`). Le FEC n'est pas universel ; sortie FEC 18 colonnes + un format natif choisi en entretien
+- [x] Risque 3 : juridique (`_work/P9-juridique.md`). Pilote outil seulement ; documents et validation par un avocat avant toute donnée réelle
+- [x] Risque 4 : modèle de temps (`P9-modele-temps.md`). 3,4 / 7,8 / 22,6 h/semaine selon l'automatisation et le taux d'exceptions
+- [x] Kit de validation (`15-validation-n06.md`, `p9-landing/index.html`, `_work/P9-cabinets.csv`)
+- [x] Interruption par limite d'usage (reset à 3 h 10 UTC), reprise sans perte
+
+## Phase 10 — découverte par les problèmes (2026-10-30 → 2026-11-03)
+- [x] Méthode (`16-methodologie-decouverte.md`), grille v4, règles de preuve [F/O/H/E/M]
+- [x] 4 angles de découverte (D1-D4), 36 pistes ; 3 vérifications contradictoires (V1-V3), 12 pistes ; décote moyenne de −10,1
+- [x] TOP 15 (`17-top-pistes.csv`), top 5, 3 gagnants, recommandation, plans de validation (`17-decouverte-resultats.md`)
+- [x] Interruptions par limites d'usage (dont la limite hebdomadaire jusqu'au 3/11), reprises sans perte
+
+## Décisions restant à vérifier (humain)
+- [ ] Test technique D1-02 sur 20 tarifs publics (aucun contact) : votre accord pour construire un **prototype local de mesure**, qui n'est pas un produit
+- [ ] Budget Google Ads 400-600 € et page de pilote à 290 € (aucune publication sans accord)
+- [ ] Étape 0 : essais Order Invoicer, Pennylane Collaboratif, Link My Books (sans contact commercial)
+- [ ] Relevé manuel des coordonnées des 22 cabinets ; vérification de l'Ordre ; compléter jusqu'à 30
+- [ ] Accord explicite avant tout envoi du message 1
+- [ ] Accord pour lancer le test N06 (aucun envoi sans accord) ; option : test C-39 avant fin janvier
+- [ ] **J0 : inventaire des contacts décideurs par segment + budget perdable** → règle du fichier 13
+- [ ] Sprint de vente de 30 jours sans code ; GO seulement avec ≥ 3 paiements
+- [ ] **Inventaire de vos accès réels** : secteurs où vous joignez ≥ 20 décideurs (variable la plus discriminante)
+- [ ] Sprint de découverte terrain de 30 jours (§7 du fichier 12) ; critère global : 0 paiement à 90 jours → problème de distribution
+- [ ] (Obsolète depuis la phase 6) Webinaire SYCFI du 4/11/2026 : prix, opérateur et fonctions du « Portail des Formateurs »
+- [ ] Essais d'une journée : Formiva, Qualiobee, Digiforma (module sous-traitants ?) ; Obat, Tolteck, EBP, Batappli, Extrabat, Abby (relance automatique de devis ?)
+- [ ] Parution du guide de lecture Qualiopi v10 et des arrêtés des indicateurs 19 et 20
+- [ ] Lecture des textes officiels une fois le réseau ouvert (Légifrance : décret 2026-728, loi 2026-534)
+- [ ] Accord du porteur avant tout contact commercial (aucun message envoyé)
+- [ ] Comité de décision à J30 (matrice dans `10-validation-30-jours.md`)

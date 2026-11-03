@@ -1,0 +1,14 @@
+{
+  "fiscal": {"taux_cotisations": 0.212, "cfp": 0.00144, "taux_vl": 0.017,
+             "source": "P7-fiscal.md : BIC prestations de services 2026, CFP 0,1 % + TFC 0,044 %, versement libératoire 1,7 % (extraits de sources officielles, à valider par un expert-comptable)"},
+  "multiples": {"pessimiste": 1.5, "central": 2.5, "favorable": 3.5, "base": "SDE annuel",
+                "source": "P7-cession.md : micro-SaaS < 1 k$ MRR 1,5-2,5x ; 1-5 k$ MRR 2-4x (Acquire, Flippa, Empire Flippers ; historiques, non garantis)"},
+  "cout_horaire_operateur": 35,
+  "opportunites": [
+    {"id":"P7-N06","titre":"Rapprochement des reversements marketplaces FR vers Pennylane/FEC (intrants DD)","prix_mensuel_ht":59,"cout_variable_client_mois":3,"frais_paiement_pct":0.015,"frais_paiement_fixe":0.25,"fixes_mensuels":90,"heures_fixes_mois":16,"heures_par_client_mois":0.6,"churn_mensuel":0.03,"cac":300},
+    {"id":"C-39","titre":"Calendrier et préparation des dépôts FCC pour petits revendeurs VoIP US (intrants DD)","prix_mensuel_ht":79,"cout_variable_client_mois":2,"frais_paiement_pct":0.055,"frais_paiement_fixe":0.25,"fixes_mensuels":330,"heures_fixes_mois":15,"heures_par_client_mois":0.6,"churn_mensuel":0.035,"cac":350},
+    {"id":"P7-N04","titre":"Application Jira de justification du temps R&D CIR/CII (intrants DD)","prix_mensuel_ht":49,"cout_variable_client_mois":1,"frais_paiement_pct":0.02,"frais_paiement_fixe":0,"fixes_mensuels":60,"heures_fixes_mois":10,"heures_par_client_mois":0.3,"churn_mensuel":0.035,"cac":200},
+    {"id":"E-13-AG","titre":"Relanzio repositionné agences et prestataires B2B (intrants estimés : P7-rescreen §3.2)","prix_mensuel_ht":59,"cout_variable_client_mois":1,"frais_paiement_pct":0.015,"frais_paiement_fixe":0.25,"fixes_mensuels":80,"heures_fixes_mois":8,"heures_par_client_mois":0.3,"churn_mensuel":0.04,"cac":350},
+    {"id":"E-13","titre":"Relanzio actuel, artisans/TPE à 24 € (intrants DD-E13 §8 : churn 6 %, ~20 h de vente par client valorisées à 35 €/h ≈ 700 €)","prix_mensuel_ht":24,"cout_variable_client_mois":0.5,"frais_paiement_pct":0.015,"frais_paiement_fixe":0.25,"fixes_mensuels":60,"heures_fixes_mois":8,"heures_par_client_mois":0.25,"churn_mensuel":0.06,"cac":700}
+  ]
+}
