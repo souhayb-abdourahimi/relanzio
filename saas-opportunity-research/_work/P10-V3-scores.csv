@@ -1,0 +1,4 @@
+id,titre,categorie,demande_25,insuffisance_20,concurrence_faible_15,acquisition_15,solo_10,rentabilite_10,revente_5,total_100,total_decouvreur,confiance_demande,confiance_globale,innovation_0_5,verdict
+P10-D1-08,Collecte du CA des franchisés et facturation des redevances pour petits franchiseurs FR (10-80 points de vente),A,4,3,3,7,6,5,5,44.5,55.5,faible,moyenne,1,"ECARTER (offre FR existante : HubyUP, Nooa, Axonaut ; Excel toléré sous 20-50 unités)"
+D2-02,Facturation et e-reporting pour vendeurs Etsy professionnels français,B,4,4,4,5,6,3,4,42.5,54.5,faible,moyenne,1,"ECARTER (Billbee, easybill, Base+VosFactures couvrent Etsy ; e-reporting absorbé par les PA gratuites ; faible volonté de payer)"
+P10-D4-06,Suivi des remboursements OPCO après la fin de la subrogation (PME et OF),A/C,3,4,5,5,5,3,3,40.0,53.5,moyenne,moyenne,2,ECARTER (PDC < 50 sal. garde la subrogation ; >= 50 sal. sans PDC mutualisé ; Lucca/Eurécia suivent les financements ; besoin peu fréquent)
