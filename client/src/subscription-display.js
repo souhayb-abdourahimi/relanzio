@@ -1,34 +1,40 @@
 import { trialDisplay } from './trial-display.js';
+import { REPLY_STOP_LIVE } from './claims.js';
 import { FREE_ACTIVE_QUOTES_LIMIT,PRO_ACTIVE_QUOTES_LIMIT,PRO_MONTHLY_PRICE,VAT_NOTICE,FREE_LIMIT_TEXT,PRO_LIMIT_TEXT,UPGRADE_LABEL } from '../../shared/plans.js';
 
+// Free and Pro are sold on who does the work, not on the quota.
 export const FREE_PLAN = Object.freeze({
   id:'free',
-  name:'Découverte / Gratuit',
+  name:'Gratuit',
+  headline:'Vous gardez la main',
   price:'0 €',
   limit:FREE_ACTIVE_QUOTES_LIMIT,
   features:[
-    FREE_LIMIT_TEXT,
-    'Tableau de bord',
-    'Planning J+2 / J+5 / J+10',
-    'Mode revue',
-    'Préparation et copie des relances'
+    `Jusqu’à ${FREE_LIMIT_TEXT}`,
+    'Relanzio vous dit qui relancer, et quand',
+    'Messages prêts à copier',
+    'Email, SMS ou appel en un geste',
+    '« Le client a répondu » arrête tout',
+    'Historique des relances et des réponses'
   ]
 });
 
 export const PRO_PLAN = Object.freeze({
   id:'pro',
   name:'Pro',
+  headline:'Relanzio relance pour vous',
   price:`${PRO_MONTHLY_PRICE} €`,
   period:'/ mois',
   vatNote:VAT_NOTICE,
   limit:PRO_ACTIVE_QUOTES_LIMIT,
   features:[
-    PRO_LIMIT_TEXT,
-    'Envoi via Relanzio',
-    'Mode automatique opt-in devis par devis',
-    'Personnalisation IA',
-    'Suivi de délivrabilité',
-    'Support intégré'
+    'Relanzio envoie la relance en votre nom, en un geste',
+    'Séquence de 3 relances au maximum, en jours ouvrés',
+    ...(REPLY_STOP_LIVE?['Arrêt automatique dès que le client répond, et sa réponse vous est transmise']:[]),
+    'Vous relisez chaque message avant l’envoi',
+    'Lien de désinscription dans chaque email',
+    `Jusqu’à ${PRO_LIMIT_TEXT}`,
+    'Support direct par email ou téléphone'
   ]
 });
 

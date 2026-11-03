@@ -39,7 +39,8 @@ test('cadence is configurable per account and validated',()=>{
 
 test('next follow-up is computed from the day the previous one was done',()=>{
   // Relance 1 done late (28 Oct), custom cadence J+3/J+7/J+14 → relance 2 four days later, 09:00 Paris.
-  assert.equal(nextRecommendedAfterAction('2026-10-28T15:00:00.000Z',1,[3,7,14]),'2026-11-01T08:00:00.000Z');
+  // Four days later is Sunday 1 Nov: follow-ups are planned on working days, so Monday 2 Nov.
+  assert.equal(nextRecommendedAfterAction('2026-10-28T15:00:00.000Z',1,[3,7,14]),'2026-11-02T08:00:00.000Z');
   assert.equal(nextRecommendedAfterAction('2026-10-28T15:00:00.000Z',2,[3,7,14]),'2026-11-04T08:00:00.000Z');
   assert.equal(nextRecommendedAfterAction('2026-10-28T15:00:00.000Z',3,[3,7,14]),null);
   assert.equal(initialRecommendedFollowupAt('2026-10-27',new Date('2026-10-27T10:00:00Z'),3).at,'2026-10-30T08:00:00.000Z');

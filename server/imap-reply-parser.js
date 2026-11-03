@@ -116,6 +116,36 @@ export function extractTextBody(raw='',depth=0) {
   return type==='text/html'?stripHtml(decoded):decoded;
 }
 
+function dispositionFilename(headers){
+  const disp=headerValue(headers,'content-disposition');
+  const fromDisp=disp.match(/filename\*?=(?:"([^"]+)"|([^;\s]+))/i);
+  const {params}=parseContentType(headerValue(headers,'content-type'));
+  const raw=fromDisp?(fromDisp[1]||fromDisp[2]):(params.name||'');
+  const value=decodeMimeWords(String(raw).replace(/^utf-8''/i,'')).trim();
+  try{return {filename:decodeURIComponent(value),attachment:/^\s*attachment/i.test(disp)};}catch{return {filename:value,attachment:/^\s*attachment/i.test(disp)};}
+}
+
+// Files attached to a reply (base64 parts with a filename), for forwarding to the artisan.
+export function extractAttachments(raw='',depth=0,out=[]) {
+  if(depth>5||out.length>=20)return out;
+  const {headerBlock,body}=splitHeaderBody(raw);
+  const headers=parseHeaders(headerBlock);
+  const {type,params}=parseContentType(headerValue(headers,'content-type'));
+  if(type.startsWith('multipart/')&&params.boundary){
+    for(const chunk of body.split(`--${params.boundary}`).slice(1)){
+      if(/^--\s*$/.test(chunk.trim())||!chunk.trim())continue;
+      extractAttachments(chunk.replace(/^\r?\n/,''),depth+1,out);
+    }
+    return out;
+  }
+  const {filename,attachment}=dispositionFilename(headers);
+  if(!filename&&!attachment)return out;
+  const transfer=headerValue(headers,'content-transfer-encoding').toLowerCase();
+  const content=transfer==='base64'?String(body).replace(/[^A-Za-z0-9+/=]/g,''):Buffer.from(transfer==='quoted-printable'?decodeQuotedPrintableToBuffer(body):Buffer.from(String(body),'latin1')).toString('base64');
+  out.push({filename:filename||'piece-jointe',contentType:type,size:Math.floor(content.length*3/4),content});
+  return out;
+}
+
 export function parseImapReply(raw='') {
   const {headerBlock}=splitHeaderBody(raw);
   const headers=parseHeaders(headerBlock);
@@ -132,6 +162,8 @@ export function parseImapReply(raw='') {
     to:[...(headers.get('to')||[]),...(headers.get('x-original-to')||[]),...(headers.get('delivered-to')||[])].flatMap(extractEmail).filter(Boolean),
     subject:decodeMimeWords(headerValue(headers,'subject')).trim(),
     receivedAt:Number.isNaN(date.getTime())?null:date.toISOString(),
+    contentType:headerValue(headers,'content-type'),
+    headers,
     text:extractTextBody(raw).trim()
   };
 }

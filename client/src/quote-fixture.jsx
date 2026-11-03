@@ -48,7 +48,7 @@ function Fixture(){
         schedule.value='none';schedule.dispatchEvent(new Event('change',{bubbles:true}));
         later(()=>{
           const text=modal.textContent||'';
-          const noneOk=!document.querySelector('input[type="datetime-local"]')&&text.includes('Aucune relance automatique');
+          const noneOk=!document.querySelector('input[type="datetime-local"]')&&text.includes('Aucune relance ne sera proposée');
           const inputs=[...modal.querySelectorAll('input,select')];
           const widthsOk=inputs.every(x=>x.getBoundingClientRect().right<=window.innerWidth+1);
           document.body.dataset.quoteQa=noneOk&&widthsOk&&document.documentElement.scrollWidth<=window.innerWidth+1?'pass':'fail-none';

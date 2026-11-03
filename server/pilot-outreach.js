@@ -106,8 +106,10 @@ async function verifyPublicDkim(record,domain='relanzio.com'){
 }
 
 export async function getBrevoPilotSenderStatus() {
-  if (!process.env.BREVO_API_KEY) throw pilotError('PILOT_BREVO_NOT_CONFIGURED', 'Brevo n’est pas configuré.', 503);
-  const headers = { accept:'application/json', 'api-key':process.env.BREVO_API_KEY };
+  // Checks the account pilot emails actually leave from (stream 'outreach' in email.js).
+  const apiKey = process.env.OUTREACH_BREVO_API_KEY || process.env.BREVO_API_KEY;
+  if (!apiKey) throw pilotError('PILOT_BREVO_NOT_CONFIGURED', 'Brevo n’est pas configuré.', 503);
+  const headers = { accept:'application/json', 'api-key':apiKey };
   const [sendersResponse, domainResponse, accountResponse, webhooksResponse, spfRows, dmarcRows] = await Promise.all([
     fetch('https://api.brevo.com/v3/senders', { method:'GET', headers }),
     fetch('https://api.brevo.com/v3/senders/domains/relanzio.com', { method:'GET', headers }),
@@ -311,7 +313,8 @@ export async function sendPilotOutreach({ prospectId, requestedBy, dryRun = fals
       replyTo:PILOT_SENDER.replyTo,
       senderEmail:PILOT_SENDER.email,
       senderName:PILOT_SENDER.name,
-      tags:['relanzio-pilot','sequence-0']
+      tags:['relanzio-pilot','sequence-0'],
+      stream:'outreach'
     });
 
     const sentAt = iso();

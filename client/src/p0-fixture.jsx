@@ -44,11 +44,11 @@ function Fixture(){
     later(()=>{
       const text=document.body.textContent||'',cards=[...document.querySelectorAll('.today-card')],noOverflow=document.documentElement.scrollWidth<=window.innerWidth+1;
       const touch=window.innerWidth>760||[...document.querySelectorAll('.today-view button')].filter(visible).every(b=>b.getBoundingClientRect().height>=44);
-      const terminalOk=count<4||text.includes('Séquence terminée — décidez : gagné, perdu ou repousser');if(!text.includes('EN RETARD')||!text.includes('AUJOURD’HUI')||!text.includes('À VENIR')||!text.includes('en retard de 2 j')||!text.includes('Attend l’accord du conjoint')||!terminalOk||!cards.length||!noOverflow||!touch){document.body.dataset.p0Qa='fail-layout';return}
+      const terminalOk=count<4||text.includes('3 relances sans réponse : un appel, ou décidez gagné / perdu');if(!text.includes('EN RETARD')||!text.includes('AUJOURD’HUI')||!text.includes('PLUS TARD')||!text.includes('en retard de 2 j')||!text.includes('Attend l’accord du conjoint')||!terminalOk||!cards.length||!noOverflow||!touch){document.body.dataset.p0Qa='fail-layout';return}
       const relancer=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Relancer');relancer?.click();
       later(()=>{
         const modal=document.querySelector('.preview-modal'),ta=modal?.querySelector('textarea'),copy=[...modal?.querySelectorAll('button')||[]].find(x=>x.textContent.trim()==='Copier');
-        const confirm=[...modal?.querySelectorAll('button')||[]].find(x=>x.textContent.trim()==='Relance faite');
+        const confirm=[...modal?.querySelectorAll('button')||[]].find(x=>x.textContent.trim()==='J’ai relancé moi-même');
         const channels=['mailto:','sms:','tel:'].every(p=>modal?.querySelector(`a[href^="${p}"]`));
         if(!modal||!ta||!copy||!confirm||!channels){document.body.dataset.p0Qa='fail-modal';return}
         setInput(ta,'Message modifié');
@@ -60,8 +60,8 @@ function Fixture(){
           const rep=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Repousser');rep?.click();
           later(()=>{
             const plus3=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='+3 j');plus3?.click();
-            later(()=>{const result=[...document.querySelectorAll('button')].filter(visible).find(x=>x.textContent.trim()==='Résultat');result?.click();},40);
-            later(()=>{const won=[...document.querySelectorAll('button')].filter(visible).find(x=>x.textContent.trim()==='Gagné');won?.click();},80);
+            later(()=>{const more=[...document.querySelectorAll('.today-card .more-btn')].filter(visible)[0];more?.click();},40);
+            later(()=>{const won=[...document.querySelectorAll('.more-list [role="menuitem"]')].filter(visible).find(x=>x.textContent.trim()==='Gagné');won?.click();},80);
             later(()=>{
               const renderMs=Math.round(performance.now()-renderStarted);document.body.dataset.renderMs=String(renderMs);
               const ok=document.body.dataset.copyOnly==='yes'&&document.body.dataset.manualConfirmed==='yes'&&document.body.dataset.lastPostpone==='3'&&document.body.dataset.lastStatus==='won'&&document.documentElement.scrollWidth<=window.innerWidth+1;

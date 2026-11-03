@@ -81,6 +81,21 @@ function parisDateKey(value=new Date()){
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+// Proof of value without claiming causality: "X € de devis gagnés après au moins une relance".
+export function valueProof(quotes = [], followups = [], replies = []) {
+  const done = followups.filter(f => ['sent','delivered','opened','clicked','bounced'].includes(f.status));
+  const followedUp = new Set(done.map(f => f.quote_id));
+  const answered = new Set(replies.filter(r => r.effect === 'stop').map(r => r.quote_id));
+  const wonAfter = quotes.filter(q => q.status === 'won' && followedUp.has(q.id));
+  return {
+    followupsDone: done.length,
+    followupsByRelanzio: done.filter(f => f.channel === 'relanzio').length,
+    quotesAnswered: answered.size,
+    wonAfterFollowup: wonAfter.length,
+    wonAfterFollowupAmount: wonAfter.reduce((s,q)=>s+Number(q.amount||0),0)
+  };
+}
+
 export function quoteMetrics(quotes = [], now = new Date()) {
   const active = quotes.filter(q => ['open','paused'].includes(q.status));
   const open = quotes.filter(q => q.status === 'open');
@@ -89,6 +104,7 @@ export function quoteMetrics(quotes = [], now = new Date()) {
   const decided = won.length + lost.length;
   const today=parisDateKey(now);
   const dueToday=open.filter(q=>{
+    if(q.reply_received_at)return false;
     if(Number(q.followup_step||0)>=3&&!q.next_followup_at)return true;
     return Boolean(q.next_followup_at&&parisDateKey(q.next_followup_at)<=today);
   }).length;

@@ -5,10 +5,10 @@ export const SITE_URL='https://relanzio.com';
 export const OG_IMAGE='/og-image.png';
 
 export const ROUTE_META=Object.freeze({
-  '/':{title:'Relanzio — Chaque matin, les devis à relancer',description:'Ajoutez vos devis envoyés en 30 secondes. Relanzio vous dit qui relancer aujourd’hui et prépare le message. Votre logiciel de devis ne change pas.'},
+  '/':{title:'Relanzio — Vos devis relancés au bon moment',description:'Ajoutez un devis déjà envoyé : Relanzio vous dit quand relancer, prépare le message et peut l’envoyer pour vous. Sans changer de logiciel de devis, sans harceler vos clients.'},
   '/pricing':{title:'Tarifs — Relanzio',description:`Gratuit jusqu’à ${FREE_LIMIT_TEXT}. Pro à ${PRO_PRICE_TEXT}, essai ${TRIAL_DAYS} jours sans carte bancaire, sans engagement.`},
   '/docs':{title:'Documentation — Relanzio',description:'Le fonctionnement de Relanzio en quelques étapes : ajouter un devis, relancer, repousser, décider.'},
-  '/faq':{title:'Questions fréquentes — Relanzio',description:'Logiciel de devis, relances par téléphone, emails, données, export : les réponses avant de commencer.'},
+  '/faq':{title:'Questions fréquentes — Relanzio',description:'Clients qui ont déjà répondu, relecture avant envoi, téléphone seul, résiliation : les réponses avant de commencer.'},
   '/contact':{title:'Contact — Relanzio',description:'Écrire à l’équipe Relanzio pour une question produit, compte ou facturation.'},
   '/legal':{title:'Mentions légales — Relanzio',description:'Éditeur, hébergeurs et contact de Relanzio.'},
   '/privacy':{title:'Politique de confidentialité — Relanzio',description:'Données personnelles traitées par Relanzio, sous-traitants et droits.'},

@@ -27,12 +27,18 @@ export function addDaysToDateKey(dateKey,days){
   return d.toISOString().slice(0,10);
 }
 
+// Follow-ups are planned on working days: Saturday and Sunday move to Monday (same rule as SQL skip_weekend).
+export function skipWeekendDateKey(dateKey){
+  const day=new Date(`${dateKey}T12:00:00Z`).getUTCDay();
+  return day===6?addDaysToDateKey(dateKey,2):day===0?addDaysToDateKey(dateKey,1):dateKey;
+}
+
 export function nextRecommendedAfterAction(performedAt,nextStep,offsets=DEFAULT_FOLLOWUP_OFFSETS){
   const step=Number(nextStep);
   if(step>=3)return null;
   const gap=gapAfterStep(offsets,step);
   if(!gap)throw new Error('INVALID_NEXT_STEP');
-  return parisLocalDateTimeToIso(addDaysToDateKey(parisBusinessDate(performedAt),gap),9,0);
+  return parisLocalDateTimeToIso(skipWeekendDateKey(addDaysToDateKey(parisBusinessDate(performedAt),gap)),9,0);
 }
 
 export function isAutomaticSendWindow(value=new Date()){
@@ -64,5 +70,5 @@ export function shouldArmInitialAutoSend(wantsAuto,nextFollowupAt,now=new Date()
 export function initialRecommendedFollowupAt(sentDate,now=new Date(),firstOffsetDays=DEFAULT_FOLLOWUP_OFFSETS[0]){
   const today=parisBusinessDate(now);
   const target=addDaysToDateKey(sentDate,firstOffsetDays);
-  return {at:parisLocalDateTimeToIso(target<today?today:target,9,0),catchUp:target<today};
+  return {at:parisLocalDateTimeToIso(skipWeekendDateKey(target<today?today:target),9,0),catchUp:target<today};
 }

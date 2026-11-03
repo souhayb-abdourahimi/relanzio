@@ -252,7 +252,7 @@ export async function sendCommercialJ0({prospectId,requestedBy}){
     const sent=await sendEmail({
       to:prospect.email,subject:claimed.subject,text:claimed.content,
       replyTo:PILOT_SENDER.replyTo,senderEmail:PILOT_SENDER.email,senderName:'Relanzio',
-      tags:['relanzio-commercial','sequence-0']
+      tags:['relanzio-commercial','sequence-0'],stream:'outreach'
     });
     const sentAt=iso();
     await db.from('outreach_events').insert({
@@ -339,7 +339,7 @@ export async function sendCommercialJ3({prospectId,requestedBy}){
     const sent=await sendEmail({
       to:prospect.email,subject:claimed.subject,text:claimed.content,
       replyTo:PILOT_SENDER.replyTo,senderEmail:PILOT_SENDER.email,senderName:'Relanzio',
-      tags:['relanzio-commercial','sequence-1']
+      tags:['relanzio-commercial','sequence-1'],stream:'outreach'
     });
     const sentAt=iso();
     await db.from('outreach_events').insert({

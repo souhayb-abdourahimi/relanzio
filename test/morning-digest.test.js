@@ -16,15 +16,20 @@ test('digest only lists usable open quotes due today or earlier, late first',()=
     q('terminal',null,{followup_step:3,amount:9400}),
     q('paused','2026-10-20T08:00:00Z',{status:'paused'}),
   ],NOW);
-  assert.deepEqual(items.map(x=>x.quote.id),['late','terminal','today']);
+  // Follow-ups due (late first), then the call to make; paused and future quotes are left out.
+  assert.deepEqual(items.map(x=>x.quote.id),['late','today','terminal']);
   assert.equal(items[0].lateDays,3);
+  assert.deepEqual(items.map(x=>x.kind),['followup','followup','call']);
 });
 
 test('digest subject and body follow the expected format',()=>{
   const items=digestItems([q('a','2026-10-28T08:00:00Z',{amount:4800}),q('b','2026-10-27T08:00:00Z',{amount:2100,followup_step:1}),q('c',null,{amount:2500,followup_step:3})],NOW);
   const d=buildDigest({profile:{company_name:'Toitures Martin'},items,appUrl:'https://relanzio.test',unsubscribeUrl:'https://relanzio.test/api/email/unsubscribe?t=x'});
-  assert.equal(d.subject,'3 relances aujourd’hui · 9 400 € en jeu');
+  assert.equal(d.subject,'Aujourd’hui : 2 devis à relancer · 1 appel conseillé');
   assert.match(d.text,/• Client b — Devis b \(2 100 €\) · relance 2\/3 · en retard de 1 j/);
+  assert.match(d.text,/À relancer \(6 900 € en jeu\)/);
+  assert.match(d.text,/À appeler\n• Client c — Devis c \(2 500 €\)/);
+  assert.doesNotMatch(d.text,/mode revue|automatique/);
   assert.match(d.text,/https:\/\/relanzio\.test\/\?from=digest/);
   assert.match(d.text,/Ne plus le recevoir : https:\/\/relanzio\.test\/api\/email\/unsubscribe\?t=x/);
 });
@@ -66,4 +71,18 @@ test('a failed send releases the claim so the next run can retry',async()=>{
   assert.equal((s.db.tables.digest_sends||[]).length,0);
   await s.run();
   assert.equal(s.sent.length,1);
+});
+
+test('client replies come first in the digest, then follow-ups and calls; old replies drop out after 7 days',()=>{
+  const items=digestItems([
+    q('due','2026-10-28T08:00:00Z',{amount:1000}),
+    q('replied',null,{reply_received_at:'2026-10-27T15:00:00Z',followup_step:1}),
+    q('pausedReply',null,{status:'paused',reply_received_at:'2026-10-26T15:00:00Z'}),
+    q('oldReply',null,{reply_received_at:'2026-10-10T15:00:00Z'}),
+    q('call',null,{followup_step:3})
+  ],NOW);
+  assert.deepEqual(items.map(x=>x.quote.id),['replied','pausedReply','due','call']);
+  const d=buildDigest({profile:{company_name:'Toitures Martin'},items,appUrl:'https://relanzio.test',unsubscribeUrl:'u'});
+  assert.equal(d.subject,'Aujourd’hui : 2 réponses reçues · 1 devis à relancer · 1 appel conseillé');
+  assert.match(d.text,/^Bonjour Toitures Martin,\n\nAujourd’hui :\n• 2 réponses reçues\n• 1 devis à relancer\n• 1 appel conseillé\n\nVoir ma journée : https:\/\/relanzio\.test\/\?from=digest/);
 });

@@ -11,13 +11,13 @@ function Fixture(){
     if(!qa)return;
     setTimeout(()=>{
       const banner=document.querySelector('.trial-banner');
-      const button=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Passer à Pro — 29 € / mois');
+      const button=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Passer à Pro');
       const text=banner?.textContent||'';
       const r=button?.getBoundingClientRect();
       const mobile=window.innerWidth<=760;
       const touchOk=!mobile||(r&&r.height>=44);
       const noOverflow=document.documentElement.scrollWidth<=window.innerWidth+1;
-      if(!banner||!button||!text.includes('Essai Pro : 7 jours restants')||!text.includes('Fin prévue le 21/10/2026')||!touchOk||!noOverflow){document.body.dataset.trialQa='fail';return}
+      if(!banner||!button||!text.includes('Essai Pro · 7 jours restants')||!text.includes('Fin prévue le 21/10/2026')||!touchOk||!noOverflow){document.body.dataset.trialQa='fail';return}
       button.click();
       setTimeout(()=>{document.body.dataset.trialQa=document.body.dataset.upgraded==='yes'?'pass':'fail-click'},50);
     },80);

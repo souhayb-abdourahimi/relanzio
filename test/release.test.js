@@ -38,7 +38,8 @@ test('email layer never uses a fake development success',()=>{
   const email=readFileSync(new URL('../server/email.js',import.meta.url),'utf8');
   assert.match(email,/EMAIL_PROVIDER_NOT_CONFIGURED/);
   assert.doesNotMatch(email,/DEV EMAIL/);
-  assert.match(email,/store:false/);
+  // Follow-up text is a fixed template: the email layer never sends client data to an AI provider.
+  assert.doesNotMatch(email,/openai/i);
 });
 
 test('release source contains required self-service routes and safety gates',()=>{
@@ -106,7 +107,8 @@ test('Stripe customer is stable while checkout idempotency is versioned per clai
 
 test('pricing and Stripe checkout stay aligned with VAT-exempt micro-enterprise configuration',()=>{
   const server=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
-  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8');
+  // Public pricing (landing and /pricing) is rendered by PricingCards: it must carry the VAT notice.
+  const client=readFileSync(new URL('../client/src/main.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PublicSite.jsx',import.meta.url),'utf8')+readFileSync(new URL('../client/src/public-meta.js',import.meta.url),'utf8')+readFileSync(new URL('../client/src/PricingCards.jsx',import.meta.url),'utf8');
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   const subscription=readFileSync(new URL('../client/src/subscription-display.js',import.meta.url),'utf8');
   const legal=readFileSync(new URL('../client/src/LegalPage.jsx',import.meta.url),'utf8');
@@ -168,7 +170,7 @@ test('privacy notice covers targeted B2B prospecting and retention',()=>{
 
 test('Docker build exposes every public launch variable used by Vite',()=>{
   const docker=readFileSync(new URL('../Dockerfile',import.meta.url),'utf8');
-  for(const key of ['VITE_SUPPORT_EMAIL','VITE_CONTACT_EMAIL','VITE_BILLING_ENABLED','VITE_LEGAL_ENTITY_TYPE','VITE_LEGAL_NAME','VITE_LEGAL_FORM','VITE_LEGAL_CAPITAL','VITE_LEGAL_ADDRESS','VITE_LEGAL_EMAIL','VITE_LEGAL_REGISTRATION','VITE_LEGAL_VAT','VITE_LEGAL_PHONE','VITE_PUBLICATION_DIRECTOR']){
+  for(const key of ['VITE_SUPPORT_EMAIL','VITE_CONTACT_EMAIL','VITE_BILLING_ENABLED','VITE_LEGAL_ENTITY_TYPE','VITE_LEGAL_NAME','VITE_LEGAL_FORM','VITE_LEGAL_CAPITAL','VITE_LEGAL_ADDRESS','VITE_LEGAL_EMAIL','VITE_LEGAL_REGISTRATION','VITE_LEGAL_VAT','VITE_LEGAL_PHONE','VITE_PUBLICATION_DIRECTOR','VITE_REPLY_DETECTION_LIVE']){
     assert.ok(docker.includes(`ARG ${key}`), `${key} build ARG missing`);
     assert.ok(docker.includes(`ENV ${key}=$${key}`), `${key} build ENV missing`);
   }
@@ -248,8 +250,9 @@ test('seven-day Pro trial is wired through schema, access and admin controls',()
   assert.match(server,/hasProAccess\(profile\)/);
   assert.match(followups,/hasProAccess\(profile\)/);
   assert.match(client,/profile\.pro_access/);
-  assert.match(trialUi,/accountBanner\(profile,lockedCount\)/);
-  assert.match(trialDisplay,/Essai Pro :/);
+  assert.match(trialUi,/accountBanner\(profile,lockedCount,activeCount\)/);
+  // Compact one-line label (mobile): "Essai Pro · 6 jours restants".
+  assert.match(trialDisplay,/Essai Pro · /);
   assert.match(trialDisplay,/upgradeLabel:UPGRADE_LABEL/);
   const plans=readFileSync(new URL('../client/src/PlansView.jsx',import.meta.url),'utf8');
   assert.match(plans,/Essai Pro de \{TRIAL_DAYS\} jours sans carte bancaire/);
