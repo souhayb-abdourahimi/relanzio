@@ -24,7 +24,7 @@ import { grantTrialToEmail, grantTrialToUser, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
 import { sendPilotOutreach, inspectPilotOutreach } from './pilot-outreach.js';
 import { safeImportCommercialProspects, prepareCommercialProspect, inspectCommercialOutreach, sendCommercialJ0, ingestBrevoInbound, runCommercialSequenceTick } from './controlled-outreach.js';
-import { stageCommercialCandidates, runCommercialQueueFeeder } from './commercial-feeder.js';
+import { stageCommercialCandidates, runCommercialQueueFeeder, commercialBacklogReport } from './commercial-feeder.js';
 import { runPilotAdminRunner } from './pilot-admin-runner.js';
 import { pollImapReplies } from './imap-replies.js';
 import { parseQuoteAmount, parseSentDate, activeQuoteLimit, isActiveQuoteStatus, normalizeFollowupScheduleMode, parseCustomFollowupAt, parseQuoteContact, sanitizeNote } from './quote-rules.js';
@@ -564,7 +564,7 @@ app.get('/api/admin/tickets', requireUser, async(req,res)=>{if(!isAdmin(req.user
 app.patch('/api/admin/tickets/:id', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const status=sanitizeText(req.body.status,30);if(!['open','in_progress','resolved','closed'].includes(status))return res.status(400).json({error:'Statut invalide.'});const {data,error}=await db.from('support_tickets').update({status,updated_at:nowIso()}).eq('id',req.params.id).select('*').maybeSingle();if(error)return res.status(500).json({error:error.message});if(!data)return res.status(404).json({error:'Ticket introuvable.'});res.json({ticket:data})});
 
 app.get('/api/admin/prospects', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});const {data,error}=await db.from('prospects').select('*').order('score',{ascending:false}).limit(500);if(error)return res.status(500).json({error:error.message});res.json({prospects:data})});
-app.get('/api/admin/outreach-health', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const health=await outreachHealth();const {data:queue,error}=await db.from('outreach_queue').select('id,prospect_id,sequence_step,scheduled_at,status,sent_at,error').order('scheduled_at',{ascending:true}).limit(200);if(error)throw error;res.json({health,queue:queue||[]})}catch(e){res.status(500).json({error:e.message})}});
+app.get('/api/admin/outreach-health', requireUser, async(req,res)=>{if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});try{const health=await outreachHealth();const {data:queue,error}=await db.from('outreach_queue').select('id,prospect_id,sequence_step,scheduled_at,status,sent_at,error').order('scheduled_at',{ascending:true}).limit(200);if(error)throw error;res.json({health,backlog:await commercialBacklogReport(),queue:queue||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post('/api/admin/outreach/send-pilot', requireUser, rateLimit({windowMs:60_000,max:20}), async(req,res)=>{
   if(!isAdmin(req.user))return res.status(403).json({error:'Forbidden'});
   try{

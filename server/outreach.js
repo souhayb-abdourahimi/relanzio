@@ -34,8 +34,12 @@ export async function processOutreachQueue(){
   if(health.sent>=cap)return {skipped:'daily_cap',health};
 
   const now=iso();
+  // The prospection sequence is D0 → J+3 → END: a legacy third step (J+7) is canceled, never sent.
+  const {error:j7Error}=await db.from('outreach_queue').update({status:'canceled',error:'sequence_simplified_no_j7',updated_at:now})
+    .gte('sequence_step',2).in('status',['held','ready','queued']);
+  if(j7Error)throw j7Error;
   const {data:due,error:dueError}=await db.from('outreach_queue').select('*')
-    .eq('status','queued').lte('scheduled_at',now).order('scheduled_at',{ascending:true}).limit(1).maybeSingle();
+    .eq('status','queued').lt('sequence_step',2).lte('scheduled_at',now).order('scheduled_at',{ascending:true}).limit(1).maybeSingle();
   if(dueError)throw dueError;if(!due)return {skipped:'nothing_due',health};
 
   const {data:claimed,error:claimError}=await db.from('outreach_queue').update({status:'sending',updated_at:now})
@@ -49,6 +53,7 @@ export async function processOutreachQueue(){
     if(sError)throw sError;
     if(suppressed||p.status==='suppressed')return await skipQueue(claimed,'suppressed','canceled');
     if(p.score<55)return await skipQueue(claimed,'score_below_55');
+    if(Number(claimed.sequence_step)>=2)return await skipQueue(claimed,'sequence_simplified_no_j7','canceled');
     if(claimed.sequence_step===0){
       const {count,error}=await db.from('outreach_events').select('*',{count:'exact',head:true}).eq('prospect_id',p.id).eq('type','sent');
       if(error)throw error;if((count||0)>0)return await skipQueue(claimed,'duplicate_initial','canceled');
