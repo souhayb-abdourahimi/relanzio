@@ -38,15 +38,18 @@ function cleanTitle(title){
   return String(title??'').replace(/\s+/g,' ').trim().slice(0,120)||'votre projet';
 }
 
+// One message per step, each written for where the conversation stands:
+// 1 = first nudge (light: did you see it, any question?), 2 = refers to the first one (still relevant? one word is enough),
+// 3 = explicitly the last one (oui / plus tard / non). Never more than 3.
 const BODIES=[
-  t=>`Je reviens vers vous au sujet du devis « ${t} » que je vous ai envoyé. Avez-vous pu le consulter ?\n\nSi un point mérite d’être précisé ou ajusté, je suis à votre disposition.`,
-  t=>`Je me permets un petit suivi concernant le devis « ${t} ». Le projet est-il toujours d’actualité de votre côté ?\n\nUne réponse rapide me suffit, même pour me dire que ce n’est pas le bon moment.`,
-  t=>`C’est mon dernier message au sujet du devis « ${t} » : je ne veux pas vous solliciter inutilement.\n\nPouvez-vous simplement me dire où vous en êtes : « oui », « plus tard » ou « non » ? Je m’adapterai.`
+  t=>`Je reviens vers vous au sujet du devis « ${t} » que je vous ai transmis. Avez-vous pu en prendre connaissance ?\n\nSi vous avez une question, ou si un point mérite d’être ajusté, je suis à votre disposition.`,
+  t=>`Suite à mon précédent message au sujet du devis « ${t} », je me permets de vous demander si le projet est toujours d’actualité de votre côté.\n\nUn mot en réponse me suffit, même pour me dire que ce n’est pas le bon moment.`,
+  t=>`Ce sera mon dernier message au sujet du devis « ${t} » : je ne souhaite pas vous solliciter inutilement.\n\nPour savoir où en est votre projet, pouvez-vous simplement me répondre « oui », « plus tard » ou « non » ? Je m’adapterai à votre choix.`
 ];
 const SUBJECTS=[
   t=>`Votre devis « ${t} »`,
   t=>`Devis « ${t} » : toujours d’actualité ?`,
-  t=>`Devis « ${t} » : dernier suivi`
+  t=>`Devis « ${t} » : dernier message de ma part`
 ];
 
 // stepIndex: 0, 1 or 2 (the follow-up about to be sent is stepIndex+1 of 3).

@@ -29,6 +29,21 @@ Garde-fous codés : l’envoi automatique exige `FOLLOWUP_AUTOMATION_ENABLED=tru
 
 Limites connues : une réponse envoyée à une autre adresse que le Reply-To (nouvel email, téléphone) n’est pas vue → bouton « Le client a répondu ». Réponses automatiques (absence) : enregistrées, n’arrêtent pas la séquence, mais sont transmises à l’artisan pour information (une vraie réponse mal classée n’est jamais silencieuse). Email non remis : envoi automatique coupé et artisan prévenu. Le titre du devis présent dans l’objet n’est jamais pris pour un signe de réponse automatique. Transfert en échec : réessayé aux relevés suivants, 5 fois au maximum (la réponse reste visible dans l’app). Réponse sur un devis gagné ou perdu : mémorisée, statut inchangé. Pièces jointes transmises : PDF, images, Office, ZIP jusqu’à 8 Mo ; les autres sont signalées dans l’email de transfert.
 
+### Relances 1, 2, 3 (modèles fixes, sans IA)
+
+- **Relance 1** (sujet « Votre devis « … » ») : ton léger, « Avez-vous pu en prendre connaissance ? », propose de répondre à une question ou d’ajuster un point.
+- **Relance 2** (« … : toujours d’actualité ? ») : rappelle le premier message, demande si le projet tient toujours, une réponse d’un mot suffit.
+- **Relance 3** (« … : dernier message de ma part ») : annonce explicitement le dernier message, réponse « oui », « plus tard » ou « non ».
+- Les textes restent valables quel que soit le canal (email Relanzio, messagerie de l’artisan, SMS). Les tests vérifient l’étape de chaque message et que les trois messages se recouvrent à moins de 25 %.
+
+### Après une réponse du client
+
+- Vraie réponse (intéressé, question, prix, délai, refus, STOP, autre) : arrêt immédiat. Aucune relance 2 ou 3 ne peut partir, même déjà planifiée : contrôle au moment de la préparation, de la réservation de l’envoi, et une dernière fois juste avant l’appel à Brevo.
+- STOP : le client est aussi exclu des emails de cet artisan sur ses autres devis.
+- Email non remis : envoi automatique coupé, la séquence n’est pas considérée comme terminée, l’artisan est prévenu.
+- Réponse automatique (absence) : enregistrée et signalée à l’artisan, les relances continuent avec le message normal de l’étape suivante. Aucune date de retour n’est déduite du texte (trop ambigu).
+- Délai de détection : la boîte est relevée toutes les 2 minutes. Une réponse envoyée à une autre adresse que le Reply-To (nouvel email à l’artisan, téléphone) n’est pas vue : bouton « Le client a répondu ».
+
 ## 3. Isolation prospection / produit
 
 Fait dans le code (comportement identique tant que rien n’est configuré) :
