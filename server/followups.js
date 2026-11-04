@@ -72,7 +72,7 @@ async function finalizeRelanzioFollowup({followupId,claimed,sentAt,providerMessa
 export async function sendQuoteFollowup(quote, profile, requestKey=null, options={}) {
   if (!hasProAccess(profile)) throw new Error('PRO_ACCESS_REQUIRED');
   const automatic=options.automatic===true;
-  if(automatic&&!isAutomaticSendWindow())throw new Error('AUTO_SEND_OUTSIDE_WINDOW');
+  if(automatic&&!isAutomaticSendWindow(options.now||new Date()))throw new Error('AUTO_SEND_OUTSIDE_WINDOW');
   if(automatic&&!canAutoSend(profile))throw new Error('AUTO_SEND_PAYMENT_FAILING');
 
   if (requestKey) {
@@ -188,7 +188,7 @@ export async function runDueFollowups(now=new Date()) {
       if (!canAutoSend(profile) || profile.email_mode !== 'automatic') {
         results.push({ id:quote.id, skipped:'approval_or_subscription_required' }); continue;
       }
-      const result = await sendQuoteFollowup(quote, profile, null, {automatic:true});
+      const result = await sendQuoteFollowup(quote, profile, null, {automatic:true,now});
       results.push({ id:quote.id, sent:true, provider_message_id:result.provider_message_id });
     } catch (e) {
       if (e.message==='QUOTE_REPLIED') { results.push({id:quote.id,skipped:'client_replied'}); continue; }

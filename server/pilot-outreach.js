@@ -1,4 +1,7 @@
-import { resolveCname, resolveTxt } from 'node:dns/promises';
+import { robustResolve } from './dns-resolve.js';
+
+// Rows as the resolver returns them; [] when the record does not exist or DNS is unavailable (= not proven).
+const dnsRows=async(kind,name)=>{const r=await robustResolve(kind,name);return r.status==='ok'?r.records:[];};
 import { evaluateBrevoDomainAuth } from './brevo-domain-auth.js';
 import { db } from './db.js';
 import { sendEmail } from './email.js';
@@ -91,13 +94,13 @@ async function verifyPublicDkim(record,domain='relanzio.com'){
   const type=String(record?.type||'TXT').toUpperCase();
   try{
     if(type==='CNAME'){
-      const rows=await resolveCname(host);
+      const rows=await dnsRows('resolveCname',host);
       if(!Array.isArray(rows)||!rows.length)return false;
       const expected=normalizeDnsTarget(record?.value);
       if(!expected)return true;
       return rows.map(normalizeDnsTarget).includes(expected);
     }
-    const rows=await resolveTxt(host);
+    const rows=await dnsRows('resolveTxt',host);
     const values=rows.map(parts=>parts.join('').replace(/\s+/g,'')).filter(Boolean);
     const expected=String(record?.value||'').replace(/\s+/g,'');
     if(expected)return values.some(v=>v===expected||v.includes(expected)||expected.includes(v));
@@ -115,8 +118,8 @@ export async function getBrevoPilotSenderStatus() {
     fetch('https://api.brevo.com/v3/senders/domains/relanzio.com', { method:'GET', headers }),
     fetch('https://api.brevo.com/v3/account', { method:'GET', headers }),
     fetch('https://api.brevo.com/v3/webhooks?type=transactional&sort=desc', { method:'GET', headers }),
-    resolveTxt('relanzio.com').catch(()=>[]),
-    resolveTxt('_dmarc.relanzio.com').catch(()=>[])
+    dnsRows('resolveTxt','relanzio.com'),
+    dnsRows('resolveTxt','_dmarc.relanzio.com')
   ]);
   if (!sendersResponse.ok) throw pilotError('PILOT_BREVO_SENDER_CHECK_FAILED', `Brevo sender check ${sendersResponse.status}: ${await sendersResponse.text()}`, 503);
   if (!domainResponse.ok) throw pilotError('PILOT_BREVO_DOMAIN_CHECK_FAILED', `Brevo domain check ${domainResponse.status}: ${await domainResponse.text()}`, 503);

@@ -13,6 +13,12 @@ export function createFakeDb(seed={},uniqueKeys={}){
       delete(){op='delete';return api;},
       eq(k,v){filters.push(r=>r[k]===v);return api;},
       neq(k,v){filters.push(r=>r[k]!==v);return api;},
+      // SQL ILIKE: % and _ wildcards, backslash escapes, case-insensitive.
+      ilike(k,pattern){
+        let re='';const p=String(pattern);
+        for(let i=0;i<p.length;i++){const c=p[i];if(c==='\\'&&i+1<p.length){re+=p[++i].replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}else if(c==='%')re+='.*';else if(c==='_')re+='.';else re+=c.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+        const rx=new RegExp('^'+re+'$','is');filters.push(r=>r[k]!=null&&rx.test(String(r[k])));return api;
+      },
       in(k,v){filters.push(r=>v.includes(r[k]));return api;},
       is(k,v){filters.push(r=>(r[k]??null)===v);return api;},
       lte(k,v){filters.push(r=>r[k]<=v);return api;},

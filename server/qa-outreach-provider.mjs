@@ -1,10 +1,10 @@
 import 'dotenv/config';
-import { resolveTxt, resolveMx } from 'node:dns/promises';
+import { txtRecords, resolveMxRobust } from './dns-resolve.js';
 import { getBrevoPilotSenderStatus } from './pilot-outreach.js';
 
 const headers={accept:'application/json','api-key':process.env.BREVO_API_KEY||''};
-const safeTxt=async name=>{try{return (await resolveTxt(name)).map(parts=>parts.join(''))}catch{return[]}};
-const safeMx=async name=>{try{return await resolveMx(name)}catch{return[]}};
+const safeTxt=name=>txtRecords(name);
+const safeMx=async name=>{const r=await resolveMxRobust(name);return r.status==='ok'?r.records:[]};
 const getJson=async url=>{
   const r=await fetch(url,{headers});
   let body=null;try{body=await r.json()}catch{}

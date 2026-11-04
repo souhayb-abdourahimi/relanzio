@@ -1,4 +1,5 @@
-import { lookup, resolveMx } from 'node:dns/promises';
+import { lookup } from 'node:dns/promises';
+import { resolveMxRobust } from './dns-resolve.js';
 import { isIP } from 'node:net';
 import { db } from './db.js';
 import { normalizeEmail, isValidEmail, sanitizeText } from './logic.js';
@@ -15,6 +16,10 @@ const EMAIL_SOURCE_MAX_BYTES=2*1024*1024;
 const FETCH_TIMEOUT_MS=10_000;
 const iso=()=>new Date().toISOString();
 
+// Network access used by the checks; replaceable in tests only (no prospect site or DNS is reached by the test suite).
+const net={lookup,fetch:(...args)=>fetch(...args),resolveMx:resolveMxRobust};
+export function __setFeederNetworkForTests(overrides){Object.assign(net,overrides);}
+
 function feederInt(name,fallback,min,max){
   const n=Number(process.env[name]);
   return Number.isInteger(n)?Math.min(max,Math.max(min,n)):fallback;
@@ -27,6 +32,7 @@ export function commercialFeederConfig(){
     enabled:process.env.COMMERCIAL_FEEDER_ENABLED==='true',
     threshold,target,
     batchMax:feederInt('COMMERCIAL_FEEDER_BATCH_MAX',10,1,25),
+    reverifyBatch:feederInt('COMMERCIAL_REVERIFY_BATCH',6,0,25),
     maxVerificationAgeDays:feederInt('COMMERCIAL_VERIFICATION_MAX_AGE_DAYS',45,1,180)
   };
 }
@@ -60,7 +66,7 @@ async function assertPublicHttpUrl(raw){
   let url;
   try{url=new URL(String(raw||''));}catch{throw new Error('source_url_invalid')}
   if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw new Error('source_url_invalid');
-  const addresses=await lookup(url.hostname,{all:true,verbatim:true});
+  const addresses=await net.lookup(url.hostname,{all:true,verbatim:true});
   if(!addresses?.length||addresses.some(x=>isPrivateAddress(x.address)))throw new Error('source_url_not_public');
   return url;
 }
@@ -86,7 +92,7 @@ async function safeFetchText(raw){
   let current=String(raw||'');
   for(let redirects=0;redirects<4;redirects++){
     const url=await assertPublicHttpUrl(current);
-    const response=await fetch(url,{
+    const response=await net.fetch(url,{
       method:'GET',redirect:'manual',signal:AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers:{'user-agent':'RelanzioProspectVerifier/1.0 (+https://relanzio.com)','accept':'text/html,text/plain;q=0.9,*/*;q=0.1'}
     });
@@ -112,9 +118,10 @@ export function candidatePersonalization(candidate={}){
 async function verifyMx(email){
   const domain=emailDomain(email);
   if(!domain)throw new Error('invalid_email_domain');
-  const rows=await resolveMx(domain);
-  if(!Array.isArray(rows)||!rows.length)throw new Error('mx_missing');
-  return rows;
+  const mx=await net.resolveMx(domain);
+  if(mx.status==='ok')return mx.records;
+  if(mx.status==='none')throw Object.assign(new Error('mx_missing'),{permanent:true});
+  throw Object.assign(new Error('mx_dns_unavailable'),{permanent:false});
 }
 
 async function verifyPublishedEvidence(candidate){
@@ -320,7 +327,8 @@ async function processCandidate(candidate){
   try{
     await verifyMx(email);
   }catch(error){
-    await rejectCandidate(candidate.id,'rejected',String(error.message||error));
+    // No MX → rejected. DNS unavailable (or any other error) → manual_review, never a rejection on a resolver failure.
+    await rejectCandidate(candidate.id,error?.permanent===true?'rejected':'manual_review',String(error.message||error));
     return {prepared:false,reason:String(error.message||error)};
   }
 
@@ -370,6 +378,137 @@ async function processCandidate(candidate){
   }
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Re-verification of candidates parked in manual_review. Same checks as the import path (score, suppression,
+// tombstone, exact and domain duplicates, MX, public email + quote workflow on the published page), plus stricter
+// human-review rules (free mailbox, company already known, domain already in another active candidate).
+// Only a candidate passing every check goes back to `waiting` (and is checked again at import). Rejected only on a
+// definitive cause; anything doubtful stays in manual_review with its reason. Duplicates / prior replies are left to a human.
+const REVERIFY_TRANSIENT=/^(mx_dns_unavailable|source_http_(5\d\d|408|429)|source_redirect_loop|fetch failed)|(ETIMEOUT|ECONNREFUSED|ECONNRESET|ESERVFAIL|EAI_AGAIN|ENOTFOUND|EREFUSED|EHOSTUNREACH|timeout|aborted|socket|network)/i;
+const REVERIFY_EVIDENCE=/^(verification_evidence_incomplete|verification_not_eligible|verification_stale)$/;
+const REVERIFY_CONTENT=/^(public_email_not_found|quote_workflow_not_confirmed|source_http_4\d\d|source_url_not_public|source_too_large)$/;
+const DAY=86400000;
+
+export function reverificationClass(reason){
+  const r=String(reason||'').trim();
+  if(!r||REVERIFY_EVIDENCE.test(r))return {kind:'evidence',cooldownMs:DAY};
+  if(REVERIFY_TRANSIENT.test(r))return {kind:'transient',cooldownMs:DAY/4};
+  if(REVERIFY_CONTENT.test(r))return {kind:'content',cooldownMs:7*DAY};
+  return null; // duplicate_email, duplicate_business_domain, prior_reply, free mailbox, company known…: human review
+}
+
+const likeLiteral=v=>String(v||'').replace(/[\\%_]/g,m=>'\\'+m);
+const hostOf=raw=>{try{return new URL(String(raw||'')).hostname.toLowerCase().replace(/^www\./,'')}catch{return ''}};
+
+async function companyAlreadyKnown(candidate){
+  const name=sanitizeText(candidate.company_name,160);
+  if(name){
+    const {data,error}=await db.from('prospects').select('id').ilike('company_name',likeLiteral(name)).limit(1);
+    if(error)throw error;
+    if(data?.length)return true;
+  }
+  const host=hostOf(candidate.website);
+  if(host){
+    const {data,error}=await db.from('prospects').select('id').ilike('website',`%${likeLiteral(host)}%`).limit(1);
+    if(error)throw error;
+    if(data?.length)return true;
+  }
+  return false;
+}
+
+async function domainInOtherActiveCandidate(candidate,email){
+  const domain=emailDomain(email);
+  if(!domain)return false;
+  const {data,error}=await db.from('outreach_candidates').select('id,status').ilike('email',`%@${likeLiteral(domain)}`)
+    .in('status',['waiting','processing','imported']).limit(5);
+  if(error)throw error;
+  return (data||[]).some(x=>x.id!==candidate.id);
+}
+
+async function reverifyOne(candidate){
+  const email=normalizeEmail(candidate.email);
+  const keep=reason=>({status:'manual_review',reason});
+  if(!isValidEmail(email)||!sanitizeText(candidate.company_name,160))return {status:'rejected',reason:'invalid_input'};
+  if(!/^https?:\/\//i.test(String(candidate.source_url||'')))return keep('public_source_required');
+  const scored=qualifyProspect({...candidate,email});
+  if(scored.score<55)return {status:'rejected',reason:'score_below_55',score:scored.score};
+  if(isFreeMailboxDomain(emailDomain(email)))return keep('free_mailbox_needs_human_review');
+  const protections=await exactProtections(email);
+  if(protections.suppression)return {status:'rejected',reason:'suppressed'};
+  if(protections.tombstone)return {status:'rejected',reason:'tombstoned'};
+  if(protections.duplicate)return keep('duplicate_email');
+  if(await duplicateProfessionalDomain(email))return keep('duplicate_business_domain');
+  if(await domainInOtherActiveCandidate(candidate,email))return keep('duplicate_candidate_domain');
+  if(await companyAlreadyKnown(candidate))return keep('company_already_known');
+  let mx;
+  try{mx=await verifyMx(email);}
+  catch(error){return error?.permanent===true?{status:'rejected',reason:'mx_missing'}:keep('mx_dns_unavailable');}
+  let evidence;
+  try{evidence=await verifyPublishedEvidence(candidate);}
+  catch(error){return keep(String(error?.message||error).slice(0,160));}
+  return {status:'waiting',score:scored.score,evidence,mx_hosts:mx.map(x=>x.exchange).slice(0,5)};
+}
+
+export async function reverifyManualReviewCandidates(limit,now=Date.now()){
+  const summary={checked:0,promoted:0,rejected:0,kept:0,reasons:{}};
+  if(!limit)return summary;
+  const {data,error}=await db.from('outreach_candidates').select('*').eq('status','manual_review')
+    .order('last_checked_at',{ascending:true,nullsFirst:true}).limit(Math.max(limit*20,100));
+  if(error)throw error;
+  const due=(data||[]).filter(c=>{
+    const cls=reverificationClass(c.reject_reason);
+    if(!cls)return false;
+    const last=Date.parse(c.last_checked_at||'');
+    return !Number.isFinite(last)||now-last>=cls.cooldownMs;
+  }).slice(0,limit);
+  for(const candidate of due){
+    summary.checked++;
+    let result;
+    try{result=await reverifyOne(candidate);}
+    catch(error){result={status:'manual_review',reason:String(error?.message||error).slice(0,160)};}
+    const at=iso();
+    const patch={status:result.status,last_checked_at:at,updated_at:at};
+    if(result.status==='waiting'){
+      Object.assign(patch,{
+        reject_reason:null,score:result.score,public_email_confirmed:true,workflow_verified:true,verified_at:at,
+        verification_status:candidate.verification_status==='warn'?'warn':'pass',
+        verification_notes:{...(candidate.verification_notes||{}),auto_reverification:{...result.evidence,mx_hosts:result.mx_hosts,previous_reason:candidate.reject_reason||null}}
+      });
+    }else{
+      patch.reject_reason=result.reason;
+      if(result.score!=null)patch.score=result.score;
+    }
+    const {error:uError}=await db.from('outreach_candidates').update(patch).eq('id',candidate.id).eq('status','manual_review');
+    if(uError)throw uError;
+    const key=result.status==='waiting'?'promoted':result.status==='rejected'?'rejected':'kept';
+    summary[key]++;
+    if(result.reason)summary.reasons[result.reason]=(summary.reasons[result.reason]||0)+1;
+  }
+  return summary;
+}
+
+// Counts only (no address, no company): what the pipeline holds right now.
+export async function commercialBacklogReport(){
+  const [{data:candidates,error:cError},{data:queue,error:qError}]=await Promise.all([
+    db.from('outreach_candidates').select('status,reject_reason').limit(10000),
+    db.from('outreach_queue').select('sequence_step,status').limit(20000)
+  ]);
+  if(cError)throw cError;if(qError)throw qError;
+  const byStatus={},manualReasons={},rejectedReasons={},queueByStep={};
+  for(const c of candidates||[]){
+    byStatus[c.status]=(byStatus[c.status]||0)+1;
+    const reason=String(c.reject_reason||'none').replace(/[^\w.:-]+/g,'_').slice(0,60);
+    if(c.status==='manual_review')manualReasons[reason]=(manualReasons[reason]||0)+1;
+    if(c.status==='rejected')rejectedReasons[reason]=(rejectedReasons[reason]||0)+1;
+  }
+  for(const q of queue||[]){
+    const step=`step_${q.sequence_step}`;
+    queueByStep[step]=queueByStep[step]||{};
+    queueByStep[step][q.status]=(queueByStep[step][q.status]||0)+1;
+  }
+  return {candidates:{total:(candidates||[]).length,by_status:byStatus,manual_review_reasons:manualReasons,rejected_reasons:rejectedReasons},queue:queueByStep};
+}
+
 async function prepareCandidates(limit){
   const {data,error}=await db.from('outreach_candidates').select('*')
     .eq('status','waiting').in('verification_status',['pass','warn'])
@@ -401,8 +540,12 @@ async function prepareCandidates(limit){
 export async function runCommercialQueueFeeder(){
   const cfg=commercialFeederConfig();
   if(!cfg.enabled)return {skipped:'feeder_disabled'};
+  // VERIFY: a few parked candidates per run, whatever the D0 stock, then a count-only report of the pipeline.
+  const reverified=await reverifyManualReviewCandidates(cfg.reverifyBatch);
+  try{log('info','outreach.backlog','Commercial backlog',{reverified,...await commercialBacklogReport()});}
+  catch(error){log('warn','outreach.backlog','Backlog report failed',{code:error?.code||'BACKLOG_REPORT_FAILED'});}
   const before=await activeD0Stock();
-  if(before>=cfg.threshold)return {skipped:'stock_above_threshold',stock:before,threshold:cfg.threshold,target:cfg.target};
+  if(before>=cfg.threshold)return {skipped:'stock_above_threshold',stock:before,threshold:cfg.threshold,target:cfg.target,reverified};
   let remaining=Math.min(cfg.batchMax,Math.max(0,cfg.target-before));
   const prepared=[],blocked=[];
 
@@ -420,5 +563,5 @@ export async function runCommercialQueueFeeder(){
     stock_before:before,stock_after:after,target:cfg.target,threshold:cfg.threshold,
     prepared:prepared.length,blocked:blocked.length
   });
-  return {stock_before:before,stock_after:after,target:cfg.target,threshold:cfg.threshold,prepared,blocked};
+  return {stock_before:before,stock_after:after,target:cfg.target,threshold:cfg.threshold,prepared,blocked,reverified};
 }

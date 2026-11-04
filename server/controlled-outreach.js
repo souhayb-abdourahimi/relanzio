@@ -1,4 +1,4 @@
-import { resolveMx } from 'node:dns/promises';
+import { resolveMxRobust } from './dns-resolve.js';
 import { db } from './db.js';
 import { sendEmail } from './email.js';
 import { normalizeEmail, isValidEmail, sanitizeText } from './logic.js';
@@ -99,13 +99,11 @@ async function blockers(prospect){
 async function ensureMx(email){
   const domain=String(email||'').split('@')[1]?.toLowerCase();
   if(!domain)throw commercialError('COMMERCIAL_EMAIL_INVALID','Adresse email invalide.');
-  try{
-    const mx=await resolveMx(domain);
-    if(!Array.isArray(mx)||!mx.length)throw new Error('no_mx');
-    return mx;
-  }catch{
-    throw commercialError('COMMERCIAL_MX_INVALID','Aucun MX valide pour le domaine destinataire.',409);
-  }
+  const mx=await resolveMxRobust(domain);
+  if(mx.status==='ok')return mx.records;
+  if(mx.status==='none')throw commercialError('COMMERCIAL_MX_INVALID','Aucun MX valide pour le domaine destinataire.',409);
+  // A DNS outage is not an answer: not permanent, the sequence pauses and the item is retried later.
+  throw commercialError('COMMERCIAL_MX_DNS_UNAVAILABLE','DNS indisponible pour vérifier le MX du destinataire.',503);
 }
 
 function providerCapacity(sender,used=0){
@@ -137,6 +135,14 @@ async function cancelLegacyJ7(prospectId){
   const {error}=await db.from('outreach_queue').update({
     status:'canceled',error:'sequence_simplified_no_j7',updated_at:iso()
   }).eq('prospect_id',prospectId).gte('sequence_step',2).in('status',['held','ready','queued']);
+  if(error)throw error;
+}
+
+// D0 → J+3 → END: any pending third step left by the old sequence is canceled, for every prospect.
+async function cancelAllLegacyJ7(){
+  const {error}=await db.from('outreach_queue').update({
+    status:'canceled',error:'sequence_simplified_no_j7',updated_at:iso()
+  }).gte('sequence_step',2).in('status',['held','ready','queued']);
   if(error)throw error;
 }
 
@@ -240,6 +246,7 @@ export async function sendCommercialJ0({prospectId,requestedBy}){
   if(claimError)throw claimError;
   if(!claimed)throw commercialError('COMMERCIAL_ALREADY_CLAIMED','J0 déjà revendiqué.');
 
+  let providerCalled=false;
   try{
     const prospect=await getProspect(prospectId);
     const latest=await blockers(prospect);
@@ -249,6 +256,7 @@ export async function sendCommercialJ0({prospectId,requestedBy}){
       throw commercialError('COMMERCIAL_BLOCKED_BEFORE_SEND','Prospect bloqué avant envoi.');
     }
     await ensureMx(prospect.email);
+    providerCalled=true;
     const sent=await sendEmail({
       to:prospect.email,subject:claimed.subject,text:claimed.content,
       replyTo:PILOT_SENDER.replyTo,senderEmail:PILOT_SENDER.email,senderName:'Relanzio',
@@ -266,10 +274,16 @@ export async function sendCommercialJ0({prospectId,requestedBy}){
     catch(j3Error){log('error','outreach.commercial-sequence','J+3 scheduling failed after confirmed D0',{prospect_id:prospect.id,queue_id:queueId,code:j3Error?.code||'J3_SCHEDULE_FAILED'});}
     return {sent:true,prospect_id:prospect.id,queue_id:queueId,provider_message_id:sent?.messageId||null,sent_at:sentAt,sequence_step:0};
   }catch(error){
+    // Nothing reached the provider (e.g. DNS unavailable at the last MX check): no email left, the slot is released
+    // and the item goes back to the queue. Once the provider was called, an unclear outcome stays counted and failed.
     const explicitProviderFailure=/^Brevo\s+[45]\d\d:/.test(String(error?.message||''));
-    await db.rpc('finalize_outreach_daily_slot',{p_reservation_key:reservationKey,p_outcome:explicitProviderFailure?'definite_failure':'unknown'});
+    const noEmailLeft=!providerCalled||explicitProviderFailure;
+    await db.rpc('finalize_outreach_daily_slot',{p_reservation_key:reservationKey,p_outcome:noEmailLeft?'definite_failure':'unknown'});
     const {data:row}=await db.from('outreach_queue').select('status').eq('id',queueId).maybeSingle();
-    if(row?.status==='sending')await db.from('outreach_queue').update({status:'failed',error:String(error.message||error).slice(0,1000),updated_at:iso()}).eq('id',queueId);
+    if(row?.status==='sending'){
+      const retry=!providerCalled&&!permanentSequenceError(error);
+      await db.from('outreach_queue').update({status:retry?'ready':'failed',error:String(error.code||error.message||error).slice(0,1000),updated_at:iso()}).eq('id',queueId);
+    }
     throw error;
   }
 }
@@ -325,6 +339,7 @@ export async function sendCommercialJ3({prospectId,requestedBy}){
     .eq('id',queueId).in('status',['held','ready']).select('*').maybeSingle();
   if(claimError)throw claimError;
   if(!claimed)throw commercialError('COMMERCIAL_ALREADY_CLAIMED','J+3 déjà revendiquée.');
+  let providerCalled=false;
   try{
     const prospect=await getProspect(prospectId);
     const state=await blockers(prospect);
@@ -336,6 +351,7 @@ export async function sendCommercialJ3({prospectId,requestedBy}){
       throw commercialError('COMMERCIAL_BLOCKED_BEFORE_SEND','J+3 bloquée avant envoi.');
     }
     await ensureMx(prospect.email);
+    providerCalled=true;
     const sent=await sendEmail({
       to:prospect.email,subject:claimed.subject,text:claimed.content,
       replyTo:PILOT_SENDER.replyTo,senderEmail:PILOT_SENDER.email,senderName:'Relanzio',
@@ -352,10 +368,16 @@ export async function sendCommercialJ3({prospectId,requestedBy}){
     await db.rpc('finalize_outreach_daily_slot',{p_reservation_key:reservationKey,p_outcome:'sent'});
     return {sent:true,prospect_id:prospect.id,queue_id:queueId,provider_message_id:sent?.messageId||null,sent_at:sentAt,sequence_step:1};
   }catch(error){
+    // Nothing reached the provider (e.g. DNS unavailable at the last MX check): no email left, the slot is released
+    // and the item goes back to the queue. Once the provider was called, an unclear outcome stays counted and failed.
     const explicitProviderFailure=/^Brevo\s+[45]\d\d:/.test(String(error?.message||''));
-    await db.rpc('finalize_outreach_daily_slot',{p_reservation_key:reservationKey,p_outcome:explicitProviderFailure?'definite_failure':'unknown'});
+    const noEmailLeft=!providerCalled||explicitProviderFailure;
+    await db.rpc('finalize_outreach_daily_slot',{p_reservation_key:reservationKey,p_outcome:noEmailLeft?'definite_failure':'unknown'});
     const {data:row}=await db.from('outreach_queue').select('status').eq('id',queueId).maybeSingle();
-    if(row?.status==='sending')await db.from('outreach_queue').update({status:'failed',error:String(error.message||error).slice(0,1000),updated_at:iso()}).eq('id',queueId);
+    if(row?.status==='sending'){
+      const retry=!providerCalled&&!permanentSequenceError(error);
+      await db.from('outreach_queue').update({status:retry?'ready':'failed',error:String(error.code||error.message||error).slice(0,1000),updated_at:iso()}).eq('id',queueId);
+    }
     throw error;
   }
 }
@@ -405,6 +427,7 @@ export async function runCommercialSequenceTick(){
   if(process.env.COMMERCIAL_SEQUENCE_ENABLED!=='true')return {skipped:'sequence_disabled'};
   if(process.env.COMMERCIAL_OUTREACH_SEND_ENABLED!=='true')return {skipped:'commercial_send_disabled'};
   if(!isCommercialBusinessWindow())return {skipped:'outside_french_business_hours'};
+  await cancelAllLegacyJ7();
 
   try{
     const imap=await pollImapReplies();
