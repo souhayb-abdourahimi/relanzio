@@ -211,7 +211,8 @@ async function flows(browser){
       const card=p8.locator('.today-card',{hasText:'Dupont Toitures'});
       await card.getByRole('button',{name:/Plus d’actions/}).click();
       await card.getByRole('menuitem',{name:'Le client a répondu'}).click();
-      await p8.getByText('Relances arrêtées : le client a répondu').waitFor();
+      // The toast; the same words also appear in the list once it refreshes, so the toast region is targeted.
+      await p8.getByRole('region',{name:/Notifications/}).getByText('Relances arrêtées : le client a répondu').waitFor();
       const replied=p8.locator('#today-replied .today-card',{hasText:'Dupont Toitures'});
       await replied.waitFor();
       assert.equal(await replied.getByRole('button',{name:'Relancer'}).count(),0,'no follow-up after a reply');

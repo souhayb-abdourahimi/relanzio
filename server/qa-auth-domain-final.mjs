@@ -285,6 +285,12 @@ try{
   assert(lost.status===200&&lost.data.quote.next_followup_at===null&&lost.data.quote.auto_send===false,'lost_stops_followup');
   const lostPreview=await api(userA.token,'/api/quotes/'+terminalSeed.data.quote.id+'/followup-preview');
   assert(lostPreview.status===409,'lost_blocks_followup_preview');
+  // The reply migration was applied by hand: check production has its final version, which the live reply mailbox needs
+  // (forward retries are counted; a reply on a decided quote is remembered without changing its status).
+  const {error:forwardColumnError}=await db.from('quote_replies').select('forward_attempts').limit(1);
+  assert(!forwardColumnError,'schema_quote_replies_forward_attempts',forwardColumnError?.message);
+  const {data:lostReply,error:lostReplyError}=await db.rpc('apply_quote_reply',{p_quote_id:terminalSeed.data.quote.id,p_user_id:userA.id,p_followup_id:null,p_source:'manual',p_channel:'other',p_category:'received',p_effect:'stop',p_from_email:null,p_excerpt:null,p_dedupe_key:'cert-lost-'+stamp,p_received_at:new Date().toISOString()});
+  assert(!lostReplyError&&lostReply?.ok===true&&lostReply.quote?.status==='lost'&&Boolean(lostReply.quote?.reply_received_at)&&lostReply.reply?.forward_attempts===0,'schema_apply_quote_reply_final_version',lostReplyError?.message||JSON.stringify({ok:lostReply?.ok,status:lostReply?.quote?.status,replied:Boolean(lostReply?.quote?.reply_received_at)}));
   const deletedTerminal=await api(userA.token,'/api/quotes/'+terminalSeed.data.quote.id,{method:'DELETE'});
   assert(deletedTerminal.status===200,'quote_delete');
   const afterDelete=await api(userA.token,'/api/quotes');
