@@ -16,6 +16,18 @@ jobs:
         run: |
           if [ -z "$SMOKE_BASE_URL" ]; then echo "STAGING_URL secret not configured"; exit 1; fi
           node scripts/smoke.mjs
+      - name: Public DNS of relanzio.com (SPF, DMARC, DKIM, MX)
+        run: |
+          for r in 1.1.1.1 8.8.8.8; do
+            echo "== resolver $r"
+            echo "SPF:   $(dig +short TXT relanzio.com @$r | tr -d '"' | grep -i 'v=spf1' || echo MISSING)"
+            echo "DMARC: $(dig +short TXT _dmarc.relanzio.com @$r | tr -d '"' | grep -i 'v=DMARC1' || echo MISSING)"
+            for sel in brevo1 brevo2 mail; do echo "DKIM $sel: $(dig +short CNAME $sel._domainkey.relanzio.com @$r | head -1) $(dig +short TXT $sel._domainkey.relanzio.com @$r | tr -d '"' | cut -c1-60 | head -1)"; done
+            echo "BREVO CODE: $(dig +short TXT relanzio.com @$r | tr -d '"' | grep -io 'brevo-code:[a-z0-9]*' | sed 's/:.*/:present/' || echo MISSING)"
+            echo "MX relanzio.com: $(dig +short MX relanzio.com @$r | tr '\n' ' ')"
+            echo "MX reply.relanzio.com: $(dig +short MX reply.relanzio.com @$r | tr '\n' ' ')"
+            echo "SPF reply.relanzio.com: $(dig +short TXT reply.relanzio.com @$r | tr -d '"' | grep -i 'v=spf1' || echo none)"
+          done
       - name: Browser pass on public pages (read-only)
         env:
           SMOKE_BASE_URL: ${{ secrets.STAGING_URL || 'https://relanzio.com' }}
