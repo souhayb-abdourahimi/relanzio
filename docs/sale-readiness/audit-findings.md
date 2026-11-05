@@ -8,7 +8,7 @@ Les comptes de service (Railway, Supabase, Stripe, Brevo, OVH, Amelu) n’ont pa
 | # | Constat | Pourquoi ça bloque | Action |
 |---|---|---|---|
 | B1 | **Pas d’historique de revenus documenté** (clients payants, MRR sur plusieurs mois) | Un acheteur valorise un SaaS sur ses revenus récurrents prouvés | Obtenir des clients payants ; archiver chaque mois les métriques ([metrics/](metrics/README.md)) et l’export Stripe |
-| B2 | **Sauvegardes non confirmées, aucune restauration testée** | Risque de perte totale des données ; question systématique en due diligence | [18 — A1/A2](18-founder-action-list.md) ; [06](06-backup-restore-runbook.md) |
+| B2 | **Sauvegarde actuelle incomplète (14/21 tables, sans comptes Auth) et restauration jamais vérifiée sur les données réelles** | Risque de perte de données ; question systématique en due diligence | Job v2 prêt (`ops/backup/`, testé en CI) à mettre en service : [18 — A2](18-founder-action-list.md) ; [06](06-backup-restore-runbook.md) ; [inventaire](backup-inventory.md) |
 | B3 | **Aucune revue juridique** (propriété du code, RGPD clients et prospects, cession de base, structure de vente) | Un acheteur ne peut pas signer sans | [21](21-legal-review-checklist.md) — LEGAL REVIEW REQUIRED |
 
 ## IMPORTANT BEFORE SALE
@@ -47,7 +47,7 @@ Les comptes de service (Railway, Supabase, Stripe, Brevo, OVH, Amelu) n’ont pa
 
 - **Aucun secret dans tout l’historique Git** (recherche complète, voir [13](13-security.md)).
 - **178 dépendances, toutes sous licence permissive**, aucune GPL/AGPL ([15](15-ip-and-licenses.md)).
-- RLS sur les 22 tables ; opérations critiques en fonctions SQL atomiques ; webhooks signés.
+- RLS sur les 21 tables ; opérations critiques en fonctions SQL atomiques ; webhooks signés.
 - ~220 tests unitaires + tests SQL (migrations, rollbacks) + E2E + mobile + accessibilité en CI ; **QA contre la production avant chaque
   déploiement** (bloquante).
 - Garde-fous de prospection testés : D0 → J+3 → FIN, aucun J+7, 1 email / 5 min, plafond quotidien, suppressions, pauses automatiques.

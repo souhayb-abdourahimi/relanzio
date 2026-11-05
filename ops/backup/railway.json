@@ -1,0 +1,13 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "ops/backup/Dockerfile",
+    "watchPatterns": ["ops/backup/**", "supabase/migrations/**", "supabase/schema.sql"]
+  },
+  "deploy": {
+    "startCommand": "node ops/backup/backup.mjs",
+    "cronSchedule": "15 2 * * *",
+    "restartPolicyType": "NEVER"
+  }
+}

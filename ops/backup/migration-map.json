@@ -1,0 +1,30 @@
+{
+  "about": "Reconciliation of supabase/migrations (repository) with supabase_migrations.schema_migrations (production history), established 2026-11-05 by read-only comparison. history_version=null means: applied in production by hand (SQL editor), never recorded in the history table. Never re-apply, never rewrite the history; this file only documents it. Checked by test/backup-migrations.test.js and on every backup run.",
+  "verified": {
+    "date": "2026-11-05",
+    "method": "production catalog (read-only) vs. a throwaway build of supabase/schema.sql + every repository migration: 230 columns identical, 82 constraints identical, 6 policies identical, 12 functions identical up to whitespace (finalize_outreach_daily_slot, reopen_quote_with_quota, safe_import_qualified_prospect), indexes identical except one (see 003_release.sql)"
+  },
+  "files": [
+    { "file": "003_release.sql", "history_version": "20261001231145", "history_name": "relanzio_v04_staging_schema", "note": "the repository file also creates index prospects_email_plain_unique, which production does not have (uniqueness is already enforced by constraint prospects_email_key); the backup carries the DEPLOYED schema" },
+    { "file": "004_stripe_webhook_idempotency.sql", "history_version": "20261002141214", "history_name": "stripe_webhook_idempotency" },
+    { "file": "005_request_idempotency_hardening.sql", "history_version": "20261004113109", "history_name": "request_idempotency_hardening" },
+    { "file": "006_pro_trial_7d.sql", "history_version": "20261013223553", "history_name": "pro_trial_7d" },
+    { "file": "007_outreach_queue.sql", "history_version": "20261013224205", "history_name": "outreach_queue" },
+    { "file": "008_prospect_sector.sql", "history_version": "20261013224303", "history_name": "prospect_sector" },
+    { "file": "20261014221647_quote_schedule_and_checkout_claim.sql", "history_version": "20261014221647", "history_name": "quote_schedule_and_checkout_claim" },
+    { "file": "20261014222310_rls_explicit_authenticated_reads.sql", "history_version": "20261014222310", "history_name": "rls_explicit_authenticated_reads" },
+    { "file": "20261014223942_atomic_quote_quota.sql", "history_version": "20261014223942", "history_name": "atomic_quote_quota" },
+    { "file": "20261014224214_index_missing_foreign_keys.sql", "history_version": "20261014224214", "history_name": "index_missing_foreign_keys" },
+    { "file": "20261015083752_atomic_quote_reopen_quota.sql", "history_version": "20261015083752", "history_name": "atomic_quote_reopen_quota" },
+    { "file": "20261015085331_stripe_event_ordering.sql", "history_version": "20261015085331", "history_name": "stripe_event_ordering" },
+    { "file": "20261016081002_controlled_outreach_20_safety.sql", "history_version": "20261016081002", "history_name": "controlled_outreach_20_safety" },
+    { "file": "20261016121000_imap_reply_ingestion.sql", "history_version": "20261016100553", "history_name": "imap_reply_ingestion", "note": "recorded in production under a different timestamp than the repository file name" },
+    { "file": "20261016133031_p0_product_loop.sql", "history_version": null, "evidence": "followups.business_date, followups.channel, functions confirm_manual_followup / finalize_relanzio_followup present in production" },
+    { "file": "20261026133000_continuous_commercial_outreach.sql", "history_version": null, "evidence": "tables outreach_candidates, sales_followups and functions claim_outreach_daily_slot / apply_outreach_reply present in production" },
+    { "file": "20261028100000_quote_contact_and_note.sql", "history_version": null, "evidence": "quotes.client_phone, quotes.note present in production" },
+    { "file": "20261028110000_followup_cadence_and_optout.sql", "history_version": null, "evidence": "table followup_optouts, profiles.followup_offsets, function followup_gap_days present in production" },
+    { "file": "20261028120000_subscription_period.sql", "history_version": null, "evidence": "profiles.subscription_current_period_start / _end / subscription_cancel_at_period_end present in production" },
+    { "file": "20261028130000_morning_digest.sql", "history_version": null, "evidence": "table digest_sends, profiles.morning_digest_enabled present in production" },
+    { "file": "20261029100000_quote_replies.sql", "history_version": null, "evidence": "table quote_replies, function apply_quote_reply present in production" }
+  ]
+}

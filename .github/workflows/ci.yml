@@ -44,3 +44,26 @@ jobs:
         run: npm run test:e2e
       - name: public pages readable without JavaScript (prerendered HTML)
         run: npm run test:nojs
+  backup-restore:
+    # Backup job: real pg_dump / restore round trips on throwaway PostgreSQL 17 clusters (no service, no network).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: PostgreSQL 17 from the official PGDG repository
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-17 postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      - name: backup / restore end to end (PostgreSQL 17)
+        env:
+          BACKUP_E2E_PG_BIN: /usr/lib/postgresql/17/bin
+          BACKUP_E2E_REQUIRED: '1'
+        run: node --test test/backup-restore-e2e.test.js
+      - name: backup job image builds and passes the same test inside the image
+        run: |
+          docker build -f ops/backup/Dockerfile -t relanzio-backup:ci .
+          docker run --rm -v "$PWD:/repo:ro" -w /repo -e BACKUP_E2E_PG_BIN=/usr/lib/postgresql/17/bin -e BACKUP_E2E_REQUIRED=1 \
+            relanzio-backup:ci node --test test/backup-restore-e2e.test.js

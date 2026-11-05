@@ -6,10 +6,9 @@ Rien ici n’interrompt le produit ni la prospection si l’ordre est respecté.
 ## A — À faire maintenant (sans lien avec une vente)
 
 1. **Vérifier les sauvegardes Supabase.** Supabase → votre projet → *Database* → *Backups* : notez s’il y a des sauvegardes
-   automatiques, leur fréquence et leur durée de conservation. S’il n’y en a pas, passez à une offre qui en propose ou planifiez
-   `scripts/backup.sh` (voir [06](06-backup-restore-runbook.md)).
-2. **Faire une sauvegarde complète et la tester une fois** sur un projet Supabase vide (ou demander à un développeur). Rangez le fichier
-   **chiffré** hors de votre ordinateur.
+   automatiques, leur fréquence et leur durée de conservation (filet de sécurité en plus du job Railway).
+2. **Mettre en service le nouveau job de sauvegarde v2 et sa restauration de contrôle** (une seule fois, environ 15 minutes, voir
+   [06 §9](06-backup-restore-runbook.md)). Conservez aussi la clé `BACKUP_ENCRYPTION_KEY_B64` dans votre gestionnaire de mots de passe.
 3. **Activer la double authentification** sur GitHub, Railway, Supabase, Stripe, Brevo, OVH, Amelu.
 4. **Ajouter le secret GitHub `STAGING_URL`** = `https://relanzio.com` (GitHub → dépôt → *Settings* → *Secrets and variables* →
    *Actions*) pour que le test horaire du site fonctionne.

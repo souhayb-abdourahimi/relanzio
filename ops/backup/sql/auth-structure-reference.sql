@@ -1,0 +1,52 @@
+-- Structure of auth.users and auth.identities as read (catalog only, no data) from the production project
+-- on 2026-11-05. Used ONLY to verify LEGACY (RZBK1) backups in an ephemeral cluster: those backups carry no
+-- auth schema. v2 backups carry the real structure themselves (auth-schema.sql) and never use this file.
+create table if not exists auth.users (
+  instance_id uuid,
+  id uuid not null primary key,
+  aud character varying(255),
+  role character varying(255),
+  email character varying(255),
+  encrypted_password character varying(255),
+  email_confirmed_at timestamp with time zone,
+  invited_at timestamp with time zone,
+  confirmation_token character varying(255),
+  confirmation_sent_at timestamp with time zone,
+  recovery_token character varying(255),
+  recovery_sent_at timestamp with time zone,
+  email_change_token_new character varying(255),
+  email_change character varying(255),
+  email_change_sent_at timestamp with time zone,
+  last_sign_in_at timestamp with time zone,
+  raw_app_meta_data jsonb,
+  raw_user_meta_data jsonb,
+  is_super_admin boolean,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  phone text default null unique,
+  phone_confirmed_at timestamp with time zone,
+  phone_change text default '',
+  phone_change_token character varying(255) default '',
+  phone_change_sent_at timestamp with time zone,
+  confirmed_at timestamp with time zone generated always as (least(email_confirmed_at, phone_confirmed_at)) stored,
+  email_change_token_current character varying(255) default '',
+  email_change_confirm_status smallint default 0 check (email_change_confirm_status >= 0 and email_change_confirm_status <= 2),
+  banned_until timestamp with time zone,
+  reauthentication_token character varying(255) default '',
+  reauthentication_sent_at timestamp with time zone,
+  is_sso_user boolean not null default false,
+  deleted_at timestamp with time zone,
+  is_anonymous boolean not null default false
+);
+create table if not exists auth.identities (
+  provider_id text not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  identity_data jsonb not null,
+  provider text not null,
+  last_sign_in_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  email text generated always as (lower(identity_data ->> 'email')) stored,
+  id uuid not null default gen_random_uuid() primary key,
+  unique (provider_id, provider)
+);
