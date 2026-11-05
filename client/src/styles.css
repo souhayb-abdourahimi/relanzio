@@ -337,3 +337,35 @@ button.today-more:hover{background:var(--soft)}
 @media(max-width:600px){.hero{padding-top:20px;gap:28px}.hero-copy>p{font-size:16px;line-height:1.5;margin-bottom:18px}.hero-actions{display:grid;grid-template-columns:1.4fr 1fr;gap:8px}.hero-actions .btn.big{padding:13px 10px;font-size:15px}.trust-line{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px}}
 .price-card small{display:block}
 @media(max-width:760px){.trial-banner.compact>div:first-child{flex:1;min-width:0}.trial-banner.compact strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}}
+/* Site refresh (from the validated mock-up): soft hero band, numbered step cards, pending-quotes calculator,
+   dark featured Pro card, plan comparison, dark footer. Full-bleed backgrounds use border-image outset (ink overflow):
+   no horizontal scrolling and no clipping of the demo's dialogs. */
+.hero{border-image:conic-gradient(var(--soft) 0 0) fill 0//0 100vmax}
+.steps article{background:white;border:1px solid var(--line);border-radius:16px;padding:24px}
+.steps article>b{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--green);color:white;font-size:16px}
+.section-head.left{text-align:left;margin:0 0 24px}
+.pending-box{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center}
+.pending-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pending-fields label{font-size:14px}
+.pending-fields input{min-height:48px;font-size:18px}
+.pending-result{background:var(--soft);border:1px solid var(--line);border-radius:18px;padding:34px;text-align:center}
+.pending-result strong{display:block;font-size:clamp(38px,5vw,54px);letter-spacing:-2px;color:var(--green);font-variant-numeric:tabular-nums}
+.pending-result span{display:block;font-weight:800;font-size:18px}
+.pending-result p{color:var(--muted);margin:14px 0 0}
+.price-card.featured{background:var(--ink);color:#f1f6f2;border:2px solid var(--bright)}
+.price-card.featured h3 em,.price-card.featured>small{color:#c3d4ca}
+.price-card.featured li:before{color:#5fd59a}
+.price-card.featured .btn{background:var(--bright);color:var(--ink);box-shadow:none}
+.pricing-note{text-align:center;color:var(--muted);font-size:14px;margin:22px auto 0;max-width:640px}
+.compare-title{font-size:32px;letter-spacing:-1.2px;margin:64px 0 18px}
+.plan-compare table{background:white;border:1px solid var(--line);border-radius:14px;font-size:14px}
+.plan-compare th[scope=row]{font-size:14px;color:var(--ink);letter-spacing:0;font-weight:600}
+.plan-compare thead th{font-size:12px}
+.plan-compare .cmp-pro{background:#eef7f1}
+.cmp-yes{color:var(--green);font-weight:900}
+.cmp-no{color:var(--muted)}
+.footer{border-image:conic-gradient(var(--ink) 0 0) fill 0//0 100vmax;color:#c3d4ca}
+.footer .logo{color:white}
+.footer a{color:#e6eee9}
+@media(max-width:900px){.pending-box{grid-template-columns:1fr;gap:28px}}
+@media(max-width:600px){.pending-fields{grid-template-columns:1fr}.pending-result{padding:26px 18px}.compare-title{font-size:26px}}

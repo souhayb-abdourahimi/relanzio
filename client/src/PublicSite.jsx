@@ -1,7 +1,8 @@
 import React,{useEffect,useState} from 'react';
 import TodayView from './TodayView.jsx';
 import FollowupModal from './FollowupModal.jsx';
-import PricingCards from './PricingCards.jsx';
+import PricingCards,{PlanComparison} from './PricingCards.jsx';
+import PendingCalculator from './PendingCalculator.jsx';
 import LegalPage from './LegalPage.jsx';
 import { routeMeta, track } from './public-meta.js';
 import { PRO_PRICE_LABEL, TRIAL_DAYS, FREE_LIMIT_TEXT } from '../../shared/plans.js';
@@ -116,6 +117,7 @@ export function Marketing({onStart=goSignup}){
         <article className="feature"><span>03</span><h3>On ne sait pas quand arrêter</h3><p>Sans suivi, on relance au hasard. Avec Relanzio, chaque devis a sa prochaine étape, et une fin.</p></article>
       </div>
     </section>
+    <PendingCalculator/>
     <section className="section soft" id="comment"><div className="container"><div className="section-head"><span>COMMENT ÇA MARCHE</span><h2>Vous ajoutez le devis. Relanzio s’occupe du reste.</h2></div><div className="steps">
       <article><b>1</b><h3>Ajoutez le devis envoyé</h3><p>Client, email ou téléphone, objet, montant, date d’envoi. 30 secondes, depuis le téléphone.</p></article>
       <article><b>2</b><h3>Relanzio planifie les relances</h3><p>Trois au maximum, les jours ouvrés à 9 h. Chaque matin, la vue Aujourd’hui vous montre quoi faire.</p></article>
@@ -165,7 +167,7 @@ export function SeoPage({path,onStart=goSignup}){
 export function PublicPage({kind,onStart=goSignup}){
   const support=SUPPORT_EMAIL,contact=CONTACT_EMAIL;
   const pages={
-    pricing:{title:'Gratuit, vous relancez. Pro, Relanzio relance pour vous.',lead:`Pro : ${PRO_PRICE_LABEL}. Abonnement mensuel récurrent, sans engagement de durée minimale.`,body:<PricingCards onStart={onStart}/>},
+    pricing:{title:'Gratuit, vous relancez. Pro, Relanzio relance pour vous.',lead:`Pro : ${PRO_PRICE_LABEL}. Abonnement mensuel récurrent, sans engagement de durée minimale.`,body:<><PricingCards onStart={onStart}/><h2 className="compare-title">Comparatif détaillé</h2><PlanComparison/></>},
     docs:{title:'Documentation',lead:'Le workflow essentiel de Relanzio, sans jargon.',body:<div className="doc-grid">
       <article><h2>1. Ajouter un devis</h2><p>Client, téléphone ou email, objet, montant et date d’envoi. La première relance est proposée J+2 après l’envoi (réglable dans Paramètres) ; un devis ancien est proposé aujourd’hui, sans rattrapage.</p></article>
       <article><h2>2. La vue Aujourd’hui</h2><p>Les réponses reçues d’abord, puis les devis en retard, ceux du jour et ceux à appeler. Pour chacun : Relancer (message prêt, email, SMS ou appel, ou envoi par Relanzio en Pro), Repousser, et dans « ⋯ » : Le client a répondu, Gagné, Perdu, Pause.</p></article>
