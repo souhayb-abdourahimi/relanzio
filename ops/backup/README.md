@@ -23,7 +23,7 @@ Inventaire : [docs/sale-readiness/backup-inventory.md](../../docs/sale-readiness
 | `sql/ephemeral-bootstrap.sql` | Rôles et fonctions `auth.*` recréés **uniquement** dans le cluster éphémère |
 | `sql/auth-structure-reference.sql` | Structure `auth.users`/`auth.identities` pour vérifier les anciennes sauvegardes |
 | `legacy/railway-function-v1.js` | Archive fidèle de l’ancien job Railway (non exécutée, défauts documentés) |
-| `Dockerfile`, `railway.json` | Image (PostgreSQL 17 officiel + Node 22) et configuration du service Railway |
+| `Dockerfile` | Image (PostgreSQL 17 officiel + Node 22). Réglages du service Railway : Dockerfile `ops/backup/Dockerfile`, commande `node ops/backup/backup.mjs`, cron `15 2 * * *`, redémarrage « Never » |
 
 ## Marqueurs de log
 

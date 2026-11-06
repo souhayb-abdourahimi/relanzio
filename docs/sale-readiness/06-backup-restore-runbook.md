@@ -130,8 +130,10 @@ l’application.
 
 Voir aussi le rapport de mission. Rien ne change pour l’application ; l’ancien job continue jusqu’à la validation du nouveau.
 
-1. Créer dans Railway un service « relanzio-backup-v2 » depuis le dépôt GitHub, branche `staging`, fichier de configuration
-   `ops/backup/railway.json` (Dockerfile, cron `15 2 * * *`, pas de redémarrage).
+1. Créer dans Railway un service « relanzio-backup-v2 » depuis le dépôt GitHub, branche `staging`, avec ces réglages
+   (*Settings* du service ; Railway n’applique plus les fichiers `railway.json`) : Dockerfile `ops/backup/Dockerfile`,
+   commande `node ops/backup/backup.mjs`, cron `15 2 * * *`, redémarrage « Never », chemins surveillés `ops/backup/**`,
+   `supabase/migrations/**`, `supabase/schema.sql`.
 2. Variables : `BACKUP_SOURCE_DB_URL` (Supabase → *Connect* → *Session pooler*, mot de passe de la base — saisi directement
    dans Railway), `BACKUP_SOURCE_PROJECT_REF=uwgvnhnpvxoebabayqac`, et des **références** vers les variables existantes de
    l’ancien service pour `BACKUP_ENCRYPTION_KEY_B64` et `S3_*` (aucune valeur à recopier).

@@ -13,7 +13,7 @@ test('the archived legacy job is the exact decoded Railway source (header exclud
 });
 
 test('nothing in the repository runs the legacy job', async () => {
-  const files = ['package.json', 'Dockerfile', 'ops/backup/Dockerfile', 'ops/backup/railway.json', 'ops/backup/package.json', '.github/workflows/ci.yml'];
+  const files = ['package.json', 'Dockerfile', 'ops/backup/Dockerfile', 'ops/backup/package.json', '.github/workflows/ci.yml'];
   for (const f of files) {
     let t = ''; try { t = await read(f); } catch { continue; }
     assert.ok(!t.includes('railway-function-v1'), `${f} references the legacy job`);
