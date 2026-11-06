@@ -29,7 +29,7 @@ test('PostgreSQL binaries are available when required', { skip: !process.env.BAC
 
 const urlOf = c => `postgresql://postgres@localhost/postgres?host=${encodeURIComponent(c.dir)}`;
 const files = async () => [
-  'ops/backup/sql/ephemeral-bootstrap.sql', 'ops/backup/sql/auth-structure-reference.sql', 'supabase/schema.sql',
+  'ops/backup/sql/ephemeral-bootstrap.sql', 'ops/backup/sql/supabase-default-privileges.sql', 'ops/backup/sql/auth-structure-reference.sql', 'supabase/schema.sql',
   ...(await readdir(path.join(ROOT, 'supabase/migrations'))).filter(f => f.endsWith('.sql')).sort().map(f => `supabase/migrations/${f}`),
   'test/fixtures/backup-source-fixture.sql'
 ];
@@ -64,6 +64,7 @@ test('backup and restore, end to end, with every failure mode', { skip, timeout:
       assert.equal(m.tables['supabase_migrations.schema_migrations'].rows, 14);
       assert.equal(m.migrations.applied_without_history.length, 7);
       assert.equal(m.restore.restored_rows['public.profiles'], 2);
+      assert.ok(m.restore.grants_revoked_after_restore > 0, 'the nightly check reproduces the Supabase default privileges and undoes them');
       assert.equal(m.auth.counts['auth.sessions'], 1);
       assert.ok(m.excluded.some(e => e.resource === 'Supabase Storage' && /0 bucket/.test(e.reason)), 'empty Storage checked');
       const stored = await readFile(path.join(work, 'store', good.keys.manifest), 'utf8');
@@ -134,12 +135,17 @@ test('backup and restore, end to end, with every failure mode', { skip, timeout:
       assert.equal((await sql(source, 'select count(*) from public.quotes')).trim(), '3', 'source untouched');
       const target = await startEphemeralCluster({ pgBin: PG, serverBin: SERVER });
       try {
-        for (const f of ['ops/backup/sql/ephemeral-bootstrap.sql', 'ops/backup/sql/auth-structure-reference.sql']) await psqlFile({ conn: target.conn, pgBin: PG, sql: await readFile(path.join(ROOT, f), 'utf8') });
+        for (const f of ['ops/backup/sql/ephemeral-bootstrap.sql', 'ops/backup/sql/supabase-default-privileges.sql', 'ops/backup/sql/auth-structure-reference.sql']) await psqlFile({ conn: target.conn, pgBin: PG, sql: await readFile(path.join(ROOT, f), 'utf8') });
         const env = { ...base, RESTORE_TARGET_DB_URL: urlOf(target) };
         r = await runRestore({ env, store, pgBin: PG, log: quiet });
         assert.equal(r.dryRun, true, JSON.stringify(r)); assert.equal((await sql(target, `select count(*) from pg_tables where schemaname='public'`)).trim(), '0', 'dry run writes nothing');
-        r = await runRestore({ env: { ...env, RESTORE_MODE: 'apply' }, store, pgBin: PG, log: quiet });
+        const logged = [];
+        r = await runRestore({ env: { ...env, RESTORE_MODE: 'apply' }, store, pgBin: PG, log: l => logged.push(l) });
         assert.equal(r.ok, true, JSON.stringify(r.problems));
+        // Supabase default privileges were undone: same grants as the source, nothing more for anon.
+        assert.match(logged.join('\n'), /RESTORE_STEP_DONE \{"step":"grants","revoked":[1-9]\d*\}/);
+        assert.equal((await sql(target, `select has_table_privilege('anon','public.quotes','select')::text || has_function_privilege('anon','public.create_quote_with_quota(uuid,integer,text,text,text,numeric,date,text,boolean,integer,text,timestamptz,text,text)','execute')::text`)).trim(), 'falsefalse');
+        assert.equal((await sql(target, `select has_table_privilege('authenticated','public.quotes','select')::text || has_table_privilege('authenticated','public.quotes','delete')::text`)).trim(), 'truefalse');
         assert.equal((await sql(target, `select count(*) from auth.users u join public.profiles p on p.id=u.id`)).trim(), '2');
         assert.equal((await sql(target, `select count(*) from auth.users`)).trim(), '3');
         r = await runRestore({ env: { ...env, RESTORE_MODE: 'apply' }, store, pgBin: PG, log: quiet });

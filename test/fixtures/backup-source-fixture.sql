@@ -74,6 +74,9 @@ insert into public.system_events (scope, message) values ('test','backup fixture
 -- Burn a sequence value so that sequence positions are really checked.
 select nextval('public.system_events_id_seq');
 
--- Supabase default privileges (a real project grants these on every new object of schema public).
-grant all on all tables in schema public to anon, authenticated, service_role;
-grant all on all sequences in schema public to anon, authenticated, service_role;
+-- Production hardening (checked on 6 Nov 2026). The objects above were created under the Supabase default
+-- privileges (ops/backup/sql/supabase-default-privileges.sql, applied before the schema), then production
+-- revoked them: anon has no table privilege in public, authenticated only reads the tables its RLS policies
+-- expose, service_role keeps everything. A restore must reproduce exactly this, not the defaults.
+revoke all on all tables in schema public from anon, authenticated;
+grant select on public.profiles, public.quotes, public.followups, public.quote_replies, public.support_tickets to authenticated;

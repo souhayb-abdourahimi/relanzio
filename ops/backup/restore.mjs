@@ -15,6 +15,7 @@ import path from 'node:path';
 import { checkArchive, decryptContainer, parseKey, sha256 } from './lib/crypto.mjs';
 import { compareFingerprints } from './lib/fingerprint.mjs';
 import { fingerprint } from './lib/dump.mjs';
+import { grantReconcileSql } from './lib/grants.mjs';
 import { checkRestoreRequest, checkTargetIsEmpty, redact } from './lib/guards.mjs';
 import { DETERMINISTIC_SETTINGS, PsqlSession, psqlFile } from './lib/pg.mjs';
 import { s3Store } from './lib/store.mjs';
@@ -65,7 +66,7 @@ export async function runRestore({ env = process.env, store, log = console.log, 
   const probe = await probeTarget({ conn: req.conn, pgBin });
   const empty = checkTargetIsEmpty(probe, manifest);
   if (!empty.ok) { say('RESTORE_REFUSED', { stage: 'target', reasons: empty.reasons }); return { ok: false, refused: true, reasons: empty.reasons }; }
-  const plan = { target_project_ref: env.RESTORE_TARGET_PROJECT_REF, target_server_version: probe.server_version, steps: TARGET_RESTORE_ORDER,
+  const plan = { target_project_ref: env.RESTORE_TARGET_PROJECT_REF, target_server_version: probe.server_version, steps: [...TARGET_RESTORE_ORDER, 'grants: revoke what Supabase default privileges added but the source did not have'],
     rows: Object.fromEntries(Object.entries(manifest.tables).map(([t, v]) => [t, v.rows])), sessions_and_tokens: 'not restored: every user signs in again' };
   if (env.RESTORE_MODE !== 'apply') { say('RESTORE_DRY_RUN', plan); return { ok: true, dryRun: true, plan }; }
 
@@ -75,11 +76,24 @@ export async function runRestore({ env = process.env, store, log = console.log, 
     say('RESTORE_STEP_DONE', { step: f });
   }
 
-  // Verification of the real target: application schema and rows identical; Auth by ids, counts and links
-  // (the target's Supabase Auth may be a newer version with extra columns, reported as warnings).
+  // Grants: a Supabase project's default privileges give anon/authenticated/service_role ALL on every new
+  // object of schema public; pg_dump never writes the REVOKEs that undo them. Remove exactly the grants the
+  // source did not have (see lib/grants.mjs), then verify the real target: application schema and rows
+  // identical; Auth by ids, counts and links (the target's Supabase Auth may be a newer version with extra
+  // columns, reported as warnings).
   const s = new PsqlSession({ conn: req.conn, pgBin, label: 'target' });
   let restored;
-  try { await s.query(DETERMINISTIC_SETTINGS); restored = await fingerprint(s); } finally { await s.close().catch(() => {}); }
+  try {
+    await s.query(DETERMINISTIC_SETTINGS);
+    restored = await fingerprint(s);
+    const grants = grantReconcileSql(payload.meta.source_fingerprint.catalog, restored.catalog);
+    if (grants.sql) {
+      try { await psqlFile({ conn: req.conn, pgBin, sql: grants.sql }); }
+      catch (e) { say('RESTORE_FAILED', { step: 'grants', error: redact(e.message, secrets) }); return { ok: false, step: 'grants' }; }
+      restored = await fingerprint(s);
+    }
+    say('RESTORE_STEP_DONE', { step: 'grants', revoked: grants.revoke });
+  } finally { await s.close().catch(() => {}); }
   const cmp = compareFingerprints(payload.meta.source_fingerprint, restored);
   const authStructure = d => /^auth\./.test(d.object) && ['columns', 'constraints', 'indexes', 'triggers', 'policies', 'rls', 'grants', 'content'].includes(d.kind);
   const problems = cmp.diffs.filter(d => !authStructure(d));
