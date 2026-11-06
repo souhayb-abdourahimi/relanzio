@@ -28,6 +28,7 @@ client/        front React (src/), fichiers publics (public/)
 server/        API Express, webhooks, tâches planifiées, prospection, QA de pré-déploiement (qa-*.mjs)
 shared/        code partagé front/serveur : offres, identité de l’éditeur, modèles de relance
 supabase/      schema.sql, migrations/, rollbacks/
+ops/backup/    job de sauvegarde quotidien (Railway), vérification et restauration protégée (voir ops/backup/README.md)
 scripts/       build (prerender), smoke, préflight, sauvegarde, vérification lecture seule (sale-readiness-health)
 test/          tests unitaires (*.test.js), SQL (test/sql), navigateur (test/e2e)
 docs/          documentation ; docs/sale-readiness/ = dossier complet d’exploitation et de cession
@@ -79,6 +80,7 @@ La prospection suit strictement **D0 → J+3 → fin** (aucun J+7), 1 email par 
 
 ## Documentation
 
+- Sauvegardes et restauration : [`docs/sale-readiness/06-backup-restore-runbook.md`](docs/sale-readiness/06-backup-restore-runbook.md)
 - Exploitation, architecture, sécurité, sauvegardes, prospection, transfert : [`docs/sale-readiness/`](docs/sale-readiness/00-README.md)
 - Décisions produit : [`docs/DECISIONS_PRODUIT.md`](docs/DECISIONS_PRODUIT.md)
 - Historique (versions 0.3 / 0.4) : [`docs/archive/`](docs/archive/README.md)

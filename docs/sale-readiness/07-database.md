@@ -1,7 +1,7 @@
 # 07 — Base de données (Supabase)
 
 Postgres + Supabase Auth. Région déclarée : Union européenne (Paris). Toutes les tables sont dans le schéma `public`
-avec **RLS activée (22/22)**. Le serveur utilise la clé `service_role` ; le navigateur ne lit que ce que la RLS autorise
+avec **RLS activée (21/21)**. Le serveur utilise la clé `service_role` ; le navigateur ne lit que ce que la RLS autorise
 (ses propres lignes) et n’écrit aucune table métier directement (écritures via l’API).
 
 ## Tables

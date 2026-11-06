@@ -18,7 +18,7 @@
 
 ## Base de données
 
-- RLS activée sur les 22 tables ; lecture limitée aux lignes de l’utilisateur ; aucune écriture directe depuis le navigateur
+- RLS activée sur les 21 tables ; lecture limitée aux lignes de l’utilisateur ; aucune écriture directe depuis le navigateur
   (vérifié avant chaque déploiement : lecture croisée et écriture directe bloquées, IDOR sur l’API refusé).
 - Opérations sensibles en fonctions SQL atomiques exécutables par `service_role` uniquement.
 

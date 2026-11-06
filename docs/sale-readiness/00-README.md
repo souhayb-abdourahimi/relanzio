@@ -16,7 +16,7 @@ Il ne contient **aucun secret** (seulement des noms de variables) et **aucune do
 | 03 | [Inventaire des services](03-infrastructure-inventory.md) | Technique, transfert |
 | 04 | [Variables d’environnement](04-environment-variables.md) | Technique |
 | 05 | [Déploiement](05-deployment-runbook.md) | Technique |
-| 06 | [Sauvegarde et restauration](06-backup-restore-runbook.md) | Technique |
+| 06 | [Sauvegarde et restauration](06-backup-restore-runbook.md) — inventaire : [backup-inventory.md](backup-inventory.md) | Technique, transfert |
 | 07 | [Base de données](07-database.md) | Technique |
 | 08 | [Facturation Stripe](08-billing-stripe.md) | Technique, finance |
 | 09 | [Emails et délivrabilité](09-email-and-deliverability.md) | Technique |

@@ -54,7 +54,7 @@ Un seul service applicatif, sans file de messages ni worker séparé : le serveu
 
 ## Données (Supabase)
 
-Postgres avec **RLS activée sur les 22 tables**, opérations sensibles en fonctions SQL atomiques (quota, relances, réponses,
+Postgres avec **RLS activée sur les 21 tables**, opérations sensibles en fonctions SQL atomiques (quota, relances, réponses,
 créneaux d’envoi). Détail : [07-database.md](07-database.md).
 
 ## Tâches planifiées (node-cron, dans le serveur)
