@@ -143,6 +143,10 @@ test('backup and restore, end to end, with every failure mode', { skip, timeout:
         r = await runRestore({ env: { ...env, RESTORE_MODE: 'apply' }, store, pgBin: PG, log: l => logged.push(l) });
         assert.equal(r.ok, true, JSON.stringify(r.problems));
         // Supabase default privileges were undone: same grants as the source, nothing more for anon.
+        assert.match(logged.join('\n'), /RESTORE_SCHEMA_SEALED/);
+        assert.match(logged.join('\n'), /RESTORE_SCHEMA_REOPENED/);
+        assert.equal((await sql(target, "select has_schema_privilege('anon','public','USAGE')")).trim(), 't',
+          'original schema USAGE restored only after a verified restore');
         assert.match(logged.join('\n'), /RESTORE_STEP_DONE \{"step":"grants","revoked":[1-9]\d*\}/);
         assert.equal((await sql(target, `select has_table_privilege('anon','public.quotes','select')::text || has_function_privilege('anon','public.create_quote_with_quota(uuid,integer,text,text,text,numeric,date,text,boolean,integer,text,timestamptz,text,text)','execute')::text`)).trim(), 'falsefalse');
         assert.equal((await sql(target, `select has_table_privilege('authenticated','public.quotes','select')::text || has_table_privilege('authenticated','public.quotes','delete')::text`)).trim(), 'truefalse');
