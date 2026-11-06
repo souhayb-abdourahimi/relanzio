@@ -5,16 +5,18 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { compareFingerprints, isAuthDiff } from './fingerprint.mjs';
 import { fingerprint } from './dump.mjs';
+import { grantReconcileSql } from './grants.mjs';
 import { DETERMINISTIC_SETTINGS, PsqlSession, psqlFile, startEphemeralCluster } from './pg.mjs';
 
 export const BOOTSTRAP_SQL = fileURLToPath(new URL('../sql/ephemeral-bootstrap.sql', import.meta.url));
+export const SUPABASE_DEFAULT_PRIVILEGES_SQL = fileURLToPath(new URL('../sql/supabase-default-privileges.sql', import.meta.url));
 export const RESTORE_ORDER = ['auth-schema.sql', 'schema.sql', 'auth-data.sql', 'app-data.sql'];
 
 // RLS works after restore: as each sampled user, the quotes visible through the policies are exactly theirs.
 async function rlsProbe(session) {
   const ok = (await session.query(`select to_regclass('public.quotes') is not null and to_regclass('public.profiles') is not null
-    and has_table_privilege('authenticated', 'public.quotes', 'select') and has_table_privilege('anon', 'public.quotes', 'select')`)).trim();
-  if (ok !== 't') return { checked: 0, problems: [], skipped: 'public.quotes not readable by authenticated/anon (grants are compared separately)' };
+    and has_table_privilege('authenticated', 'public.quotes', 'select')`)).trim();
+  if (ok !== 't') return { checked: 0, problems: [], skipped: 'public.quotes not readable by authenticated (grants are compared separately)' };
   const ids = (await session.query(`select q.user_id from public.quotes q group by q.user_id order by count(*) desc, q.user_id limit 3`)).split('\n').filter(Boolean);
   const problems = [];
   for (const id of ids) {
@@ -26,10 +28,13 @@ async function rlsProbe(session) {
     await session.query('rollback');
     if (visible !== own) problems.push(`RLS probe: a user sees ${visible} quote(s) instead of ${own}`);
   }
-  await session.query('begin; set local role anon');
-  const anon = Number((await session.query(`select count(*) from public.quotes`)).trim());
-  await session.query('rollback');
-  if (anon !== 0) problems.push(`RLS probe: anonymous role sees ${anon} quote(s)`);
+  // anon: either no SELECT privilege at all (production) or RLS must hide every row.
+  if ((await session.query(`select has_table_privilege('anon', 'public.quotes', 'select')`)).trim() === 't') {
+    await session.query('begin; set local role anon');
+    const anon = Number((await session.query(`select count(*) from public.quotes`)).trim());
+    await session.query('rollback');
+    if (anon !== 0) problems.push(`RLS probe: anonymous role sees ${anon} quote(s)`);
+  }
   return { checked: ids.length, problems };
 }
 
@@ -39,17 +44,25 @@ export async function verifyByEphemeralRestore({ files, sourceFingerprint, pgBin
   const started = Date.now();
   try {
     await psqlFile({ conn: cluster.conn, pgBin, sql: await readFile(BOOTSTRAP_SQL, 'utf8') });
+    await psqlFile({ conn: cluster.conn, pgBin, sql: await readFile(SUPABASE_DEFAULT_PRIVILEGES_SQL, 'utf8') });
     for (const f of RESTORE_ORDER) {
       try { await psqlFile({ conn: cluster.conn, pgBin, sql: files[f] }); }
       catch (e) { throw new Error(`RESTORE_STEP_FAILED:${f}: ${e.message}`); }
       log(`restored ${f}`);
     }
     const session = new PsqlSession({ conn: cluster.conn, pgBin, label: 'restored' });
-    let restored, rls, version;
+    let restored, rls, version, grants;
     try {
       await session.query(DETERMINISTIC_SETTINGS);
       version = (await session.query('show server_version')).trim();
       restored = await fingerprint(session);
+      // Same step as ops/backup/restore.mjs on a real project: undo the default privileges the source had revoked.
+      grants = grantReconcileSql(sourceFingerprint.catalog, restored.catalog);
+      if (grants.sql) {
+        await psqlFile({ conn: cluster.conn, pgBin, sql: grants.sql });
+        log(`grants reconciled: ${grants.revoke} revoked`);
+        restored = await fingerprint(session);
+      }
       rls = await rlsProbe(session);
     } finally { await session.close().catch(() => {}); }
     const cmp = compareFingerprints(sourceFingerprint, restored);
@@ -67,8 +80,9 @@ export async function verifyByEphemeralRestore({ files, sourceFingerprint, pgBin
         environment: 'ephemeral PostgreSQL cluster inside the job container (unix socket, no network listener), deleted after the check',
         server_version: version,
         restored_rows: rows,
-        checks: ['row counts', 'row content fingerprints (SHA-256 of sorted row hashes)', 'columns', 'constraints (PK, FK, unique, check)', 'indexes', 'functions', 'triggers', 'RLS flags and policies', 'grants to anon/authenticated/service_role', 'views', 'enums', 'sequence values', 'orphan rows for every foreign key', 'RLS probe as authenticated and anon'],
+        checks: ['row counts', 'row content fingerprints (SHA-256 of sorted row hashes)', 'columns', 'constraints (PK, FK, unique, check)', 'indexes', 'functions', 'triggers', 'RLS flags and policies', 'grants to anon/authenticated/service_role (after undoing Supabase default privileges)', 'views', 'enums', 'sequence values', 'orphan rows for every foreign key', 'RLS probe as authenticated and anon'],
         rls_probe_users: rls.checked,
+        grants_revoked_after_restore: grants.revoke,
         problems: appProblems,
         duration_ms: Date.now() - started
       },

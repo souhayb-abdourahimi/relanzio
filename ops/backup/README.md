@@ -18,9 +18,11 @@ Inventaire : [docs/sale-readiness/backup-inventory.md](../../docs/sale-readiness
 | `lib/verify-restore.mjs` | Restauration dans un cluster PostgreSQL éphémère (socket local, sans réseau) puis comparaison |
 | `lib/guards.mjs` | Garde-fous : production interdite comme cible, cible vide obligatoire, secrets masqués |
 | `lib/crypto.mjs` | Conteneur RZBK2 (AES-256-GCM) ; lecture des anciens RZBK1 |
+| `lib/grants.mjs` | Après restauration : retire les droits que les défauts d’un projet Supabase ajoutent mais que la source n’avait pas (jamais d’ajout) |
 | `lib/manifest.mjs`, `lib/retention.mjs`, `lib/store.mjs` | Manifeste public (sans donnée personnelle), rétention 30 jours, stockage S3 |
 | `migration-map.json` | Rapprochement fichiers `supabase/migrations` ↔ historique Supabase |
 | `sql/ephemeral-bootstrap.sql` | Rôles et fonctions `auth.*` recréés **uniquement** dans le cluster éphémère |
+| `sql/supabase-default-privileges.sql` | Droits par défaut d’un projet Supabase, reproduits **uniquement** dans le cluster éphémère |
 | `sql/auth-structure-reference.sql` | Structure `auth.users`/`auth.identities` pour vérifier les anciennes sauvegardes |
 | `legacy/railway-function-v1.js` | Archive fidèle de l’ancien job Railway (non exécutée, défauts documentés) |
 | `Dockerfile` | Image (PostgreSQL 17 officiel + Node 22). Réglages du service Railway : Dockerfile `ops/backup/Dockerfile`, commande `node ops/backup/backup.mjs`, cron `15 2 * * *`, redémarrage « Never » |

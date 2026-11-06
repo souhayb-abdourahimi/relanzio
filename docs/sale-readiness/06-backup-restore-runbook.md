@@ -11,7 +11,8 @@ Code : [`ops/backup/`](../../ops/backup/README.md). Inventaire détaillé : [bac
 | Couverture de l’ancien job | **Incomplète** : 14 tables sur 21, aucun compte Auth, schéma reconstruit depuis GitHub au lieu du schéma déployé | Audit du 5 novembre ; `auth_users_covered=false`, `restore_verified=false` |
 | Nouveau job (v2) | **Déployé le 6 novembre 2026**, testé en CI sur PostgreSQL 17 | `ops/backup/`, job CI `backup-restore` |
 | Restauration testée sur des données de production réelles | **Oui, le 6 novembre 2026 à 10:29 UTC** : `COMPLETE_AND_RESTORE_VERIFIED`, 21 tables + `auth.users` (13) + `auth.identities` (13) + historique des migrations (14), restaurés dans un PostgreSQL 17 isolé et identiques à la source, aucun écart | Manifeste `v2/daily/relanzio-20261106T102857965Z.manifest.json` (SHA-256 `de8e1854…26d48bf`) |
-| Connexion réelle via Supabase Auth après restauration | **Pas encore** : demande une restauration dans un projet Supabase jetable (section 8) | — |
+| Restauration dans un vrai projet Supabase | **Oui, le 6 novembre 2026 à 23:04 UTC**, dans un projet jetable (`relanzio-restore-test`, Paris, offre gratuite) : 21 tables, 1 975 lignes, 13 comptes et 13 identités avec les mêmes UUID, profils liés, contenu identique à la sauvegarde. Un écart trouvé et corrigé : droits en trop (section 7, étape 6) | Logs Railway `relanzio-restore-runner` ; requêtes en lecture seule (section 8) |
+| Connexion réelle via Supabase Auth après restauration | **Pas encore** : test avec un compte contrôlé par le propriétaire, dans le projet jetable (section 8) | — |
 | Restauration testée sur des données synthétiques | **Oui**, à chaque CI : sauvegarde → relecture → restauration → comparaison objet par objet, plus tous les cas d’échec | `test/backup-restore-e2e.test.js` |
 
 On peut dire à un acheteur que les sauvegardes sont automatisées, chiffrées, contrôlées, et que la restauration des données, du
@@ -85,7 +86,9 @@ temporaire, aucune écoute réseau, supprimé à la fin) :
 - colonnes, contraintes (PK, FK, unicité, check), index, fonctions (définition complète), triggers, RLS et politiques, droits
   `anon` / `authenticated` / `service_role`, vues, types, valeurs des séquences ;
 - lignes orphelines pour chaque clé étrangère ;
-- RLS en pratique : chaque utilisateur testé ne voit que ses devis, le rôle anonyme n’en voit aucun ;
+- les droits par défaut d’un projet Supabase sont reproduits, puis retirés comme lors d’une vraie restauration (section 7,
+  étape 6) ;
+- RLS en pratique : chaque utilisateur testé ne voit que ses devis ; le rôle anonyme n’y a aucun droit, ou n’en voit aucun ;
 - comptes Auth (section 5).
 
 Un seul écart donne `RESTORE_FAILED` ou `AUTH_RESTORE_FAILED`, un statut non vérifié dans le manifeste et un code de sortie non nul.
@@ -106,8 +109,14 @@ l’application.
    la cible en lecture seule et affiche `RESTORE_DRY_RUN` avec le plan, **sans rien écrire**. Il refuse (`RESTORE_REFUSED`)
    si la cible est la production (référence, hôte, utilisateur du pooler, même URL que la source, même identifiant de cluster),
    si elle n’est pas vide, ou si la confirmation ne nomme pas exactement la cible.
-6. **Restauration** : relancer avec `RESTORE_MODE=apply`. Ordre : schéma, comptes Auth, données. Aucune suppression,
-   aucun `DROP`, aucun `TRUNCATE`. Le script compare ensuite la cible à la sauvegarde (`TARGET_RESTORE_VERIFIED`).
+6. **Restauration** : relancer avec `RESTORE_MODE=apply`. Ordre : schéma, comptes Auth, données, puis **droits**. Aucune
+   suppression de données, aucun `DROP`, aucun `TRUNCATE`. Le script compare ensuite la cible à la sauvegarde
+   (`TARGET_RESTORE_VERIFIED`).
+   Étape « droits » : un projet Supabase donne par défaut tous les droits aux rôles `anon` et `authenticated` sur chaque nouvel
+   objet du schéma `public`, et `pg_dump` n’écrit pas les retraits qui annulent ces défauts. Sans cette étape, la copie
+   restaurée ouvrirait à `anon` des tables et des fonctions que la production lui ferme (constaté lors de la restauration du
+   6 novembre). Le script retire donc exactement les droits que la source n’avait pas (`RESTORE_STEP_DONE {"step":"grants"}`),
+   sans jamais en ajouter ; la restauration de contrôle de chaque nuit reproduit ces défauts et fait la même correction.
 7. **Supprimer les variables `RESTORE_*`** du service.
 8. **Basculer l’application** : `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `VITE_SUPABASE_*` dans
    Railway ; dans Supabase → *Authentication* : URL du site `https://relanzio.com`, URL de redirection, SMTP. Redéployer,

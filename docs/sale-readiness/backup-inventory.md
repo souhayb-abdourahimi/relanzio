@@ -51,7 +51,7 @@ Une table ajoutée plus tard dans `public` est sauvegardée automatiquement (pas
 | Fonctions SQL | 12 | idem | oui (définition complète) | CI |
 | Triggers | 0 | — | oui (contrôlés s’il en apparaît) | CI |
 | RLS (21/21 tables) et politiques | 6 politiques | idem | oui | CI, y compris test de lecture par rôle |
-| Droits `anon` / `authenticated` / `service_role` | 152 sur les tables | non | oui | CI |
+| Droits `anon` / `authenticated` / `service_role` | 215 (tables, séquences, fonctions) | non | oui, y compris le retrait des droits par défaut de Supabase après restauration | CI ; restauration réelle (6 nov.) |
 | Séquences | 3 | non | oui (valeur courante) | CI |
 | Historique des migrations (`supabase_migrations`) | 14 entrées | liste figée de 12 | oui (table complète) | CI |
 | Fichiers `supabase/migrations` du dépôt | 21 fichiers | 12 | oui (copie dans l’archive) | CI |
@@ -80,8 +80,9 @@ L’historique n’a pas été modifié ; la sauvegarde porte le schéma **réel
 | auth.schema_migrations, auth.instances | — | non | Gérées par Supabase Auth |
 
 12 profils pour 13 comptes : un compte n’a pas de profil (contrôlé à chaque restauration, la valeur doit rester identique).
-Preuve Auth : CI (base de données) ; Réel (6 nov.) ; connexion réelle via Supabase Auth : **À faire** lors d’une restauration dans
-un projet Supabase ([06 §7](06-backup-restore-runbook.md)).
+Preuve Auth : CI (base de données) ; Réel (6 nov.) ; restauration dans un vrai projet Supabase le 6 novembre (13 comptes,
+13 identités, mêmes UUID, profils liés) ; connexion réelle via Supabase Auth : **À faire** avec un compte de test
+([06 §8](06-backup-restore-runbook.md)).
 
 ## Autres ressources Supabase
 
