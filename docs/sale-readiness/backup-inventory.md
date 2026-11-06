@@ -5,8 +5,9 @@ en lecture seule sur la production (Supabase `uwgvnhnpvxoebabayqac`, PostgreSQL 
 
 Légende des preuves :
 - **CI** : vérifié automatiquement à chaque modification du code, sur des données synthétiques, avec PostgreSQL 17 ;
-- **Nuit** : vérifié par le job v2 à chaque sauvegarde, sur les vraies données (une fois le job déployé) ;
-- **À faire** : pas encore prouvé sur les données réelles.
+- **Réel (6 nov.)** : vérifié sur les vraies données de production par le job v2 (première exécution le 6 novembre 2026, statut
+  `COMPLETE_AND_RESTORE_VERIFIED`), puis à chaque sauvegarde nocturne ;
+- **À faire** : pas encore prouvé.
 
 ## Base de données — tables applicatives (schéma `public`)
 
@@ -15,27 +16,27 @@ sauvegarde actuellement en production contient la table.
 
 | Table | Lignes | Ancien job | Job v2 | Preuve |
 |---|---:|:---:|:---:|---|
-| profiles | 12 | oui | oui | CI ; Nuit (À faire) |
-| quotes | 9 | oui | oui | CI ; Nuit (À faire) |
-| followups | 4 | oui | oui | CI ; Nuit (À faire) |
-| quote_replies | 4 | **non** | oui | CI ; Nuit (À faire) |
-| followup_optouts | 1 | **non** | oui | CI ; Nuit (À faire) |
-| digest_sends | 0 | **non** | oui | CI ; Nuit (À faire) |
-| prospects | 35 | oui | oui | CI ; Nuit (À faire) |
-| prospect_tombstones | 0 | **non** | oui | CI ; Nuit (À faire) |
-| suppressions | 7 | oui | oui | CI ; Nuit (À faire) |
-| outreach_candidates | 249 | **non** | oui | CI ; Nuit (À faire) |
-| outreach_queue | 64 | oui | oui | CI ; Nuit (À faire) |
-| outreach_events | 106 | oui | oui | CI ; Nuit (À faire) |
-| outreach_daily_slots | 29 | **non** | oui | CI ; Nuit (À faire) |
-| sales_followups | 0 | **non** | oui | CI ; Nuit (À faire) |
-| feedback_insights | 0 | oui | oui | CI ; Nuit (À faire) |
-| lifecycle_messages | 0 | oui | oui | CI ; Nuit (À faire) |
-| support_tickets | 0 | oui | oui | CI ; Nuit (À faire) |
-| trial_events | 8 | oui | oui | CI ; Nuit (À faire) |
-| product_events | 454 | oui | oui | CI ; Nuit (À faire) |
-| system_events | 833 | oui | oui | CI ; Nuit (À faire) |
-| stripe_webhook_events | 131 | oui | oui | CI ; Nuit (À faire) |
+| profiles | 12 | oui | oui | CI ; Réel (6 nov.) |
+| quotes | 9 | oui | oui | CI ; Réel (6 nov.) |
+| followups | 4 | oui | oui | CI ; Réel (6 nov.) |
+| quote_replies | 4 | **non** | oui | CI ; Réel (6 nov.) |
+| followup_optouts | 1 | **non** | oui | CI ; Réel (6 nov.) |
+| digest_sends | 0 | **non** | oui | CI ; Réel (6 nov.) |
+| prospects | 35 | oui | oui | CI ; Réel (6 nov.) |
+| prospect_tombstones | 0 | **non** | oui | CI ; Réel (6 nov.) |
+| suppressions | 7 | oui | oui | CI ; Réel (6 nov.) |
+| outreach_candidates | 249 | **non** | oui | CI ; Réel (6 nov.) |
+| outreach_queue | 64 | oui | oui | CI ; Réel (6 nov.) |
+| outreach_events | 106 | oui | oui | CI ; Réel (6 nov.) |
+| outreach_daily_slots | 29 | **non** | oui | CI ; Réel (6 nov.) |
+| sales_followups | 0 | **non** | oui | CI ; Réel (6 nov.) |
+| feedback_insights | 0 | oui | oui | CI ; Réel (6 nov.) |
+| lifecycle_messages | 0 | oui | oui | CI ; Réel (6 nov.) |
+| support_tickets | 0 | oui | oui | CI ; Réel (6 nov.) |
+| trial_events | 8 | oui | oui | CI ; Réel (6 nov.) |
+| product_events | 454 | oui | oui | CI ; Réel (6 nov.) |
+| system_events | 833 | oui | oui | CI ; Réel (6 nov.) |
+| stripe_webhook_events | 131 | oui | oui | CI ; Réel (6 nov.) |
 | **Total** | **1 946** | 14/21 | 21/21 | |
 
 Une table ajoutée plus tard dans `public` est sauvegardée automatiquement (pas de liste à maintenir).
@@ -44,7 +45,7 @@ Une table ajoutée plus tard dans `public` est sauvegardée automatiquement (pas
 
 | Ressource | Production | Ancien job | Job v2 | Preuve |
 |---|---|:---:|:---:|---|
-| Colonnes, types, valeurs par défaut | 230 colonnes | reconstruit depuis GitHub | schéma déployé (`pg_dump`) | CI ; Nuit (À faire) |
+| Colonnes, types, valeurs par défaut | 230 colonnes | reconstruit depuis GitHub | schéma déployé (`pg_dump`) | CI ; Réel (6 nov.) |
 | Contraintes (PK, FK, unicité, check) | 82 | idem | oui | CI |
 | Index | 58 | idem (1 index de trop dans le dépôt) | oui | CI |
 | Fonctions SQL | 12 | idem | oui (définition complète) | CI |
@@ -79,7 +80,7 @@ L’historique n’a pas été modifié ; la sauvegarde porte le schéma **réel
 | auth.schema_migrations, auth.instances | — | non | Gérées par Supabase Auth |
 
 12 profils pour 13 comptes : un compte n’a pas de profil (contrôlé à chaque restauration, la valeur doit rester identique).
-Preuve Auth : CI (base de données) ; Nuit (À faire) ; connexion réelle via Supabase Auth : **À faire** lors d’une restauration dans
+Preuve Auth : CI (base de données) ; Réel (6 nov.) ; connexion réelle via Supabase Auth : **À faire** lors d’une restauration dans
 un projet Supabase ([06 §7](06-backup-restore-runbook.md)).
 
 ## Autres ressources Supabase
@@ -117,4 +118,4 @@ un projet Supabase ([06 §7](06-backup-restore-runbook.md)).
   - comparaison champ par champ ;
   - liste des 7 tables et des comptes absents.
 
-**Statut : À faire.**
+**Statut : À faire** (la sauvegarde v2 du 6 novembre, complète et vérifiée, la remplace comme référence).

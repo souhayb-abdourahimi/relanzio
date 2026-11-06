@@ -8,7 +8,7 @@ Les comptes de service (Railway, Supabase, Stripe, Brevo, OVH, Amelu) n’ont pa
 | # | Constat | Pourquoi ça bloque | Action |
 |---|---|---|---|
 | B1 | **Pas d’historique de revenus documenté** (clients payants, MRR sur plusieurs mois) | Un acheteur valorise un SaaS sur ses revenus récurrents prouvés | Obtenir des clients payants ; archiver chaque mois les métriques ([metrics/](metrics/README.md)) et l’export Stripe |
-| B2 | **Sauvegarde actuelle incomplète (14/21 tables, sans comptes Auth) et restauration jamais vérifiée sur les données réelles** | Risque de perte de données ; question systématique en due diligence | Job v2 prêt (`ops/backup/`, testé en CI) à mettre en service : [18 — A2](18-founder-action-list.md) ; [06](06-backup-restore-runbook.md) ; [inventaire](backup-inventory.md) |
+| B2 | ~~Sauvegarde incomplète, restauration jamais vérifiée~~ **Corrigé le 6 novembre 2026** : job v2 en service, restauration complète (21 tables + comptes Auth) vérifiée sur les données réelles dans un environnement isolé. Reste : test de connexion dans un projet Supabase restauré | Question systématique en due diligence | [06](06-backup-restore-runbook.md) ; [inventaire](backup-inventory.md) |
 | B3 | **Aucune revue juridique** (propriété du code, RGPD clients et prospects, cession de base, structure de vente) | Un acheteur ne peut pas signer sans | [21](21-legal-review-checklist.md) — LEGAL REVIEW REQUIRED |
 
 ## IMPORTANT BEFORE SALE

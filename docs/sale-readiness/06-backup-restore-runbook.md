@@ -3,18 +3,20 @@
 Procédure de référence pour sauvegarder la base Relanzio, prouver qu’elle se restaure, et la reconstruire après une panne grave.
 Code : [`ops/backup/`](../../ops/backup/README.md). Inventaire détaillé : [backup-inventory.md](backup-inventory.md).
 
-## 1. État au 5 novembre 2026 (à lire en premier)
+## 1. État au 6 novembre 2026 (à lire en premier)
 
 | Élément | État | Preuve |
 |---|---|---|
-| Job en production | **Ancien job** (`relanzio-backup-job`, Railway Function, archivé dans `ops/backup/legacy/`) | Logs Railway `BACKUP_SUCCESS` chaque nuit depuis le 30 octobre |
+| Job en production | **Job v2** (`relanzio-backup-v2`, cron `15 2 * * *`), en parallèle de l’ancien job (`relanzio-backup-job`, archivé dans `ops/backup/legacy/`) jusqu’à 7 nuits vertes | Logs Railway |
 | Couverture de l’ancien job | **Incomplète** : 14 tables sur 21, aucun compte Auth, schéma reconstruit depuis GitHub au lieu du schéma déployé | Audit du 5 novembre ; `auth_users_covered=false`, `restore_verified=false` |
-| Nouveau job (v2) | **Écrit, testé en CI sur PostgreSQL 17, pas encore déployé** | `ops/backup/`, job CI `backup-restore` |
-| Restauration testée sur des données de production réelles | **Pas encore** : nécessite d’exécuter le job v2 (ou `verify.mjs`) dans Railway, là où se trouvent la clé et le bucket | Section 9 |
+| Nouveau job (v2) | **Déployé le 6 novembre 2026**, testé en CI sur PostgreSQL 17 | `ops/backup/`, job CI `backup-restore` |
+| Restauration testée sur des données de production réelles | **Oui, le 6 novembre 2026 à 10:29 UTC** : `COMPLETE_AND_RESTORE_VERIFIED`, 21 tables + `auth.users` (13) + `auth.identities` (13) + historique des migrations (14), restaurés dans un PostgreSQL 17 isolé et identiques à la source, aucun écart | Manifeste `v2/daily/relanzio-20261106T102857965Z.manifest.json` (SHA-256 `de8e1854…26d48bf`) |
+| Connexion réelle via Supabase Auth après restauration | **Pas encore** : demande une restauration dans un projet Supabase jetable (section 8) | — |
 | Restauration testée sur des données synthétiques | **Oui**, à chaque CI : sauvegarde → relecture → restauration → comparaison objet par objet, plus tous les cas d’échec | `test/backup-restore-e2e.test.js` |
 
-Tant que la ligne « données de production réelles » n’est pas « Oui », il ne faut **pas** affirmer à un acheteur que la restauration
-complète a été testée.
+On peut dire à un acheteur que les sauvegardes sont automatisées, chiffrées, contrôlées, et que la restauration des données, du
+schéma et des comptes est vérifiée chaque nuit dans un environnement isolé. Tant que la connexion réelle via Supabase Auth n’a pas
+été testée dans un projet Supabase restauré, ne pas affirmer que « tout le service » a été restauré et utilisé.
 
 ## 2. Architecture
 
