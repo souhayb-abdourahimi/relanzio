@@ -47,7 +47,7 @@ async function recommendedNextFollowupAt(quote,sentDate,profile,now=new Date()){
 }
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 import { rowsToSemicolonCsv } from './export.js';
-import { createStripeWebhookProcessor } from './stripe-webhook.js';
+import { createStripeWebhookProcessor, createStripeWebhookHandler } from './stripe-webhook.js';
 import { runTrialEndingReminders } from './billing-emails.js';
 import { runMorningDigest } from './morning-digest.js';
 import { buildFunnel, countEvents, FUNNEL_EVENTS } from './funnel.js';
@@ -56,7 +56,7 @@ import { VAT_NOTICE,PRO_PRICE_LABEL,PRO_MONTHLY_PRICE,FREE_LIMIT_TEXT,monthlyRec
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
-const stripeWebhooks = createStripeWebhookProcessor({db,stripe,getProfile,reportError,sendEmail});
+const stripeWebhooks = createStripeWebhookProcessor({db,stripe,reportError,sendEmail});
 const __dirname = dirname(fileURLToPath(import.meta.url)); const dist = join(__dirname, '..', 'dist');
 const admins = () => (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 const isAdmin = user => admins().includes((user?.email || '').toLowerCase());
@@ -87,17 +87,9 @@ app.use(rateLimit({ windowMs:60_000, max:180 }));
 
 
 // Raw body must come before express.json.
-app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async (req,res)=>{
-  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe not configured');
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
-    res.json(await stripeWebhooks.processEvent(event));
-  } catch(e) {
-    await reportError('stripe.webhook',e,{event_id:event?.id||null,event_type:event?.type||null,request_id:req.requestId});
-    res.status(400).send('Webhook processing failed');
-  }
-});
+app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), createStripeWebhookHandler({
+  stripe,secret:process.env.STRIPE_WEBHOOK_SECRET,processEvent:stripeWebhooks.processEvent,reportError,
+}));
 
 app.use(express.json({limit:'256kb'}));
 app.get('/api/health', (_req,res)=>res.json({ok:true,service:'relanzio',version:'0.4.0'}));

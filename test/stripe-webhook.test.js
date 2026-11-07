@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Stripe from 'stripe';
-import { createStripeWebhookProcessor, subscriptionPeriod } from '../server/stripe-webhook.js';
+import { createStripeWebhookProcessor, createStripeWebhookHandler, subscriptionPeriod } from '../server/stripe-webhook.js';
 import { trialEndingEmail, paymentFailedEmail, isTrialEndingSoon, runTrialEndingReminders } from '../server/billing-emails.js';
 import { hasProAccess, hasSubscriptionProAccess, canAutoSend } from '../server/entitlements.js';
 import { createFakeDb } from './helpers/fake-db.js';
@@ -39,7 +39,7 @@ test('signature verification rejects tampered payloads and wrong secrets',()=>{
 
 test('full subscription lifecycle: checkout, failure, recovery, cancellation at period end, end',async()=>{
   const h=harness();
-  h.subs.sub_1={id:'sub_1',status:'active',cancel_at_period_end:false,items:{data:[{current_period_start:PERIOD_START,current_period_end:PERIOD_END}]}};
+  h.subs.sub_1={id:'sub_1',customer:'cus_1',status:'active',cancel_at_period_end:false,items:{data:[{current_period_start:PERIOD_START,current_period_end:PERIOD_END}]}};
 
   await h.deliver('checkout.session.completed',{id:'cs_1',customer:'cus_1',subscription:'sub_1',payment_status:'paid',metadata:{user_id:USER}},'evt_checkout');
   assert.equal(h.profile().plan,'pro');
@@ -98,13 +98,14 @@ test('stale events arriving late never overwrite a newer state',async()=>{
 
 test('a processing failure releases the event so Stripe can retry it',async()=>{
   const h=harness();
+  h.subs.sub_9={id:'sub_9',customer:'cus_9',status:'active'};
   const db=h.db,original=db.from;
   let fail=true;
   db.from=t=>{if(t==='profiles'&&fail){fail=false;throw new Error('db down');}return original(t);};
-  await assert.rejects(h.deliver('checkout.session.completed',{id:'cs_9',customer:'cus_9',subscription:null,payment_status:'paid',metadata:{user_id:USER}},'evt_retry'));
+  await assert.rejects(h.deliver('checkout.session.completed',{id:'cs_9',customer:'cus_9',subscription:'sub_9',payment_status:'paid',metadata:{user_id:USER}},'evt_retry'));
   assert.equal((db.tables.stripe_webhook_events||[]).length,0);
   db.from=original;
-  const ok=await h.deliver('checkout.session.completed',{id:'cs_9',customer:'cus_9',subscription:null,payment_status:'paid',metadata:{user_id:USER}},'evt_retry');
+  const ok=await h.deliver('checkout.session.completed',{id:'cs_9',customer:'cus_9',subscription:'sub_9',payment_status:'paid',metadata:{user_id:USER}},'evt_retry');
   assert.equal(ok.received,true);
   assert.equal(h.profile().subscription_status,'active');
 });
@@ -135,4 +136,19 @@ test('email copy and period helpers',()=>{
   assert.match(trialEndingEmail({appUrl:'https://relanzio.com',trialEndsAt:'2026-10-27T08:00:00Z'}).subject,/2 jours/);
   assert.match(paymentFailedEmail({appUrl:'https://relanzio.com'}).text,/envoi automatique des relances est suspendu/);
   assert.deepEqual(subscriptionPeriod({current_period_start:PERIOD_START,current_period_end:PERIOD_END,cancel_at_period_end:false}),{subscription_current_period_start:'2026-12-01T00:00:00.000Z',subscription_current_period_end:'2027-01-01T00:00:00.000Z',subscription_cancel_at_period_end:false});
+});
+
+
+test('signed synthetic webhook passes through HTTP handler into isolated database',async()=>{
+  const h=harness();h.subs.sub_1={id:'sub_1',customer:'cus_1',status:'active'};
+  const processor=createStripeWebhookProcessor({db:h.db,stripe:{subscriptions:{retrieve:async id=>h.subs[id]}},env:{BILLING_EMAILS_ENABLED:'false'}});
+  const handler=createStripeWebhookHandler({stripe:sdk,secret:SECRET,processEvent:processor.processEvent});
+  const payload=JSON.stringify({id:'evt_http',type:'checkout.session.completed',created:1800000000,data:{object:{mode:'subscription',customer:'cus_1',subscription:'sub_1',metadata:{user_id:USER}}}});
+  const signature=sdk.webhooks.generateTestHeaderString({payload,secret:SECRET});
+  const res={statusCode:200,status(code){this.statusCode=code;return this;},send(body){this.body=body;},json(body){this.body=body;}};
+  await handler({body:Buffer.from(payload),headers:{'stripe-signature':signature}},res);
+  assert.equal(res.statusCode,200);assert.equal(res.body.result.applied,true);
+  assert.equal(h.profile().subscription_status,'active');
+  await handler({body:Buffer.from(payload),headers:{'stripe-signature':signature}},res);
+  assert.equal(res.body.duplicate,true);
 });
