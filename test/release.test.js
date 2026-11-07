@@ -24,15 +24,7 @@ test('Stripe billing event ordering ignores stale or foreign subscription events
   assert.equal(shouldIgnoreBillingEvent(profile,'checkout.session.completed',{subscription:'sub_old'},200),true);
 });
 
-test('Stripe webhook idempotency and ordering guards are present in release source',()=>{
-  const server=readFileSync(new URL('../server/stripe-webhook.js',import.meta.url),'utf8');
-  const index=readFileSync(new URL('../server/index.js',import.meta.url),'utf8');
-  assert.match(index,/stripe\.webhooks\.constructEvent\(req\.body, req\.headers\['stripe-signature'\], process\.env\.STRIPE_WEBHOOK_SECRET\)/);
-  assert.match(server,/stripe_webhook_events'\)\.insert\(\{event_id:event\.id,event_type:event\.type\}\)/);
-  assert.match(server,/claimError\?\.code==='23505'/);
-  assert.match(server,/shouldIgnoreBillingEvent/);
-  assert.match(server,/stripe_state_event_created/);
-});
+// Webhook retry, ordering and signature behavior is covered by stripe-*.test.js.
 
 test('email layer never uses a fake development success',()=>{
   const email=readFileSync(new URL('../server/email.js',import.meta.url),'utf8');
