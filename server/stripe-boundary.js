@@ -17,7 +17,7 @@ function assertPrice(price,config){
   if(price?.id!==config.priceId||price.currency!=='eur'||price.unit_amount!==2900||price.recurring?.interval!=='month'||price.recurring?.interval_count!==1)
     fail('BILLING_PRICE_MISMATCH');
 }
-export async function verifyStripeConfiguration(stripe,env=process.env,event){
+export async function verifyStripeConfiguration(stripe,env=process.env,event,requestOptions,requireActivePrice=false){
   const config=stripeBoundaryConfig(env);
   if(event){
     assertMode(event,config);
@@ -27,9 +27,11 @@ export async function verifyStripeConfiguration(stripe,env=process.env,event){
   }
   if(!stripe)fail('BILLING_STRIPE_UNAVAILABLE');
   // Read with the same SDK client/key as subscription retrieval. No cached success across failures.
-  const account=await stripe.accounts.retrieve();
+  const account=await stripe.accounts.retrieve({},requestOptions);
   if(account.id!==config.accountId)fail('BILLING_ACCOUNT_MISMATCH');
-  assertPrice(await stripe.prices.retrieve(config.priceId),config);
+  const price=await stripe.prices.retrieve(config.priceId,{},requestOptions);
+  assertPrice(price,config);
+  if(requireActivePrice&&price.active!==true)fail('BILLING_PRICE_NOT_ACTIVE');
   return config;
 }
 export async function verifyStripeCustomer(stripe,config,customerId,profile){

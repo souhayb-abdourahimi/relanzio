@@ -55,3 +55,7 @@ Une incohérence ou panne de vérification produit une erreur 503, sans marquer 
 `test/stripe-boundary.test.js` utilise exclusivement des objets fictifs et une base mémoire, y compris un événement Test signé. Il couvre les modes, comptes, prix, quantités, propriétaires, erreurs de lecture Stripe, doublons et reprises. Les tests de cycle de vie utilisent un abonnement résilié toujours consultable ; le cas 404 est testé séparément et conserve les droits jusqu’à clarification.
 
 Les contrôles ajoutent des lectures Stripe par notification : une indisponibilité Stripe bloque temporairement le traitement et impose une reprise. Aucune mutation Stripe n’est effectuée par le webhook. L’identification de la production contient les coordonnées connues de Relanzio : une migration de domaine/base devra conserver `NODE_ENV=production` et réviser ces garde-fous. Les événements historiques ne contiennent pas tous leur mode ou compte en base ; aucune réparation automatique n’est supposée sûre.
+
+## Vérification au démarrage
+
+Le renforcement suivant ajoute un moniteur de configuration Stripe au démarrage, une disponibilité qui dépend de sa vérification, un refus temporaire de Checkout/portail et des diagnostics expurgés. Les pages publiques et le contrôle de vie restent indépendants de Stripe. Procédure, limites et retour arrière exclusivement protégé : [STRIPE_STARTUP_RUNBOOK.md](STRIPE_STARTUP_RUNBOOK.md).
