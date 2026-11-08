@@ -59,7 +59,7 @@ Toute anomalie ⇒ **pause** (journal `Commercial sequence paused` + raison), 0 
 - Logs Railway : `outreach.backlog` (comptages, sans données personnelles), `outreach.commercial-feeder`,
   `outreach.commercial-sequence` (`Commercial D0 sent` avec message ID, `Commercial sequence paused`), `cron.commercial-*`.
 - Admin : `GET /api/admin/outreach-health` (santé 24 h, backlog, file).
-- QA avant chaque déploiement : `server/qa-outreach-safety.mjs` (contre la vraie base, données de test isolées).
+- QA destructive `server/qa-outreach-safety.mjs` : uniquement en laboratoire local isolé et explicitement autorisé, avec données fictives ; jamais sur la base de production. Elle ne fait plus partie du pré-déploiement proposé dans la PR.
 
 ## Pour arrêter immédiatement
 

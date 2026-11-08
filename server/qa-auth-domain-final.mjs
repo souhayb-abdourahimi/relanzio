@@ -1,5 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { lockedQuoteIds } from '../shared/quota.js';
+import { assertIsolatedDestructiveQa } from './destructive-qa-guard.mjs';
+
+assertIsolatedDestructiveQa();
 
 const stamp=Date.now(),results=[];
 let userA,userB,server,local,app,db,createClient;

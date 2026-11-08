@@ -18,7 +18,7 @@ export function billingTransition(eventType, object={}, current={plan:'free',sub
 
 
 export function billingEventSubscriptionId(eventType,object={}){
-  if(['customer.subscription.updated','customer.subscription.deleted'].includes(eventType))return object?.id||null;
+  if(['customer.subscription.created','customer.subscription.updated','customer.subscription.deleted'].includes(eventType))return object?.id||null;
   const direct=typeof object?.subscription==='string'?object.subscription:object?.subscription?.id;
   const parent=typeof object?.parent?.subscription_details?.subscription==='string'
     ?object.parent.subscription_details.subscription
@@ -32,7 +32,7 @@ export function shouldIgnoreBillingEvent(profile={},eventType='',object={},event
   const eventSub=billingEventSubscriptionId(eventType,object);
   const currentSub=profile.stripe_subscription_id||null;
   if(currentSub&&eventSub&&currentSub!==eventSub){
-    if(['customer.subscription.updated','customer.subscription.deleted','invoice.paid','invoice.payment_failed'].includes(eventType))return true;
+    if(['customer.subscription.created','customer.subscription.updated','customer.subscription.deleted','invoice.paid','invoice.payment_failed'].includes(eventType))return true;
     if(eventType==='checkout.session.completed'&&last&&created<=last)return true;
   }
   return false;

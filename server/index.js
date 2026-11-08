@@ -47,7 +47,9 @@ async function recommendedNextFollowupAt(quote,sentDate,profile,now=new Date()){
 }
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 import { rowsToSemicolonCsv } from './export.js';
-import { createStripeWebhookProcessor } from './stripe-webhook.js';
+import { createStripeWebhookProcessor, createStripeWebhookHandler } from './stripe-webhook.js';
+import { verifyStripeCustomer } from './stripe-boundary.js';
+import { createBillingReadiness, createAvailabilityRouter } from './billing-readiness.js';
 import { runTrialEndingReminders } from './billing-emails.js';
 import { runMorningDigest } from './morning-digest.js';
 import { buildFunnel, countEvents, FUNNEL_EVENTS } from './funnel.js';
@@ -56,7 +58,8 @@ import { VAT_NOTICE,PRO_PRICE_LABEL,PRO_MONTHLY_PRICE,FREE_LIMIT_TEXT,monthlyRec
 
 const app = express(); app.set('trust proxy', 1);
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
-const stripeWebhooks = createStripeWebhookProcessor({db,stripe,getProfile,reportError,sendEmail});
+const billingReadiness=createBillingReadiness({stripe,onChange:status=>console.log(JSON.stringify({scope:'billing.readiness',...status}))});
+const stripeWebhooks = createStripeWebhookProcessor({db,stripe,reportError,sendEmail});
 const __dirname = dirname(fileURLToPath(import.meta.url)); const dist = join(__dirname, '..', 'dist');
 const admins = () => (process.env.ADMIN_EMAILS || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 const isAdmin = user => admins().includes((user?.email || '').toLowerCase());
@@ -87,23 +90,14 @@ app.use(rateLimit({ windowMs:60_000, max:180 }));
 
 
 // Raw body must come before express.json.
-app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), async (req,res)=>{
-  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe not configured');
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET);
-    res.json(await stripeWebhooks.processEvent(event));
-  } catch(e) {
-    await reportError('stripe.webhook',e,{event_id:event?.id||null,event_type:event?.type||null,request_id:req.requestId});
-    res.status(400).send('Webhook processing failed');
-  }
-});
+app.post('/api/stripe/webhook', express.raw({ type:'application/json' }), createStripeWebhookHandler({
+  stripe,secret:process.env.STRIPE_WEBHOOK_SECRET,processEvent:stripeWebhooks.processEvent,reportError,
+}));
 
 app.use(express.json({limit:'256kb'}));
-app.get('/api/health', (_req,res)=>res.json({ok:true,service:'relanzio',version:'0.4.0'}));
 // Public readiness says only whether the service can work (healthchecks, smoke tests). Details are admin-only.
-function readinessReport(){const integrations={supabase:Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_ANON_KEY&&process.env.SUPABASE_SERVICE_ROLE_KEY),stripe:Boolean(process.env.STRIPE_SECRET_KEY&&process.env.STRIPE_PRO_PRICE_ID&&process.env.STRIPE_WEBHOOK_SECRET),brevo:Boolean(process.env.BREVO_API_KEY&&process.env.BREVO_WEBHOOK_SECRET&&process.env.EMAIL_FROM_ADDRESS),openai:Boolean(process.env.OPENAI_API_KEY)};const ready=integrations.supabase&&integrations.stripe&&integrations.brevo;return {ready,integrations,automation:{followups:process.env.FOLLOWUP_AUTOMATION_ENABLED==='true',lifecycle:process.env.LIFECYCLE_EMAILS_ENABLED==='true',acquisition:process.env.ACQUISITION_ENABLED==='true',morningDigest:process.env.MORNING_DIGEST_ENABLED==='true',billingEmails:process.env.BILLING_EMAILS_ENABLED==='true',replyDetection:replyConfiguration().configured,automaticSending:automaticSendingAvailable()}}}
-app.get('/api/readiness', (_req,res)=>{const {ready}=readinessReport();res.status(ready?200:503).json({ready})});
+function readinessReport(){const integrations={supabase:Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_ANON_KEY&&process.env.SUPABASE_SERVICE_ROLE_KEY),stripe:billingReadiness.snapshot().ready,brevo:Boolean(process.env.BREVO_API_KEY&&process.env.BREVO_WEBHOOK_SECRET&&process.env.EMAIL_FROM_ADDRESS),openai:Boolean(process.env.OPENAI_API_KEY)};const ready=integrations.supabase&&integrations.stripe&&integrations.brevo;return {ready,integrations,billing:billingReadiness.snapshot(),automation:{followups:process.env.FOLLOWUP_AUTOMATION_ENABLED==='true',lifecycle:process.env.LIFECYCLE_EMAILS_ENABLED==='true',acquisition:process.env.ACQUISITION_ENABLED==='true',morningDigest:process.env.MORNING_DIGEST_ENABLED==='true',billingEmails:process.env.BILLING_EMAILS_ENABLED==='true',replyDetection:replyConfiguration().configured,automaticSending:automaticSendingAvailable()}}}
+app.use('/api',createAvailabilityRouter({billing:billingReadiness,dependenciesReady:()=>{const {integrations}=readinessReport();return integrations.supabase&&integrations.brevo;}}));
 
 // Privacy-friendly first-party product analytics. No ad tracker/cross-site identifier.
 app.post('/api/events', rateLimit({windowMs:60_000,max:30}), async (req,res)=>{
@@ -423,7 +417,7 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
   let claimedAt=null;
   try{
     if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'La souscription Pro n’est pas disponible pour le moment.'});
-    if(!stripe||!process.env.STRIPE_PRO_PRICE_ID)return res.status(503).json({error:"Stripe n'est pas configuré."});
+    const billingConfig=await billingReadiness.requireReady();
     const profile=await getProfile(req.user);
     if(['past_due','unpaid'].includes(profile.subscription_status))return res.status(409).json({error:'Votre dernier paiement a été refusé. Mettez à jour votre carte depuis « Gérer mon abonnement » plutôt que de souscrire à nouveau.'});
     if(hasSubscriptionProAccess(profile))return res.status(409).json({error:'Votre compte dispose déjà d’un abonnement Pro. Utilisez Gérer mon abonnement.'});
@@ -434,6 +428,7 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
       await mustDb(db.from('profiles').update({stripe_customer_id:customer,updated_at:nowIso()}).eq('id',req.user.id));
     }
 
+    await verifyStripeCustomer(stripe,billingConfig,customer,profile);
     await stripe.customers.update(customer,{invoice_settings:{footer:VAT_NOTICE}});
 
     const fingerprint=checkoutConfigFingerprint({priceId:process.env.STRIPE_PRO_PRICE_ID,appUrl:process.env.APP_URL});
@@ -462,6 +457,7 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
     await db.from('product_events').insert({user_id:req.user.id,event:'checkout_started',path:'/app'});
     res.json({url:session.url,reused:false});
   }catch(e){
+    if(e.billingUnavailable)return res.status(503).json({error:'La facturation est temporairement indisponible. Réessayez plus tard.',request_id:req.requestId});
     await reportError('billing.checkout',e,{request_id:req.requestId});
     res.status(500).json({error:'Impossible d’ouvrir le paiement pour le moment.',request_id:req.requestId});
   }finally{
@@ -471,14 +467,15 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
 app.post('/api/billing/portal', requireUser, rateLimit({windowMs:60_000,max:10}), async(req,res)=>{
   try{
     if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'La gestion de l’abonnement n’est pas disponible pour le moment.'});
-    if(!stripe)return res.status(503).json({error:'Stripe non configuré.'});
+    const billingConfig=await billingReadiness.requireReady();
     const profile=await getProfile(req.user);
     if(!profile.stripe_customer_id)return res.status(400).json({error:'Aucun compte de facturation.'});
+    await verifyStripeCustomer(stripe,billingConfig,profile.stripe_customer_id,profile);
     const args={customer:profile.stripe_customer_id,return_url:process.env.APP_URL};
     if(process.env.STRIPE_PORTAL_CONFIGURATION_ID)args.configuration=process.env.STRIPE_PORTAL_CONFIGURATION_ID;
     const session=await stripe.billingPortal.sessions.create(args);
     res.json({url:session.url});
-  }catch(e){await reportError('billing.portal',e,{request_id:req.requestId});res.status(500).json({error:'Impossible d’ouvrir la gestion de l’abonnement.',request_id:req.requestId})}
+  }catch(e){if(e.billingUnavailable)return res.status(503).json({error:'La facturation est temporairement indisponible. Réessayez plus tard.',request_id:req.requestId});await reportError('billing.portal',e,{request_id:req.requestId});res.status(500).json({error:'Impossible d’ouvrir la gestion de l’abonnement.',request_id:req.requestId})}
 });
 
 app.post('/api/support/ask', requireUser, async(req,res)=>{ try{res.json(await answerSupport(sanitizeText(req.body.question,2000)))}catch(e){res.status(500).json({error:e.message})} });
@@ -721,7 +718,11 @@ if(process.env.NODE_ENV==='production'){
     res.status(404).type('text/plain').send('Not found');
   });
 }
-const port=Number(process.env.PORT||3000);if(process.env.NODE_ENV!=='test')app.listen(port,'0.0.0.0',()=>console.log(`Relanzio running on :${port}`));
+const port=Number(process.env.PORT||3000);
+if(process.env.NODE_ENV!=='test'){
+  void billingReadiness.start();
+  app.listen(port,'0.0.0.0',()=>console.log(`Relanzio running on :${port}`));
+}
 
 async function runPilotStartupDryRun(){
   if(process.env.PILOT_OUTREACH_STARTUP_DRY_RUN!=='true')return;

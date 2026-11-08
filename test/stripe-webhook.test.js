@@ -1,7 +1,8 @@
+import {fixtureStripe,testBillingEnv} from './helpers/stripe-fixture.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Stripe from 'stripe';
-import { createStripeWebhookProcessor, subscriptionPeriod } from '../server/stripe-webhook.js';
+import { createStripeWebhookProcessor, createStripeWebhookHandler, subscriptionPeriod } from '../server/stripe-webhook.js';
 import { trialEndingEmail, paymentFailedEmail, isTrialEndingSoon, runTrialEndingReminders } from '../server/billing-emails.js';
 import { hasProAccess, hasSubscriptionProAccess, canAutoSend } from '../server/entitlements.js';
 import { createFakeDb } from './helpers/fake-db.js';
@@ -17,11 +18,12 @@ function harness({profile={}}={}){
   const db=createFakeDb({profiles:[{id:USER,email:'artisan@example.test',company_name:'Toitures Martin',plan:'pro',subscription_status:'none',stripe_customer_id:null,stripe_subscription_id:null,stripe_state_event_created:0,trial_started_at:'2026-10-20T10:00:00Z',trial_ends_at:'2026-10-27T10:00:00Z',...profile}]},{stripe_webhook_events:['event_id'],lifecycle_messages:['user_id','type']});
   const subs={};
   const stripe={subscriptions:{retrieve:async id=>{if(!subs[id])throw Object.assign(new Error('missing'),{code:'resource_missing'});return subs[id];}}};
+  fixtureStripe(stripe,USER);
   const sent=[];
-  const processor=createStripeWebhookProcessor({db,stripe,getProfile:async u=>({...db.tables.profiles.find(p=>p.id===u.id)}),sendEmail:async m=>{sent.push(m);return {messageId:'x'};},env:{BILLING_EMAILS_ENABLED:'true',APP_URL:'https://relanzio.test'}});
+  const processor=createStripeWebhookProcessor({db,stripe,getProfile:async u=>({...db.tables.profiles.find(p=>p.id===u.id)}),sendEmail:async m=>{sent.push(m);return {messageId:'x'};},env:{...testBillingEnv,BILLING_EMAILS_ENABLED:'true',APP_URL:'https://relanzio.test'}});
   let created=1_800_000_000;
   const deliver=async(type,object,id=`evt_${type}_${created}`)=>{
-    const payload=JSON.stringify({id,object:'event',type,created:created++,data:{object}});
+    const payload=JSON.stringify({id,object:'event',livemode:false,type,created:created++,data:{object}});
     const header=sdk.webhooks.generateTestHeaderString({payload,secret:SECRET});
     const event=sdk.webhooks.constructEvent(payload,header,SECRET); // the exact call made by server/index.js
     return processor.processEvent(event);
@@ -39,7 +41,7 @@ test('signature verification rejects tampered payloads and wrong secrets',()=>{
 
 test('full subscription lifecycle: checkout, failure, recovery, cancellation at period end, end',async()=>{
   const h=harness();
-  h.subs.sub_1={id:'sub_1',status:'active',cancel_at_period_end:false,items:{data:[{current_period_start:PERIOD_START,current_period_end:PERIOD_END}]}};
+  h.subs.sub_1={id:'sub_1',customer:'cus_1',status:'active',cancel_at_period_end:false,items:{data:[{current_period_start:PERIOD_START,current_period_end:PERIOD_END}]}};
 
   await h.deliver('checkout.session.completed',{id:'cs_1',customer:'cus_1',subscription:'sub_1',payment_status:'paid',metadata:{user_id:USER}},'evt_checkout');
   assert.equal(h.profile().plan,'pro');
@@ -83,7 +85,7 @@ test('full subscription lifecycle: checkout, failure, recovery, cancellation at 
   assert.equal(hasProAccess(h.profile()),true);
 
   // Period over: back to free, data untouched.
-  delete h.subs.sub_1;
+  h.subs.sub_1.status='canceled';
   await h.deliver('customer.subscription.deleted',{id:'sub_1',customer:'cus_1',status:'canceled'});
   assert.equal(h.profile().plan,'free');
   assert.equal(h.profile().subscription_status,'canceled');
@@ -98,13 +100,14 @@ test('stale events arriving late never overwrite a newer state',async()=>{
 
 test('a processing failure releases the event so Stripe can retry it',async()=>{
   const h=harness();
+  h.subs.sub_9={id:'sub_9',customer:'cus_9',status:'active'};
   const db=h.db,original=db.from;
   let fail=true;
   db.from=t=>{if(t==='profiles'&&fail){fail=false;throw new Error('db down');}return original(t);};
-  await assert.rejects(h.deliver('checkout.session.completed',{id:'cs_9',customer:'cus_9',subscription:null,payment_status:'paid',metadata:{user_id:USER}},'evt_retry'));
+  await assert.rejects(h.deliver('checkout.session.completed',{id:'cs_9',customer:'cus_9',subscription:'sub_9',payment_status:'paid',metadata:{user_id:USER}},'evt_retry'));
   assert.equal((db.tables.stripe_webhook_events||[]).length,0);
   db.from=original;
-  const ok=await h.deliver('checkout.session.completed',{id:'cs_9',customer:'cus_9',subscription:null,payment_status:'paid',metadata:{user_id:USER}},'evt_retry');
+  const ok=await h.deliver('checkout.session.completed',{id:'cs_9',customer:'cus_9',subscription:'sub_9',payment_status:'paid',metadata:{user_id:USER}},'evt_retry');
   assert.equal(ok.received,true);
   assert.equal(h.profile().subscription_status,'active');
 });
@@ -123,9 +126,9 @@ test('J-2 trial email targets trials ending in 24–48 h, once per account',asyn
   assert.equal(isTrialEndingSoon({...ending,stripe_subscription_id:'sub_x'},now),false);
   const sent=[];
   const db=createFakeDb({profiles:[ending]},{lifecycle_messages:['user_id','type']});
-  const processor=createStripeWebhookProcessor({db,stripe:null,getProfile:async()=>null,sendEmail:async m=>{sent.push(m);},env:{BILLING_EMAILS_ENABLED:'true'}});
-  await runTrialEndingReminders({db,sendOnce:processor.sendOnce,env:{BILLING_EMAILS_ENABLED:'true',APP_URL:'https://relanzio.test'},now});
-  await runTrialEndingReminders({db,sendOnce:processor.sendOnce,env:{BILLING_EMAILS_ENABLED:'true',APP_URL:'https://relanzio.test'},now});
+  const processor=createStripeWebhookProcessor({db,stripe:null,getProfile:async()=>null,sendEmail:async m=>{sent.push(m);},env:{...testBillingEnv,BILLING_EMAILS_ENABLED:'true'}});
+  await runTrialEndingReminders({db,sendOnce:processor.sendOnce,env:{...testBillingEnv,BILLING_EMAILS_ENABLED:'true',APP_URL:'https://relanzio.test'},now});
+  await runTrialEndingReminders({db,sendOnce:processor.sendOnce,env:{...testBillingEnv,BILLING_EMAILS_ENABLED:'true',APP_URL:'https://relanzio.test'},now});
   assert.equal(sent.length,1);
   assert.match(sent[0].text,/https:\/\/relanzio\.test\/\?view=plans/);
   assert.match(sent[0].text,/Aucune donnée n’est supprimée/);
@@ -135,4 +138,19 @@ test('email copy and period helpers',()=>{
   assert.match(trialEndingEmail({appUrl:'https://relanzio.com',trialEndsAt:'2026-10-27T08:00:00Z'}).subject,/2 jours/);
   assert.match(paymentFailedEmail({appUrl:'https://relanzio.com'}).text,/envoi automatique des relances est suspendu/);
   assert.deepEqual(subscriptionPeriod({current_period_start:PERIOD_START,current_period_end:PERIOD_END,cancel_at_period_end:false}),{subscription_current_period_start:'2026-12-01T00:00:00.000Z',subscription_current_period_end:'2027-01-01T00:00:00.000Z',subscription_cancel_at_period_end:false});
+});
+
+
+test('signed synthetic webhook passes through HTTP handler into isolated database',async()=>{
+  const h=harness();h.subs.sub_1={id:'sub_1',customer:'cus_1',status:'active'};
+  const processor=createStripeWebhookProcessor({db:h.db,stripe:fixtureStripe({subscriptions:{retrieve:async id=>h.subs[id]}},USER),env:{...testBillingEnv,BILLING_EMAILS_ENABLED:'false'}});
+  const handler=createStripeWebhookHandler({stripe:sdk,secret:SECRET,processEvent:processor.processEvent});
+  const payload=JSON.stringify({id:'evt_http',livemode:false,type:'checkout.session.completed',created:1800000000,data:{object:{mode:'subscription',customer:'cus_1',subscription:'sub_1',metadata:{user_id:USER}}}});
+  const signature=sdk.webhooks.generateTestHeaderString({payload,secret:SECRET});
+  const res={statusCode:200,status(code){this.statusCode=code;return this;},send(body){this.body=body;},json(body){this.body=body;}};
+  await handler({body:Buffer.from(payload),headers:{'stripe-signature':signature}},res);
+  assert.equal(res.statusCode,200);assert.equal(res.body.result.applied,true);
+  assert.equal(h.profile().subscription_status,'active');
+  await handler({body:Buffer.from(payload),headers:{'stripe-signature':signature}},res);
+  assert.equal(res.body.duplicate,true);
 });
