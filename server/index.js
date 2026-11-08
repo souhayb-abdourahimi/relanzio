@@ -48,6 +48,7 @@ async function recommendedNextFollowupAt(quote,sentDate,profile,now=new Date()){
 import { checkoutConfigFingerprint, checkoutMetadata, isReusableCheckoutSession, checkoutIdempotencyKey } from './checkout-policy.js';
 import { rowsToSemicolonCsv } from './export.js';
 import { createStripeWebhookProcessor, createStripeWebhookHandler } from './stripe-webhook.js';
+import { verifyStripeConfiguration, verifyStripeCustomer } from './stripe-boundary.js';
 import { runTrialEndingReminders } from './billing-emails.js';
 import { runMorningDigest } from './morning-digest.js';
 import { buildFunnel, countEvents, FUNNEL_EVENTS } from './funnel.js';
@@ -416,6 +417,7 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
   try{
     if(process.env.BILLING_ENABLED!=='true')return res.status(423).json({error:'La souscription Pro n’est pas disponible pour le moment.'});
     if(!stripe||!process.env.STRIPE_PRO_PRICE_ID)return res.status(503).json({error:"Stripe n'est pas configuré."});
+    const billingConfig=await verifyStripeConfiguration(stripe);
     const profile=await getProfile(req.user);
     if(['past_due','unpaid'].includes(profile.subscription_status))return res.status(409).json({error:'Votre dernier paiement a été refusé. Mettez à jour votre carte depuis « Gérer mon abonnement » plutôt que de souscrire à nouveau.'});
     if(hasSubscriptionProAccess(profile))return res.status(409).json({error:'Votre compte dispose déjà d’un abonnement Pro. Utilisez Gérer mon abonnement.'});
@@ -426,6 +428,7 @@ app.post('/api/billing/checkout', requireUser, rateLimit({windowMs:60_000,max:10
       await mustDb(db.from('profiles').update({stripe_customer_id:customer,updated_at:nowIso()}).eq('id',req.user.id));
     }
 
+    await verifyStripeCustomer(stripe,billingConfig,customer,profile);
     await stripe.customers.update(customer,{invoice_settings:{footer:VAT_NOTICE}});
 
     const fingerprint=checkoutConfigFingerprint({priceId:process.env.STRIPE_PRO_PRICE_ID,appUrl:process.env.APP_URL});
@@ -466,6 +469,8 @@ app.post('/api/billing/portal', requireUser, rateLimit({windowMs:60_000,max:10})
     if(!stripe)return res.status(503).json({error:'Stripe non configuré.'});
     const profile=await getProfile(req.user);
     if(!profile.stripe_customer_id)return res.status(400).json({error:'Aucun compte de facturation.'});
+    const billingConfig=await verifyStripeConfiguration(stripe);
+    await verifyStripeCustomer(stripe,billingConfig,profile.stripe_customer_id,profile);
     const args={customer:profile.stripe_customer_id,return_url:process.env.APP_URL};
     if(process.env.STRIPE_PORTAL_CONFIGURATION_ID)args.configuration=process.env.STRIPE_PORTAL_CONFIGURATION_ID;
     const session=await stripe.billingPortal.sessions.create(args);

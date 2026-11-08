@@ -1,3 +1,4 @@
+import {fixtureStripe,testBillingEnv} from './helpers/stripe-fixture.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStripeWebhookProcessor, createStripeWebhookHandler } from '../server/stripe-webhook.js';
@@ -9,9 +10,10 @@ const BASE={id:'u1',email:'artisan@example.test',plan:'free',subscription_status
 function harness({profiles=[BASE]}={}){
   const db=createFakeDb({profiles}, {stripe_webhook_events:['event_id']});
   let clock=new Date('2026-11-07T10:00:00.000Z');
-  const subs={sub_1:{id:'sub_1',customer:'cus_1',status:'active',cancel_at_period_end:false,current_period_start:1793520000,current_period_end:1796112000}};
+  const subs={sub_1:{id:'sub_1',customer:'cus_1',livemode:false,metadata:{user_id:'u1'},items:{has_more:false,data:[{quantity:1,price:{id:'price_fixture',livemode:false,currency:'eur',unit_amount:2900,recurring:{interval:'month',interval_count:1}}}]},status:'active',cancel_at_period_end:false,current_period_start:1793520000,current_period_end:1796112000}};
   const stripe={subscriptions:{retrieve:async id=>{if(!subs[id])throw Object.assign(new Error('missing'),{code:'resource_missing'});return structuredClone(subs[id]);}}};
-  const processor=createStripeWebhookProcessor({db,stripe,now:()=>clock,env:{BILLING_EMAILS_ENABLED:'false'},sendEmail:async()=>assert.fail('email forbidden')});
+  fixtureStripe(stripe,'u1');
+  const processor=createStripeWebhookProcessor({db,stripe,now:()=>clock,env:{...testBillingEnv,BILLING_EMAILS_ENABLED:'false'},sendEmail:async()=>assert.fail('email forbidden')});
   return {db,stripe,subs,process:processor.processEvent,profile:()=>db.tables.profiles[0],advance:()=>{clock=new Date(clock.getTime()+6*60_000);}};
 }
 function event(type='invoice.paid',id='evt_1',created=100){

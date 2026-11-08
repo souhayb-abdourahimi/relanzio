@@ -1,3 +1,4 @@
+import {fixtureStripe,testBillingEnv} from './helpers/stripe-fixture.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -20,10 +21,11 @@ function liveHarness(profile,{billingEmails='false'}={}){
   const db=createFakeDb({profiles:[{id:USER,email:'client.live@example.test',company_name:'Plomberie Live',plan:'free',subscription_status:'none',stripe_customer_id:null,stripe_subscription_id:null,stripe_state_event_created:0,trial_started_at:null,trial_ends_at:null,trial_expired_at:null,...profile}]},{stripe_webhook_events:['event_id'],lifecycle_messages:['user_id','type']});
   const subs={},sent=[];
   const stripe={subscriptions:{retrieve:async id=>{if(!subs[id])throw Object.assign(new Error('No such subscription'),{code:'resource_missing',statusCode:404});return subs[id];}}};
-  const processor=createStripeWebhookProcessor({db,stripe,getProfile:async u=>({...db.tables.profiles.find(p=>p.id===u.id)}),sendEmail:async m=>{sent.push(m);},env:{BILLING_EMAILS_ENABLED:billingEmails,APP_URL:'https://relanzio.com'}});
+  fixtureStripe(stripe,USER,{live:true,customerId:'cus_live',priceId:'price_pro_live'});
+  const processor=createStripeWebhookProcessor({db,stripe,getProfile:async u=>({...db.tables.profiles.find(p=>p.id===u.id)}),sendEmail:async m=>{sent.push(m);},env:{...testBillingEnv,STRIPE_EXPECTED_MODE:'live',STRIPE_SECRET_KEY:'sk_live_fixture',STRIPE_PRO_PRICE_ID:'price_pro_live',BILLING_EMAILS_ENABLED:billingEmails,APP_URL:'https://relanzio.com'}});
   let created=1_900_000_000;
   const deliver=async(type,object,id=`evt_${created}`)=>{
-    const payload=JSON.stringify({id,object:'event',api_version:'2025-08-27.basil',type,created:created++,livemode:false,data:{object}});
+    const payload=JSON.stringify({id,object:'event',api_version:'2025-08-27.basil',type,created:created++,livemode:true,data:{object}});
     const header=sdk.webhooks.generateTestHeaderString({payload,secret:SECRET});
     return processor.processEvent(sdk.webhooks.constructEvent(payload,header,SECRET));
   };
@@ -75,7 +77,7 @@ test('Stripe giving up (unpaid, then deleted) moves the account to Free',async()
   await h.deliver('customer.subscription.updated',h.subs.sub_live);
   assert.deepEqual([h.profile().plan,h.profile().subscription_status],['free','unpaid']);
   assert.equal(hasProAccess(h.profile(),new Date('2026-12-03T00:00:00Z')),false);
-  delete h.subs.sub_live;
+  h.subs.sub_live.status='canceled';
   await h.deliver('customer.subscription.deleted',basilSub('sub_live','canceled','2026-12-01T10:00:00Z','2027-01-01T10:00:00Z'));
   assert.deepEqual([h.profile().plan,h.profile().subscription_status],['free','canceled']);
 });

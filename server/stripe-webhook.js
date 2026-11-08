@@ -6,6 +6,7 @@ import {
 } from './billing.js';
 import { paymentFailedEmail } from './billing-emails.js';
 import { pastDueGraceEndsAt } from './entitlements.js';
+import { verifyStripeConfiguration, verifyStripeSubscription } from './stripe-boundary.js';
 
 // Event completion is durable; unfinished claims expire so interrupted workers can be retried.
 const CLAIM_TTL_MS=5*60_000;
@@ -35,21 +36,16 @@ export function createStripeWebhookProcessor({db,stripe,reportError=async()=>{},
     if(!customerId)throw billingError('BILLING_CUSTOMER_MISSING');
     return mustDb(db.from('profiles').select('*').eq('stripe_customer_id',customerId).maybeSingle());
   }
-  async function authoritativeState(eventType,obj){
+  async function authoritativeState(eventType,obj,profile,config){
     const subscriptionId=billingEventSubscriptionId(eventType,obj);
     if(!subscriptionId)throw billingError('BILLING_SUBSCRIPTION_MISSING');
     if(!stripe)throw billingError('BILLING_STRIPE_UNAVAILABLE');
-    try{
-      const current=await stripe.subscriptions.retrieve(subscriptionId);
-      if(current.id!==subscriptionId||!customerIdOf(obj)||customerIdOf(current)!==customerIdOf(obj))
-        throw billingError('BILLING_CUSTOMER_MISMATCH');
-      const status=normalizeSubscriptionStatus(current.status);
-      return {transition:{plan:planForSubscriptionStatus(status),subscription_status:status,...subscriptionPeriod(current)},subscriptionId};
-    }catch(e){
-      if(eventType==='customer.subscription.deleted'&&(e?.code==='resource_missing'||e?.statusCode===404))
-        return {transition:{plan:'free',subscription_status:'canceled',subscription_cancel_at_period_end:false},subscriptionId};
-      throw e;
-    }
+    const current=await stripe.subscriptions.retrieve(subscriptionId);
+    if(current.id!==subscriptionId||!customerIdOf(obj)||customerIdOf(current)!==customerIdOf(obj))
+      throw billingError('BILLING_CUSTOMER_MISMATCH');
+    await verifyStripeSubscription(stripe,config,current,profile,customerIdOf(obj));
+    const status=normalizeSubscriptionStatus(current.status);
+    return {transition:{plan:planForSubscriptionStatus(status),subscription_status:status,...subscriptionPeriod(current)},subscriptionId};
   }
   async function logEvent(userId,event,metadata={}){
     const {error}=await db.from('product_events').insert({user_id:userId,event,path:'/stripe',metadata});
@@ -70,9 +66,9 @@ export function createStripeWebhookProcessor({db,stripe,reportError=async()=>{},
       return {error:String(e.message||e)};
     }
   }
-  async function applyBillingEvent(profile,event,obj,extra={},verifyClaim=async()=>{}){
+  async function applyBillingEvent(profile,event,obj,extra={},verifyClaim=async()=>{},config){
     if(shouldIgnoreBillingEvent(profile,event.type,obj,event.created))return ignored('stale_or_foreign_subscription');
-    const state=await authoritativeState(event.type,obj);
+    const state=await authoritativeState(event.type,obj,profile,config);
     await verifyClaim();
     const eventCreated=Number(event.created||0);
     const patch={...state.transition,...extra,updated_at:nowIso()};
@@ -110,6 +106,8 @@ export function createStripeWebhookProcessor({db,stripe,reportError=async()=>{},
     return lease;
   }
   async function processEvent(event){
+    // Even completed duplicates must pass the mode/account boundary before any DB access.
+    const config=await verifyStripeConfiguration(stripe,env,event);
     const lease=await claimEvent(event);
     if(lease===null)return {received:true,duplicate:true};
     const owned=()=>db.from('stripe_webhook_events');
@@ -131,9 +129,10 @@ export function createStripeWebhookProcessor({db,stripe,reportError=async()=>{},
           ?(obj.metadata?.user_id?await mustDb(db.from('profiles').select('*').eq('id',obj.metadata.user_id).maybeSingle()):null)
           :await profileByCustomer(customerIdOf(obj));
         if(!profile)throw billingError('BILLING_PROFILE_NOT_FOUND');
+        if(checkout&&obj.client_reference_id&&obj.client_reference_id!==profile.id)throw billingError('BILLING_PROFILE_MISMATCH');
         if(checkout&&profile.stripe_customer_id&&profile.stripe_customer_id!==customerIdOf(obj))throw billingError('BILLING_CUSTOMER_MISMATCH');
         if(!checkout&&!profile.stripe_subscription_id)throw billingError('BILLING_SUBSCRIPTION_NOT_LINKED');
-        result=await applyBillingEvent(profile,event,obj,checkout?{stripe_customer_id:customerIdOf(obj)}:{},verifyClaim);
+        result=await applyBillingEvent(profile,event,obj,checkout?{stripe_customer_id:customerIdOf(obj)}:{},verifyClaim,config);
         if(event.type==='invoice.payment_failed'&&result.applied&&result.patch.subscription_status==='past_due')
           await sendOnce(profile,`payment_failed:${obj.id||event.id}`,paymentFailedEmail({appUrl:env.APP_URL,graceEndsAt:pastDueGraceEndsAt({...profile,...result.patch})}));
       }
