@@ -26,15 +26,13 @@ Les variables `VITE_*` et `APP_URL` sont des **arguments de build** : les modifi
 ## QA avant déploiement (Railway « Pre-deploy command »)
 
 Configurée **dans le tableau de bord Railway** (pas dans le dépôt) : `node server/qa-predeploy-final.mjs`.
-Elle s’exécute avec les variables de production et **bloque le déploiement** en cas d’échec. Elle enchaîne :
+Dans la PR de sécurisation, cette commande contrôle uniquement la présence de la configuration et effectue des lectures Stripe : mode, compte et tarif Pro actif. Elle ne lance ni application, ni migration, ni test de données, ni client Supabase, ni email. Elle retourne un échec explicite si la configuration est incomplète ou si Stripe ne répond pas. Les diagnostics contiennent des codes fixes, jamais les secrets.
 
-1. `qa-outreach-safety.mjs` : quotas d’envoi concurrents, plafond 300, jour calendaire de Paris, import idempotent, tombstones,
-   suppressions, réponses positive / absence / refus / STOP, aucun second D0 (données de test isolées, nettoyées).
-2. `qa-outreach-provider.mjs` : état Brevo et DNS **journalisé** (non bloquant).
-3. `qa-auth-domain-final.mjs` : deux comptes de test temporaires (supprimés ensuite) → inscription, essai 7 jours, quotas Free 5 /
-   Pro 100, RLS, relances, réponse client, export, suppression de compte, schéma attendu des réponses, sécurité.
+Railway vérifie ensuite `/api/readiness` sur la nouvelle instance : HTTP 503 empêche la bascule pendant le délai configuré. Le pré-déploiement et le healthcheck sont deux étapes distinctes ; la première ne remplace pas la seconde.
 
-> Pour un acheteur : noter cette commande avant tout transfert de projet Railway. Sans elle, les déploiements ne sont plus contrôlés.
+Les anciens scripts `qa-outreach-safety.mjs` et `qa-auth-domain-final.mjs` créent, modifient et suppriment des données. **Ne jamais les lancer sur la production ou une copie de données réelles.** Ils exigent un environnement local de test explicitement autorisé avec URLs en boucle locale ; ces contrôles ne prouvent pas à eux seuls qu’un tunnel local est isolé. Les utiliser seulement avec des données fictives et un réseau garantissant l’absence d’accès à la production. Le script `qa-outreach-provider.mjs` est séparé et peut accéder à des services externes ; il ne fait plus partie de cette commande.
+
+Cette modification figure uniquement dans la PR : la commande effectivement en production reste l’ancienne tant que la PR n’est pas déployée avec autorisation. Ne déclencher aucun déploiement avant validation des autres prérequis.
 
 ## Healthchecks
 

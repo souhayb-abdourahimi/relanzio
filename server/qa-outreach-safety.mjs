@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import { prepareCommercialProspect } from './controlled-outreach.js';
+import { assertIsolatedDestructiveQa } from './destructive-qa-guard.mjs';
+
+assertIsolatedDestructiveQa();
+const {prepareCommercialProspect}=await import('./controlled-outreach.js');
 
 const url=process.env.SUPABASE_URL;
 const key=process.env.SUPABASE_SERVICE_ROLE_KEY;

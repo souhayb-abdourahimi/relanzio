@@ -79,3 +79,17 @@ Déclencheurs : attribution de droits incohérents, erreurs persistantes de conf
 Procédure, après accord : arrêter les étapes de nettoyage, conserver les diagnostics expurgés, vérifier que la révision de secours et ses paramètres sont prêts, puis remplacer seulement la version applicative. Conserver le mode Live, le compte attendu et l’isolation Test. Ne pas réactiver le webhook Test, ne pas retirer les garde-fous et ne pas restaurer globalement Supabase. Toute correction de données constitue une intervention séparée sous préconditions de concurrence.
 
 **Interdit comme secours :** `main` ou l’ancien commit de production dépourvu de séparation Test/Live. Si aucun artefact protégé n’est prêt, ne pas lancer le déploiement. Une suspension ciblée de la facturation serait une mesure exceptionnelle à faire autoriser, pas une action automatique.
+
+## Pré-déploiement sans écriture — correctif proposé
+
+La configuration Railway actuelle exécute `node server/qa-predeploy-final.mjs`. Dans la PR uniquement, ce fichier ne lance plus les trois anciens scripts QA. Il vérifie la présence des paramètres indispensables et utilise le contrôle Stripe GET existant, sans importer le serveur, un client Supabase, des migrations, des tâches planifiées ou un système d’email. Un code non nul bloque le déploiement si la configuration est incorrecte ou si Stripe est indisponible ; aucun message brut du fournisseur ou secret n’est affiché.
+
+Il ne lance pas un serveur factice et n’exige donc pas que ce serveur réponde 200. Railway contrôle séparément `/api/readiness` sur la nouvelle instance : un 503 maintenu empêche la bascule. `/api/health` reste un contrôle de vie. Aucune option de test de la commande ne permet de désactiver la vérification Stripe.
+
+Les deux suites QA historiques qui écrivent et suppriment des données refusent maintenant toute exécution sans `NODE_ENV=test`, sans activation explicite `ALLOW_LOCAL_DESTRUCTIVE_QA=true`, ou sans URLs Supabase et application en boucle locale. Elles refusent aussi un environnement Railway déclaré production. Cela ne prouve pas qu’un tunnel local ne conduit pas à la production : l’isolation réseau et les identifiants fictifs doivent être vérifiés séparément. Aucun de ces scripts ne doit être exécuté avec des données réelles. Le script de diagnostic fournisseur séparé peut contacter des services externes et ne fait plus partie du pré-déploiement.
+
+La configuration Railway existante n’a pas été changée : tant que la PR n’est pas déployée, elle exécutera toujours la version ancienne et dangereuse de la commande. La fusion pouvant déclencher un déploiement, un plan de bascule explicitement approuvé reste nécessaire. Vérifier aussi les tâches de démarrage et la coordination entre instances ; cette correction ne les neutralise pas.
+
+### Secours et ancien pré-déploiement
+
+La révision de secours `7c0063594969a620f7ba82a2c5479c1202c37e85` protège les opérations Stripe, mais contient l’ancien pré-déploiement destructif et l’ancien contrôle de disponibilité. **Ne pas l’activer telle quelle** : préparer un artefact protégé avec un pré-déploiement sans écriture et une disponibilité fiable, puis le valider dans un environnement isolé avant toute mise en service. Le retour arrière Railway restaure aussi d’anciennes variables ; vérifier et approuver la configuration avant activation. Aucun retour vers un code sans séparation Test/Live.
