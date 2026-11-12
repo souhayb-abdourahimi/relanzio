@@ -1,7 +1,8 @@
 # Laboratoire d'intégration Stripe Test + Supabase isolé
 
 Ce laboratoire fait tourner le **vrai serveur** du commit testé, ici `76a803bb` (PR #16), avec :
-- une **pile Supabase locale** (Docker, adresse `127.0.0.1` uniquement) ;
+- une **pile Supabase locale** (conteneurs Docker sur la machine GitHub Actions jetable ; le serveur et les scripts s'y
+  connectent par `127.0.0.1`, la machine n'accepte aucune connexion entrante depuis Internet) ;
 - quand le propriétaire l'a configuré, un **bac à sable Stripe Test séparé**.
 
 Il ne touche jamais la production. Il s'exécute dans GitHub Actions
