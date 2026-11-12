@@ -1,0 +1,56 @@
+name: Lab setup (isolated)
+description: >-
+  Shared set-up of the Stripe integration lab: sinks production hosts, installs dependencies and the browser,
+  starts the local Supabase stack, applies the schema, creates the lab users, then applies the kernel egress
+  firewall. Reads no secret.
+inputs:
+  pull-stripe-cli:
+    description: Pull the Stripe CLI image before the firewall is applied.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: "Isolation 1/3: DNS sinkhole of every known production host"
+      shell: bash
+      run: |
+        for h in relanzio.com www.relanzio.com relanzio-production.up.railway.app uwgvnhnpvxoebabayqac.supabase.co \
+                 api.brevo.com smtp-relay.brevo.com ssl0.ovh.net imap.mail.ovh.net smtp.mail.ovh.net api.openai.com \
+                 backboard.railway.app backboard.railway.com api.supabase.com; do
+          echo "0.0.0.0 $h" | sudo tee -a /etc/hosts >/dev/null
+          echo ":: $h" | sudo tee -a /etc/hosts >/dev/null
+        done
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - shell: bash
+      run: |
+        npm ci --no-audit --no-fund
+        npm install --no-save @playwright/test@1.55.0
+        npx playwright install --with-deps chromium
+    - shell: bash
+      run: node --test test/lab-isolation.test.js
+    - name: "Isolation 2/3: environment variables and production hosts"
+      shell: bash
+      env:
+        SUPABASE_URL: http://127.0.0.1:54321
+      run: node scripts/lab/isolation-check.mjs network
+    - uses: supabase/setup-cli@v1
+      with:
+        version: latest
+    - name: Local Supabase stack
+      shell: bash
+      run: supabase start --workdir lab -x imgproxy,postgres-meta,supavisor,logflare,vector,edge-runtime
+    - name: Schema, migrations, two lab users
+      shell: bash
+      run: |
+        supabase status --workdir lab -o json > "$RUNNER_TEMP/supabase-status.json"
+        node scripts/lab/prepare-lab.mjs "$RUNNER_TEMP/supabase-status.json"
+    - name: Stripe CLI image (before the firewall)
+      if: inputs.pull-stripe-cli == 'true'
+      shell: bash
+      run: |
+        docker pull -q stripe/stripe-cli:latest
+        echo "Stripe CLI image: $(docker image inspect --format '{{index .RepoDigests 0}}' stripe/stripe-cli:latest)"
+    - name: "Isolation 3/3: kernel egress firewall (IPv4 + IPv6, runner + containers)"
+      shell: bash
+      run: sudo bash scripts/lab/egress-firewall.sh apply
