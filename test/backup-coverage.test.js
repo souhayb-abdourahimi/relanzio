@@ -73,6 +73,7 @@ test('migrations: every repository file is reconciled with the real 14-entry pro
   assert.deepEqual(r.failures, []); assert.deepEqual(r.warnings, []);
   assert.equal(r.history_entries, 14); assert.equal(r.recorded, 14);
   assert.equal(r.applied_without_history.length, 7);
+  assert.deepEqual(r.pending_deployment, ['20261112100000_scheduled_job_leases.sql']);
   assert.equal(repoFiles.length, map.files.length);
 });
 

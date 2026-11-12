@@ -91,6 +91,8 @@ un changement impose un redéploiement.
 |---|---|---|---|
 | `ADMIN_EMAILS` | Emails ayant accès à l’administration (liste) | non (mais sensible) | oui pour l’admin |
 | `CRON_SECRET` | Protège `POST /api/cron/run` (déclenchement manuel des relances dues) | **OUI** | non (sans valeur : route refusée) |
+| `SCHEDULER_ENABLED` | `false` = mode secours : aucune tâche planifiée ni de démarrage, `POST /api/cron/run` en 503 ([SCHEDULED_JOBS](../SCHEDULED_JOBS.md)) | non | non (défaut `true`) |
+| `SCHEDULER_START_DELAY_SECONDS` | Délai sans tâche après démarrage, pour laisser Railway arrêter l'ancienne instance | non | non (défaut `120`) |
 | `OPENAI_API_KEY` | Analyse des réponses de prospection, assistant support | **OUI** | non (repli sans IA) |
 | `OPENAI_MODEL` | Modèle utilisé | non | non |
 | `VITE_LEGAL_ENTITY_TYPE`, `VITE_LEGAL_NAME`, `VITE_LEGAL_FORM`, `VITE_LEGAL_CAPITAL`, `VITE_LEGAL_ADDRESS`, `VITE_LEGAL_REGISTRATION`, `VITE_LEGAL_PHONE`, `VITE_PUBLICATION_DIRECTOR` | Identité légale (build, contrôlée par le préflight). L’identité affichée vient aujourd’hui de `shared/company.js` | non | préflight |

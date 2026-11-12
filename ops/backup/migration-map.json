@@ -25,6 +25,7 @@
     { "file": "20261028110000_followup_cadence_and_optout.sql", "history_version": null, "evidence": "table followup_optouts, profiles.followup_offsets, function followup_gap_days present in production" },
     { "file": "20261028120000_subscription_period.sql", "history_version": null, "evidence": "profiles.subscription_current_period_start / _end / subscription_cancel_at_period_end present in production" },
     { "file": "20261028130000_morning_digest.sql", "history_version": null, "evidence": "table digest_sends, profiles.morning_digest_enabled present in production" },
-    { "file": "20261029100000_quote_replies.sql", "history_version": null, "evidence": "table quote_replies, function apply_quote_reply present in production" }
+    { "file": "20261029100000_quote_replies.sql", "history_version": null, "evidence": "table quote_replies, function apply_quote_reply present in production" },
+    { "file": "20261112100000_scheduled_job_leases.sql", "history_version": null, "pending_deployment": true, "note": "NOT applied in production yet (branch fix/scheduled-jobs-shared-lease, owner approval required). Apply it BEFORE deploying the code that uses it; then replace pending_deployment by the history version Supabase records." }
   ]
 }

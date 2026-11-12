@@ -129,6 +129,8 @@ export function evaluateMigrations({ history, repoFiles, map }) {
     if (f.history_version && !versions.has(f.history_version)) failures.push(`${f.file}: expected history version ${f.history_version} is missing from Supabase history`);
   }
   const recorded = map.files.filter(f => f.history_version && versions.has(f.history_version)).length;
-  const unrecorded = map.files.filter(f => !f.history_version).map(f => f.file);
-  return { ok: failures.length === 0, failures, warnings, history_entries: history.length, repository_files: repoFiles.length, recorded, applied_without_history: unrecorded };
+  // pending_deployment: written in the repository but not applied in production yet (documented, not a failure).
+  const pending = map.files.filter(f => f.pending_deployment && !f.history_version).map(f => f.file);
+  const unrecorded = map.files.filter(f => !f.history_version && !f.pending_deployment).map(f => f.file);
+  return { ok: failures.length === 0, failures, warnings, history_entries: history.length, repository_files: repoFiles.length, recorded, applied_without_history: unrecorded, pending_deployment: pending };
 }
