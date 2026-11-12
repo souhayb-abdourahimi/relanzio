@@ -1,0 +1,44 @@
+# Local Supabase stack of the Stripe integration lab (supabase CLI, Docker, 127.0.0.1 only).
+# Nothing here points to a hosted project. The schema is applied from supabase/schema.sql + supabase/migrations.
+project_id = "relanzio-lab"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[storage]
+enabled = false
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = []
+jwt_expiry = 3600
+enable_signup = false
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false

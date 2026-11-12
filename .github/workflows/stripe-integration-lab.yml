@@ -1,0 +1,124 @@
+name: Stripe integration lab (isolated)
+# Runs the REAL server of this commit against a LOCAL Supabase stack (Docker, 127.0.0.1) and, when the owner has
+# configured it, a SEPARATE Stripe TEST sandbox. Never production: see lab/README.md for the isolation proofs.
+# Only on lab/** branches or by hand. Secrets come from the protected environment "stripe-lab" only.
+on:
+  push:
+    branches: ['lab/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: stripe-integration-lab
+  cancel-in-progress: false
+jobs:
+  lab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: stripe-lab
+    env:
+      NODE_ENV: development
+      APP_URL: http://127.0.0.1:3000
+      LAB_SERVER_URL: http://127.0.0.1:3000
+      PORT: '3000'
+      STRIPE_EXPECTED_MODE: test
+      LAB_REST_CONTAINER: supabase_rest_relanzio-lab
+      # Every outbound sender stays off; no provider key exists in this environment anyway.
+      COMMERCIAL_OUTREACH_SEND_ENABLED: 'false'
+      FOLLOWUP_AUTOMATION_ENABLED: 'false'
+      LIFECYCLE_EMAILS_ENABLED: 'false'
+      BILLING_EMAILS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: "Isolation 1: sink every production host (before any secret is read)"
+        run: |
+          for h in relanzio.com www.relanzio.com relanzio-production.up.railway.app uwgvnhnpvxoebabayqac.supabase.co \
+                   api.brevo.com smtp-relay.brevo.com ssl0.ovh.net imap.mail.ovh.net smtp.mail.ovh.net api.openai.com; do
+            echo "0.0.0.0 $h" | sudo tee -a /etc/hosts >/dev/null
+            echo ":: $h" | sudo tee -a /etc/hosts >/dev/null
+          done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: node --test test/lab-isolation.test.js
+
+      - name: "Isolation 2: environment and network"
+        env:
+          SUPABASE_URL: http://127.0.0.1:54321
+        run: node scripts/lab/isolation-check.mjs network
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Local Supabase stack (127.0.0.1)
+        run: supabase start --workdir lab -x imgproxy,postgres-meta,supavisor,logflare,vector,edge-runtime
+      - name: Schema, migrations and two lab users
+        run: |
+          supabase status --workdir lab -o json > "$RUNNER_TEMP/supabase-status.json"
+          node scripts/lab/prepare-lab.mjs "$RUNNER_TEMP/supabase-status.json"
+
+      - name: Is the Stripe lab sandbox configured?
+        id: key
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_LAB_SECRET_KEY }}
+        run: |
+          if [ -n "$STRIPE_SECRET_KEY" ]; then echo "present=true" >> "$GITHUB_OUTPUT"
+          else echo "present=false" >> "$GITHUB_OUTPUT"; echo "::notice::STRIPE_LAB_SECRET_KEY not configured: infrastructure-only run, Stripe scenarios NOT executed."; fi
+
+      - name: "Without Stripe: the server starts on the local stack and billing fails closed"
+        if: steps.key.outputs.present != 'true'
+        env:
+          STRIPE_EXPECTED_ACCOUNT_ID: acct_labNotConfigured
+          STRIPE_PRO_PRICE_ID: price_labNotConfigured
+        run: |
+          node scripts/lab/isolation-check.mjs network
+          node server/index.js > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/api/health >/dev/null 2>&1 && break; sleep 1; done
+          curl -fsS http://127.0.0.1:3000/api/health
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/readiness); echo "readiness: $code"
+          test "$code" != "200"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:3000/api/stripe/webhook); echo "webhook: $code"
+          test "$code" = "503"
+          kill %1 || true
+          echo "--- server log (last lines)"; tail -n 40 "$RUNNER_TEMP/server.log"
+
+      - name: "Isolation 3: Stripe sandbox (TEST key, not the production account, no webhook endpoint)"
+        if: steps.key.outputs.present == 'true'
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_LAB_SECRET_KEY }}
+          STRIPE_EXPECTED_ACCOUNT_ID: ${{ vars.STRIPE_LAB_ACCOUNT_ID }}
+          PRODUCTION_STRIPE_ACCOUNT_ID: ${{ vars.PRODUCTION_STRIPE_ACCOUNT_ID }}
+          STRIPE_PRO_PRICE_ID: ${{ vars.STRIPE_LAB_PRICE_ID }}
+        run: node scripts/lab/isolation-check.mjs stripe
+
+      - name: "Stripe TEST lifecycle and webhook scenarios against the real server"
+        if: steps.key.outputs.present == 'true'
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_LAB_SECRET_KEY }}
+          STRIPE_EXPECTED_ACCOUNT_ID: ${{ vars.STRIPE_LAB_ACCOUNT_ID }}
+          PRODUCTION_STRIPE_ACCOUNT_ID: ${{ vars.PRODUCTION_STRIPE_ACCOUNT_ID }}
+          STRIPE_PRO_PRICE_ID: ${{ vars.STRIPE_LAB_PRICE_ID }}
+          RELANZIO_DEV_SUPABASE_CONFIRMED: 'yes'
+        run: |
+          set -euo pipefail
+          WHSEC=$(docker run --rm stripe/stripe-cli:latest listen --api-key "$STRIPE_SECRET_KEY" --print-secret)
+          echo "::add-mask::$WHSEC"
+          docker run -d --name lab-stripe-listen --network host stripe/stripe-cli:latest listen --api-key "$STRIPE_SECRET_KEY" \
+            --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,invoice.paid,invoice.payment_failed \
+            --forward-to http://127.0.0.1:3000/api/stripe/webhook >/dev/null
+          STRIPE_WEBHOOK_SECRET="$WHSEC" node server/index.js > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/api/readiness >/dev/null 2>&1 && break; sleep 1; done
+          curl -fsS http://127.0.0.1:3000/api/readiness
+          STRIPE_WEBHOOK_SECRET="$WHSEC" node scripts/stripe-test-validation.mjs
+          STRIPE_WEBHOOK_SECRET="$WHSEC" node scripts/lab/scenarios.mjs
+
+      - name: Diagnostics on failure (no secret is printed)
+        if: failure()
+        run: |
+          tail -n 80 "$RUNNER_TEMP/server.log" 2>/dev/null || true
+          docker logs --tail 40 lab-stripe-listen 2>/dev/null || true
