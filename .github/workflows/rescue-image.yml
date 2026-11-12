@@ -1,0 +1,18 @@
+name: Emergency image (build + verify, no deploy)
+# Builds the production image of a rescue/** branch with the repository Dockerfile and verifies emergency mode
+# (SCHEDULER_ENABLED=false) in an internal Docker network without Internet. Nothing is pushed or deployed.
+on:
+  push:
+    branches: ['rescue/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: scripts/rescue/verify-image.sh relanzio-rescue:${{ github.sha }}
