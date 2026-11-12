@@ -19,6 +19,7 @@ import { answerSupport } from './support.js';
 import { buildCeoMetrics, weeklyRecommendations } from './ceo.js';
 import { runLifecycleEmails } from './lifecycle.js';
 import { reportError } from './observability.js';
+import { createJobLeases, schedulerSettings } from './job-lease.js';
 import { hasProAccess, hasSubscriptionProAccess, isManagedTrialActive, isTrialEligible, withEntitlements } from './entitlements.js';
 import { grantTrialToEmail, grantTrialToUser, expireTrials } from './trials.js';
 import { processOutreachQueue, outreachHealth } from './outreach.js';
@@ -682,17 +683,47 @@ app.get('/api/admin/ceo', requireUser, async(req,res)=>{
     res.json({metrics,funnel:{all:buildFunnel({events:events||[],profiles:profiles||[],followups:followups||[]}),last30:buildFunnel({events:events||[],profiles:profiles||[],followups:followups||[],since:since30})},eventCounts30:countEvents((events||[]).filter(e=>FUNNEL_EVENTS.includes(e.event)),since30),recommendations:weeklyRecommendations(metrics,insights||[]),mrrNote:`MRR indicatif basé uniquement sur les abonnements Stripe actifs à ${PRO_MONTHLY_PRICE} €; les essais ne sont pas comptés.`});}catch(e){res.status(500).json({error:e.message})}
 });
 
-app.post('/api/cron/run', async(req,res)=>{if(!safeEqual(String(req.headers['x-cron-secret']||''),String(process.env.CRON_SECRET||'')))return res.status(401).json({error:'Unauthorized'});try{res.json({results:await runDueFollowups()})}catch(e){res.status(500).json({error:e.message})}});
-cron.schedule('*/15 * * * *',async()=>{try{await runDueFollowups()}catch(e){await reportError('cron.followups',e)}},{noOverlap:true});
-cron.schedule('2,17,32,47 * * * *',async()=>{try{await expireTrials()}catch(e){await reportError('cron.trials',e)}},{noOverlap:true});
-cron.schedule('*/10 * * * *',async()=>{try{const result=await processOutreachQueue();if(result?.error)await reportError('cron.outreach.result',new Error(result.error),{queue_id:result.queue_id})}catch(e){await reportError('cron.outreach',e)}},{noOverlap:true});
-cron.schedule('*/2 * * * *',async()=>{try{await pollQuoteReplies()}catch(e){await reportError('cron.quote-replies',e,{code:e?.code||'REPLY_POLL_FAILED'})}},{noOverlap:true});
-cron.schedule('*/10 * * * *',async()=>{try{await pollImapReplies()}catch(e){await reportError('cron.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})}},{noOverlap:true});
-cron.schedule('3,13,23,33,43,53 * * * *',async()=>{try{await runCommercialQueueFeeder()}catch(e){await reportError('cron.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'})}},{noOverlap:true});
-cron.schedule('*/5 * * * *',async()=>{try{await runCommercialSequenceTick()}catch(e){await reportError('cron.commercial-sequence',e,{code:e?.code||'COMMERCIAL_SEQUENCE_FAILED'})}},{noOverlap:true});
-cron.schedule('30 7 * * 1-5',async()=>{try{await runMorningDigest({db,sendEmail,reportError})}catch(e){await reportError('cron.morning-digest',e)}},{noOverlap:true,timezone:'Europe/Paris'});
-cron.schedule('5 10 * * *',async()=>{try{await runTrialEndingReminders({db,sendOnce:stripeWebhooks.sendOnce})}catch(e){await reportError('cron.trial-ending',e)}},{noOverlap:true,timezone:'Europe/Paris'});
-cron.schedule('15 8 * * *',async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}},{noOverlap:true});
+// Scheduled jobs. Each run first takes a shared lease in the database (server/job-lease.js): at most one process
+// runs a job at a time, even while an old and a new Railway instance overlap during a deploy. Without the lease
+// (held elsewhere, database unavailable) the run is skipped. SCHEDULER_ENABLED=false turns every scheduled and
+// start-up job off (emergency mode); SCHEDULER_START_DELAY_SECONDS delays the first run after a start.
+const scheduler=schedulerSettings();
+const schedulerStartedAt=Date.now();
+const jobLeases=createJobLeases({rpc:(fn,args)=>db.rpc(fn,args),log:(event,details)=>console.log(`${event} ${JSON.stringify(details)}`)});
+async function runScheduledJob(name,{ttl,gap},fn){
+  if(!scheduler.enabled)return {ran:false,reason:'scheduler_disabled'};
+  if(Date.now()-schedulerStartedAt<scheduler.startDelaySeconds*1000){console.log(`JOB_SKIPPED_STARTUP_GRACE ${JSON.stringify({job:name})}`);return {ran:false,reason:'startup_grace'};}
+  return jobLeases.runExclusive(name,fn,{ttlSeconds:ttl,minGapSeconds:gap});
+}
+function scheduleJob(name,expression,lease,fn,options={}){
+  if(!scheduler.enabled)return;
+  cron.schedule(expression,async()=>{try{await runScheduledJob(name,lease,fn)}catch(e){await reportError(`cron.${name}.lease`,e)}},{noOverlap:true,...options});
+}
+function startupJob(name,lease,fn){
+  if(!scheduler.enabled)return;
+  setTimeout(()=>{runScheduledJob(name,lease,fn).catch(e=>reportError(`startup.${name}.lease`,e))},scheduler.startDelaySeconds*1000+1000);
+}
+// ttl: seconds before a crashed owner's lease expires (renewed every ttl/3 while the job runs).
+// gap: minimum seconds between two runs of the same job, so one cron tick runs once across instances.
+const LEASES={
+  followups:{ttl:840,gap:300}, trials:{ttl:600,gap:300}, outreach:{ttl:540,gap:240}, quoteReplies:{ttl:110,gap:60},
+  imapReplies:{ttl:540,gap:240}, commercialFeeder:{ttl:540,gap:240}, commercialSequence:{ttl:270,gap:120},
+  daily:{ttl:1800,gap:3600}, startupOnce:{ttl:600,gap:0}
+};
+
+app.post('/api/cron/run', async(req,res)=>{if(!safeEqual(String(req.headers['x-cron-secret']||''),String(process.env.CRON_SECRET||'')))return res.status(401).json({error:'Unauthorized'});
+  if(!scheduler.enabled)return res.status(503).json({error:'Traitements planifiés désactivés (SCHEDULER_ENABLED=false).'});
+  try{const run=await runScheduledJob('followups',{ttl:LEASES.followups.ttl,gap:0},()=>runDueFollowups());if(!run.ran)return res.status(409).json({skipped:run.reason});res.json({results:run.result})}catch(e){res.status(500).json({error:e.message})}});
+scheduleJob('followups','*/15 * * * *',LEASES.followups,async()=>{try{await runDueFollowups()}catch(e){await reportError('cron.followups',e)}});
+scheduleJob('trials','2,17,32,47 * * * *',LEASES.trials,async()=>{try{await expireTrials()}catch(e){await reportError('cron.trials',e)}});
+scheduleJob('outreach','*/10 * * * *',LEASES.outreach,async()=>{try{const result=await processOutreachQueue();if(result?.error)await reportError('cron.outreach.result',new Error(result.error),{queue_id:result.queue_id})}catch(e){await reportError('cron.outreach',e)}});
+scheduleJob('quote-replies','*/2 * * * *',LEASES.quoteReplies,async()=>{try{await pollQuoteReplies()}catch(e){await reportError('cron.quote-replies',e,{code:e?.code||'REPLY_POLL_FAILED'})}});
+scheduleJob('imap-replies','*/10 * * * *',LEASES.imapReplies,async()=>{try{await pollImapReplies()}catch(e){await reportError('cron.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})}});
+scheduleJob('commercial-feeder','3,13,23,33,43,53 * * * *',LEASES.commercialFeeder,async()=>{try{await runCommercialQueueFeeder()}catch(e){await reportError('cron.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'})}});
+scheduleJob('commercial-sequence','*/5 * * * *',LEASES.commercialSequence,async()=>{try{await runCommercialSequenceTick()}catch(e){await reportError('cron.commercial-sequence',e,{code:e?.code||'COMMERCIAL_SEQUENCE_FAILED'})}});
+scheduleJob('morning-digest','30 7 * * 1-5',LEASES.daily,async()=>{try{await runMorningDigest({db,sendEmail,reportError})}catch(e){await reportError('cron.morning-digest',e)}},{timezone:'Europe/Paris'});
+scheduleJob('trial-ending','5 10 * * *',LEASES.daily,async()=>{try{await runTrialEndingReminders({db,sendOnce:stripeWebhooks.sendOnce})}catch(e){await reportError('cron.trial-ending',e)}},{timezone:'Europe/Paris'});
+scheduleJob('lifecycle','15 8 * * *',LEASES.daily,async()=>{if(process.env.LIFECYCLE_EMAILS_ENABLED!=='true')return;try{await runLifecycleEmails()}catch(e){await reportError('cron.lifecycle',e)}});
 
 app.use((err,req,res,next)=>{
   if(err?.type==='entity.too.large'||err?.status===413)return res.status(413).json({error:'Requête trop volumineuse.'});
@@ -702,9 +733,10 @@ app.use((err,req,res,next)=>{
 process.on('unhandledRejection',e=>reportError('process.unhandledRejection',e));
 process.on('uncaughtException',e=>{reportError('process.uncaughtException',e).finally(()=>process.exit(1));});
 
-expireTrials().catch(e=>reportError('startup.trials',e));
-pollImapReplies().catch(e=>reportError('startup.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'}));
-runCommercialQueueFeeder().catch(e=>reportError('startup.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'}));
+// Start-up runs share the cron jobs' leases (same names), after the start-up grace period.
+startupJob('trials',LEASES.trials,()=>expireTrials().catch(e=>reportError('startup.trials',e)));
+startupJob('imap-replies',LEASES.imapReplies,()=>pollImapReplies().catch(e=>reportError('startup.imap-replies',e,{code:e?.code||'IMAP_POLL_FAILED'})));
+startupJob('commercial-feeder',LEASES.commercialFeeder,()=>runCommercialQueueFeeder().catch(e=>reportError('startup.commercial-feeder',e,{code:e?.code||'COMMERCIAL_FEEDER_FAILED'})));
 
 if(process.env.NODE_ENV==='production'){
   // index:false so "/" is served by the prerendered landing below, not by the empty SPA shell.
@@ -738,7 +770,7 @@ async function runPilotStartupDryRun(){
   }
   console.log('PILOT_STARTUP_DRY_RUN '+JSON.stringify(results));
 }
-runPilotStartupDryRun().catch(e=>console.error('PILOT_STARTUP_DRY_RUN_FAILED',e.message));
-runPilotAdminRunner().catch(e=>console.error('PILOT_ADMIN_RUNNER_FAILED',e.message));
+startupJob('pilot-startup-dry-run',LEASES.startupOnce,()=>runPilotStartupDryRun().catch(e=>console.error('PILOT_STARTUP_DRY_RUN_FAILED',e.message)));
+startupJob('pilot-admin-runner',LEASES.startupOnce,()=>runPilotAdminRunner().catch(e=>console.error('PILOT_ADMIN_RUNNER_FAILED',e.message)));
 
 export default app;
