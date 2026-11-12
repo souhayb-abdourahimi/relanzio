@@ -58,10 +58,12 @@ async function main() {
   } catch (e) { results.APP_CODE = { ok: false, info: `cannot compare with ${PR16_COMMIT.slice(0, 8)}: ${e.message.split('\n')[0]}` }; }
   try {
     const environment = await github('/environments/stripe-lab');
-    const policies = await github('/environments/stripe-lab/deployment-branch-policies');
+    // Branch rules exist only when "selected branches" is enabled; otherwise GitHub answers 404 (= no restriction).
+    const policies = environment?.deployment_branch_policy?.custom_branch_policies === true
+      ? await github('/environments/stripe-lab/deployment-branch-policies') : { branch_policies: [] };
     const r = evaluateEnvironment(environment, policies);
     results.ENV_GATE = r.problems.length ? { ok: false, info: r.problems.join('; ') } : { ok: true, info: `${r.reviewers} required reviewer(s), branch ${RUN_BRANCH} only` };
-  } catch (e) { results.ENV_GATE = { ok: false, info: `not verifiable: ${e.message}` }; }
+  } catch (e) { results.ENV_GATE = { ok: false, info: e.status === 404 ? 'environment stripe-lab does not exist' : `not verifiable: ${e.message}` }; }
 
   for (const [k, v] of Object.entries(results)) console.log(`LAB_GATE_${v.ok ? 'OK' : (mode === 'enforce' ? 'FAILED' : 'NOT_MET')} ${k} ${v.info}`);
   const ok = Object.values(results).every(v => v.ok);
