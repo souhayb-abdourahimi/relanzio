@@ -8,8 +8,6 @@
   <url><loc>http://localhost:3000/logiciel-relance-devis</loc></url>
   <url><loc>http://localhost:3000/relance-devis-agence</loc></url>
   <url><loc>http://localhost:3000/modele-email-relance-devis</loc></url>
-  <url><loc>http://localhost:3000/legal</loc></url>
   <url><loc>http://localhost:3000/privacy</loc></url>
-  <url><loc>http://localhost:3000/dpa</loc></url>
   <url><loc>http://localhost:3000/terms</loc></url>
 </urlset>
