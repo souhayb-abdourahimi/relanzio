@@ -122,7 +122,15 @@ for (const [ev, label] of [[evCreated, 'customer.subscription.created'], [evPaid
   const p = await profile(L);
   if (p.stripe_subscription_id || p.plan === 'pro') fail(`${label} before linking changed the profile`);
   if ((await eventRow(ev.id))?.processed_at) fail(`${label} before linking was marked processed`);
-  ok('B', `${label} AVANT checkout.session.completed : refusé (503), rien écrit, rejouable`);
+  // The reason must be the missing link, not any other failure (the server records webhook errors in system_events).
+  let reason = null;
+  for (let i = 0; i < 10 && !reason; i++) {
+    const { data } = await db.from('system_events').select('message,metadata').eq('scope', 'stripe.webhook').order('created_at', { ascending: false }).limit(20);
+    reason = (data || []).find(r => r.metadata?.event_id === ev.id)?.message || null;
+    if (!reason) await sleep(500);
+  }
+  if (!/BILLING_SUBSCRIPTION_NOT_LINKED/.test(reason || '')) fail(`${label} before linking: refused for another reason (${reason || 'none recorded'})`);
+  ok('B', `${label} AVANT checkout.session.completed : refusé (503, BILLING_SUBSCRIPTION_NOT_LINKED), rien écrit, rejouable`);
 }
 {
   const r = await deliver(evCheckout);

@@ -70,8 +70,17 @@ verify() {
   return $failed
 }
 
+# Before the firewall: the same targets, to show that the blocks measured afterwards come from the firewall.
+baseline() {
+  for target in smtp.gmail.com:587 smtp.gmail.com:465 imap.gmail.com:993 1.1.1.1:80; do
+    host=${target%:*}; port=${target#*:}
+    if timeout 6 bash -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null; then echo "EGRESS_BASELINE_REACHABLE $target"; else echo "EGRESS_BASELINE_UNREACHABLE $target"; fi
+  done
+}
+
 case "${1:-apply}" in
+  baseline) baseline ;;
   apply) apply_v4; apply_v6; echo "EGRESS_FIREWALL_APPLIED"; iptables -S LAB_EGRESS; iptables -S LAB_EGRESS_DOCKER; verify ;;
   verify) verify ;;
-  *) echo "usage: $0 [apply|verify]"; exit 2 ;;
+  *) echo "usage: $0 [baseline|apply|verify]"; exit 2 ;;
 esac

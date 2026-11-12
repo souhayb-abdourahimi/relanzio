@@ -53,4 +53,6 @@ runs:
         echo "Stripe CLI image: $(docker image inspect --format '{{index .RepoDigests 0}}' stripe/stripe-cli:latest)"
     - name: "Isolation 3/3: kernel egress firewall (IPv4 + IPv6, runner + containers)"
       shell: bash
-      run: sudo bash scripts/lab/egress-firewall.sh apply
+      run: |
+        bash scripts/lab/egress-firewall.sh baseline
+        sudo bash scripts/lab/egress-firewall.sh apply
