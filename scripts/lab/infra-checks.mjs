@@ -31,6 +31,19 @@ if (error) fail(error.message);
 if (p.plan !== 'free' || p.subscription_status !== 'none' || p.stripe_customer_id || p.stripe_subscription_id || p.checkout_claimed_at) fail(`profile changed: ${JSON.stringify(p)}`);
 ok('profile untouched (free, no Stripe reference, no checkout claim)');
 
+// The lab readiness path used by the real Stripe job (scripts/lab/server-ready.mjs): the lab admin can read the
+// server's detailed readiness; here Supabase is configured, Brevo is absent and Stripe is (rightly) not verified.
+{
+  const r = await fetch(`${env.SUPABASE_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: env.LAB_ADMIN_EMAIL, password: env.LAB_ADMIN_PASSWORD }) });
+  const admin = await r.json();
+  if (!r.ok || !admin.access_token) fail(`lab admin sign-in ${r.status}`);
+  const det = await fetch(`${env.LAB_SERVER_URL}/api/admin/readiness`, { headers: { Authorization: `Bearer ${admin.access_token}` } });
+  if (det.status !== 200) fail(`/api/admin/readiness answered ${det.status} to the lab admin`);
+  const report = await det.json();
+  if (report.integrations?.supabase !== true || report.integrations?.brevo !== false || report.billing?.ready !== false) fail(`unexpected detailed readiness: ${JSON.stringify({ integrations: report.integrations, billing: report.billing?.code })}`);
+  ok('lab readiness path works: lab admin reads the detailed report (Supabase on, Brevo absent, Stripe not verified without a key)');
+}
+
 const browser = await chromium.launch();
 try { const page = await browser.newPage(); const r = await page.goto(`${env.LAB_SERVER_URL}/api/health`); if (r.status() !== 200) fail(`browser got ${r.status()}`); }
 finally { await browser.close(); }

@@ -78,3 +78,90 @@ test('the application code under test is byte-identical to the PR #16 commit', (
   try { changed = changedAppFiles(); } catch { return; } // shallow clone without the PR #16 commit: checked in the workflow (fetch-depth 0)
   assert.deepEqual(changed, []);
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Lab start-up readiness (scripts/lab/server-ready.mjs): the lab starts with Brevo ABSENT but only once Stripe is
+// verified by the server itself; production /api/readiness is unchanged (still requires Brevo).
+import { evaluateLabReadiness } from '../scripts/lab/server-ready.mjs';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
+
+const verified = { supabase: true, stripe: true, brevo: false };
+const okReport = { integrations: verified, billing: { ready: true, state: 'ready', code: 'BILLING_CONFIGURATION_VERIFIED' }, automation: {} };
+
+test('lab readiness rule: Brevo absent + Stripe verified is ready; anything less is refused', () => {
+  assert.deepEqual(evaluateLabReadiness({ healthStatus: 200, publicReadinessStatus: 503, report: okReport }), { ready: true, problems: [] });
+  const notVerified = { ...okReport, integrations: { ...verified, stripe: false }, billing: { ready: false, state: 'configuration_error', code: 'BILLING_PRICE_MISMATCH' } };
+  assert.match(evaluateLabReadiness({ healthStatus: 200, publicReadinessStatus: 503, report: notVerified }).problems.join(), /Stripe not verified.*BILLING_PRICE_MISMATCH/);
+  assert.match(evaluateLabReadiness({ healthStatus: 200, publicReadinessStatus: 200, report: { ...okReport, integrations: { ...verified, brevo: true } } }).problems.join(), /Brevo is configured.*answered 200/);
+  assert.match(evaluateLabReadiness({ healthStatus: 200, publicReadinessStatus: 503, report: { ...okReport, integrations: { ...verified, supabase: false } } }).problems.join(), /Supabase/);
+  assert.match(evaluateLabReadiness({ healthStatus: 200, publicReadinessStatus: 503, report: { ...okReport, automation: { billingEmails: true } } }).problems.join(), /automation\.billingEmails/);
+  assert.equal(evaluateLabReadiness({ healthStatus: 0, publicReadinessStatus: 0, report: null }).ready, false);
+});
+
+async function freePort() { const s = createServer(); s.listen(0, '127.0.0.1'); await once(s, 'listening'); const p = s.address().port; await new Promise(r => s.close(r)); return p; }
+async function labServer(t, { unitAmount = 2900, extraEnv = {} } = {}) {
+  const fake = createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    const path = req.url.split('?')[0];
+    if (path === '/v1/account') return res.end(JSON.stringify({ id: 'acct_lab' }));
+    if (path === '/v1/prices/price_lab') return res.end(JSON.stringify({ id: 'price_lab', active: true, livemode: false, currency: 'eur', unit_amount: unitAmount, recurring: { interval: 'month', interval_count: 1 } }));
+    if (path === '/auth/v1/token') return res.end(JSON.stringify({ access_token: 'lab-token', token_type: 'bearer', expires_in: 3600, user: { id: '00000000-0000-4000-8000-0000000000aa', email: 'lab-admin@example.com' } }));
+    if (path === '/auth/v1/user') return res.end(JSON.stringify({ id: '00000000-0000-4000-8000-0000000000aa', aud: 'authenticated', role: 'authenticated', email: 'lab-admin@example.com' }));
+    if (path.startsWith('/v1/')) { res.statusCode = 404; return res.end('{"error":{"message":"not in fake"}}'); }
+    res.end('[]');
+  });
+  fake.listen(0, '127.0.0.1'); await once(fake, 'listening'); t.after(() => fake.close());
+  const port = await freePort();
+  const fakeUrl = `http://127.0.0.1:${fake.address().port}`;
+  const env = { PATH: process.env.PATH, NODE_ENV: 'development', PORT: String(port), DOTENV_CONFIG_PATH: '/dev/null', LAB_STRIPE_PORT: String(fake.address().port),
+    SUPABASE_URL: fakeUrl, SUPABASE_ANON_KEY: 'fake-anon', SUPABASE_SERVICE_ROLE_KEY: 'fake-service',
+    STRIPE_SECRET_KEY: 'sk_test_fictional', STRIPE_EXPECTED_MODE: 'test', STRIPE_EXPECTED_ACCOUNT_ID: 'acct_lab', STRIPE_PRO_PRICE_ID: 'price_lab', STRIPE_WEBHOOK_SECRET: 'whsec_fictional',
+    ADMIN_EMAILS: 'lab-admin@example.com', ...extraEnv };
+  const child = spawn(process.execPath, ['--import', './test/helpers/local-billing-network.js', 'server/index.js'], { cwd: new URL('..', import.meta.url).pathname, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  let logs = ''; child.stdout.on('data', d => { logs += d; }); child.stderr.on('data', d => { logs += d; });
+  t.after(async () => { if (child.exitCode === null) { child.kill(); await once(child, 'exit'); } });
+  const base = `http://127.0.0.1:${port}`;
+  return { base, fakeUrl, logs: () => logs };
+}
+async function runReady(s, timeoutMs = 15000) {
+  const p = spawn(process.execPath, ['scripts/lab/server-ready.mjs'], { cwd: new URL('..', import.meta.url).pathname, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { PATH: process.env.PATH, LAB_SERVER_URL: s.base, SUPABASE_URL: s.fakeUrl, SUPABASE_ANON_KEY: 'fake-anon', LAB_ADMIN_EMAIL: 'lab-admin@example.com', LAB_ADMIN_PASSWORD: 'lab-only', LAB_READY_TIMEOUT_MS: String(timeoutMs) } });
+  let out = ''; p.stdout.on('data', d => { out += d; }); p.stderr.on('data', d => { out += d; });
+  const [code] = await once(p, 'exit');
+  return { code, out };
+}
+
+test('lab start-up: real server, Brevo ABSENT, valid Stripe TEST config -> ready; production /api/readiness still 503 without Brevo', { timeout: 60000 }, async t => {
+  const s = await labServer(t);
+  const r = await runReady(s);
+  assert.equal(r.code, 0, r.out + s.logs());
+  assert.match(r.out, /LAB_SERVER_READY .*"stripe":"BILLING_CONFIGURATION_VERIFIED".*"brevo":"absent".*"public_readiness":503/);
+  assert.equal((await fetch(`${s.base}/api/readiness`)).status, 503, 'the production rule (Brevo required) is unchanged');
+});
+
+test('lab start-up: invalid Stripe configuration (wrong price) is NOT ready', { timeout: 60000 }, async t => {
+  const s = await labServer(t, { unitAmount: 1900 });
+  const r = await runReady(s, 6000);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /LAB_SERVER_NOT_READY .*Stripe not verified by the server/);
+});
+
+test('lab start-up: Brevo configured is refused by the lab, while production /api/readiness answers 200 as before', { timeout: 60000 }, async t => {
+  const s = await labServer(t, { extraEnv: { BREVO_API_KEY: 'fake-brevo', BREVO_WEBHOOK_SECRET: 'fake', EMAIL_FROM_ADDRESS: 'lab@example.com' } });
+  const r = await runReady(s);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /LAB_SERVER_NOT_READY .*Brevo is configured/);
+  let status = 0;
+  for (let i = 0; i < 100 && status !== 200; i++) { status = (await fetch(`${s.base}/api/readiness`)).status; if (status !== 200) await new Promise(r2 => setTimeout(r2, 100)); }
+  assert.equal(status, 200, 'with Brevo, Supabase and a verified Stripe, production readiness is 200 (behaviour unchanged)');
+});
+
+test('the Stripe job waits on the lab readiness check (Brevo-free), never on production /api/readiness', () => {
+  const s = jobs.stripe;
+  assert.doesNotMatch(s, /curl[^\n]*\/api\/readiness/, 'production readiness requires Brevo, absent from the lab by design');
+  const ready = s.indexOf('node scripts/lab/server-ready.mjs');
+  assert.ok(ready > 0 && ready < s.indexOf('scripts/lab/stripe-run.mjs'), 'server readiness is checked before the scenarios');
+  assert.match(workflow, /ADMIN_EMAILS: lab-admin@example\.com/);
+});

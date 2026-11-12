@@ -34,10 +34,13 @@ async function createUser(email) {
 }
 const user1 = await createUser('lab-lifecycle@example.com');
 const user2 = await createUser('lab-linking@example.com');
-console.log('LAB_USERS 2 created (example.com addresses, local stack only)');
+// Lab-only admin, used ONLY to read the server's detailed readiness (/api/admin/readiness); never pays nor subscribes.
+const admin = await createUser('lab-admin@example.com');
+console.log('LAB_USERS 3 created (example.com addresses, local stack only)');
 
 const out = process.env.GITHUB_ENV;
 const lines = [`SUPABASE_URL=${API_URL}`, `SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}`, `SUPABASE_ANON_KEY=${ANON_KEY}`, `LAB_DB_URL=${DB_URL}`,
   `LIFECYCLE_USER_ID=${user1.id}`, `LIFECYCLE_USER_EMAIL=${user1.email}`, `LIFECYCLE_USER_PASSWORD=${user1.password}`,
-  `LINKING_USER_ID=${user2.id}`, `LINKING_USER_EMAIL=${user2.email}`, `LINKING_USER_PASSWORD=${user2.password}`];
+  `LINKING_USER_ID=${user2.id}`, `LINKING_USER_EMAIL=${user2.email}`, `LINKING_USER_PASSWORD=${user2.password}`,
+  `LAB_ADMIN_EMAIL=${admin.email}`, `LAB_ADMIN_PASSWORD=${admin.password}`];
 if (out) appendFileSync(out, lines.join('\n') + '\n'); else console.log('(no GITHUB_ENV: not exported)');

@@ -28,6 +28,8 @@ env:
   FOLLOWUP_AUTOMATION_ENABLED: 'false'
   LIFECYCLE_EMAILS_ENABLED: 'false'
   BILLING_EMAILS_ENABLED: 'false'
+  # Lab-only admin (local Auth user created by prepare-lab.mjs), used only to read /api/admin/readiness.
+  ADMIN_EMAILS: lab-admin@example.com
 jobs:
   infra:
     runs-on: ubuntu-24.04
@@ -104,8 +106,9 @@ jobs:
           [ -n "$WHSEC" ] || { echo "stripe listen did not start"; exit 1; }
           echo "::add-mask::$WHSEC"
           STRIPE_WEBHOOK_SECRET="$WHSEC" node server/index.js > "$RUNNER_TEMP/server.log" 2>&1 &
-          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/api/readiness >/dev/null 2>&1 && break; sleep 1; done
-          curl -fsS http://127.0.0.1:3000/api/readiness
+          # Not /api/readiness: in production it also requires Brevo, deliberately absent from the lab (unchanged rule).
+          # server-ready.mjs requires Supabase + Stripe verified by the server itself, and Brevo ABSENT.
+          node scripts/lab/server-ready.mjs
           STRIPE_WEBHOOK_SECRET="$WHSEC" node scripts/lab/stripe-run.mjs
       - name: Stop the listener
         if: always()

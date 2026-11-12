@@ -23,6 +23,27 @@ déclare le commit qu'il a relu. Avant toute étape qui reçoit la clé, la tâc
 La tâche `infra` affiche à chaque push le même contrôle en mode rapport, sans bloquer : commit courant à approuver, code
 identique à la PR #16 et état de protection de l'environnement.
 
+## Démarrage du serveur dans le laboratoire
+
+En production, `/api/readiness` ne répond 200 que si Supabase, Stripe **et Brevo** sont configurés. Le laboratoire n'a
+volontairement pas Brevo, puisqu'aucun email ne doit partir. Il ne se fie donc pas à cette route, dont le comportement en
+production reste inchangé.
+
+`scripts/lab/server-ready.mjs` lit le diagnostic détaillé du serveur (`/api/admin/readiness`) avec un compte
+administrateur propre au laboratoire (`lab-admin@example.com`, créé dans l'Auth locale, listé dans `ADMIN_EMAILS` du seul
+workflow du laboratoire). Il exige :
+- `/api/health` répond 200 ;
+- Supabase est configuré ;
+- Stripe est vérifié par le moniteur du serveur lui-même (`BILLING_CONFIGURATION_VERIFIED` : clé Test, compte attendu,
+  prix exact, secret webhook) ;
+- **Brevo est absent** et aucun interrupteur d'email n'est actif.
+
+Il refuse si `/api/readiness` répond 200, ce qui signifierait que Brevo est configuré. Des tests permanents sur le vrai
+serveur couvrent les trois cas :
+- Brevo absent et Stripe valide : prêt ;
+- prix Stripe invalide : refusé ;
+- Brevo présent : refusé par le laboratoire, alors que `/api/readiness` répond 200 comme en production.
+
 ## Certification du passage Stripe
 
 Les 22 scénarios de `REQUIRED` (`scripts/lab/stripe-run.mjs`) sont **obligatoires**. Le résultat global vaut :
