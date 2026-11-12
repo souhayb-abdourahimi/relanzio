@@ -75,6 +75,12 @@ tourne ailleurs ou si l'instance est encore dans son délai de démarrage.
 Retour arrière : redéployer la version précédente, qui ignore la table. Ne supprimer la table qu'après
 (`supabase/rollbacks/20261112100000_scheduled_job_leases.down.sql`).
 
+## Sauvegarde
+
+La table `scheduled_job_leases` fait partie du schéma `public` : la sauvegarde v2 la couvre automatiquement, ce qui fait
+passer la base à 22 tables. Elle ne contient que l'état des baux, sans donnée client. Après une restauration, un bail
+restauré expire au plus tard au bout de 30 minutes. Les tâches reprennent ensuite normalement.
+
 ## Ce que le verrou ne garantit pas
 
 - **Exactement une fois pour les effets externes.** Si le fournisseur d'email accepte un envoi juste avant un plantage,
