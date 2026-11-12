@@ -165,3 +165,77 @@ test('the Stripe job waits on the lab readiness check (Brevo-free), never on pro
   assert.ok(ready > 0 && ready < s.indexOf('scripts/lab/stripe-run.mjs'), 'server readiness is checked before the scenarios');
   assert.match(workflow, /ADMIN_EMAILS: lab-admin@example\.com/);
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Checkout URL acceptance (scripts/lab/checkout-browser.mjs): only the exact URL Stripe issued for a verified
+// cs_test_ session of the lab user with the lab TEST price, on checkout.stripe.com. Nothing sensitive is logged.
+import { verifyCheckoutSession, describeCheckoutUrl, payCheckout } from '../scripts/lab/checkout-browser.mjs';
+
+const ID = 'cs_test_a1B2c3D4e5F6g7H8';
+const URL_C = `https://checkout.stripe.com/c/pay/${ID}#fidSECRETFRAGMENT`;
+const expected = { customerId: 'cus_lab', userId: 'user-lab', priceId: 'price_lab' };
+const labPrice = { id: 'price_lab', livemode: false, currency: 'eur', unit_amount: 2900, recurring: { interval: 'month', interval_count: 1 } };
+const items = { has_more: false, data: [{ quantity: 1, price: labPrice }] };
+const session = (url, over = {}) => ({ object: 'checkout.session', id: ID, livemode: false, url, status: 'open', mode: 'subscription', customer: 'cus_lab', client_reference_id: 'user-lab', metadata: { user_id: 'user-lab' }, ...over });
+
+test('checkout: legitimate Stripe Test formats are accepted only when verified through the API', () => {
+  for (const url of [URL_C, `https://checkout.stripe.com/c/pay/${ID}`, `https://checkout.stripe.com/g/pay/${ID}#frag`, `https://checkout.stripe.com/pay/${ID}?x=1`, 'https://checkout.stripe.com/c/pay/opaqueTokenWithoutTheId#frag']) {
+    const v = verifyCheckoutSession(url, session(url), items, expected);
+    assert.deepEqual(v.problems, [], url.replace(/#.*/, ''));
+    assert.equal(v.ok, true); assert.equal(v.url, url);
+  }
+});
+
+test('checkout: live sessions, unknown domains, unverified or mismatching sessions and wrong prices are refused', () => {
+  const refuse = (url, s, it = items, exp = expected) => { const v = verifyCheckoutSession(url, s, it, exp); assert.equal(v.ok, false, `${url} ${JSON.stringify(s && { id: s.id, livemode: s.livemode })}`); return v.problems.join(' | '); };
+  const LIVE = 'https://checkout.stripe.com/c/pay/cs_live_a1B2c3D4';
+  assert.match(refuse(LIVE, session(LIVE, { id: 'cs_live_a1B2c3D4', livemode: true })), /live session id in the URL.*not cs_test_.*livemode is not false/);
+  assert.match(refuse(URL_C, session(URL_C, { livemode: true })), /livemode is not false/);
+  for (const host of ['checkout.stripe.com.evil.example', 'evil.example', 'buy.stripe.com', 'checkout.stripe.co', 'pay.stripe.com']) {
+    const url = `https://${host}/c/pay/${ID}`;
+    assert.match(refuse(url, session(url)), /unknown domain/);
+  }
+  assert.match(refuse(`http://checkout.stripe.com/c/pay/${ID}`, session(`http://checkout.stripe.com/c/pay/${ID}`)), /not https/);
+  assert.match(refuse(`https://checkout.stripe.com:8443/c/pay/${ID}`, session(`https://checkout.stripe.com:8443/c/pay/${ID}`)), /port or credentials/);
+  assert.match(refuse(`https://u:p@checkout.stripe.com/c/pay/${ID}`, session(`https://u:p@checkout.stripe.com/c/pay/${ID}`)), /port or credentials/);
+  assert.match(refuse(URL_C, null), /session not found/);
+  assert.match(refuse(URL_C, session('https://checkout.stripe.com/c/pay/cs_test_other')), /not the one Stripe issued/);
+  const other = `https://checkout.stripe.com/c/pay/cs_test_zzzzzz`;
+  assert.match(refuse(other, session(other)), /differs from the verified session/);
+  assert.match(refuse(URL_C, session(URL_C, { status: 'complete' })), /status complete/);
+  assert.match(refuse(URL_C, session(URL_C, { mode: 'payment' })), /mode payment/);
+  assert.match(refuse(URL_C, session(URL_C, { customer: 'cus_other' })), /customer/);
+  assert.match(refuse(URL_C, session(URL_C, { client_reference_id: 'someone-else' })), /not for the lab user/);
+  assert.match(refuse(URL_C, session(URL_C), { has_more: false, data: [{ quantity: 1, price: { ...labPrice, unit_amount: 1900 } }] }), /29\.00 EUR/);
+  assert.match(refuse(URL_C, session(URL_C), { has_more: false, data: [{ quantity: 1, price: { ...labPrice, livemode: true } }] }), /29\.00 EUR/);
+  assert.match(refuse(URL_C, session(URL_C), { has_more: false, data: [{ quantity: 2, price: labPrice }] }), /exactly one line item/);
+  assert.match(refuse(URL_C, session(URL_C), null), /exactly one line item/);
+  assert.match(refuse('not a url', session('not a url')), /URL invalid/);
+});
+
+test('checkout: the browser is never opened without a positive verification of that exact URL', async () => {
+  const ok = verifyCheckoutSession(URL_C, session(URL_C), items, expected);
+  await assert.rejects(payCheckout(URL_C, { successPrefix: 'http://127.0.0.1:3000' }), /CHECKOUT_NOT_VERIFIED/);
+  await assert.rejects(payCheckout(URL_C, { successPrefix: 'http://127.0.0.1:3000', verified: { ok: false, url: URL_C } }), /CHECKOUT_NOT_VERIFIED/);
+  await assert.rejects(payCheckout(`https://checkout.stripe.com/c/pay/cs_test_other`, { successPrefix: 'http://127.0.0.1:3000', verified: ok }), /CHECKOUT_NOT_VERIFIED/);
+  await assert.rejects(payCheckout(URL_C, { verified: ok }), /CHECKOUT_SUCCESS_PREFIX_REQUIRED/);
+});
+
+test('checkout: the logged description keeps only the host and the path structure (no id, token, query or fragment)', () => {
+  const d = describeCheckoutUrl(`${URL_C.replace('#', '?client_secret=SECRETVALUE#')}`);
+  assert.deepEqual(d, { valid_url: true, scheme: 'https', host: 'checkout.stripe.com', port: null, path: '/c/pay/<cs_test_id>', has_query: true, has_fragment: true });
+  const text = JSON.stringify(d);
+  for (const secret of [ID, 'a1B2c3D4', 'SECRETVALUE', 'SECRETFRAGMENT', 'fid']) assert.ok(!text.includes(secret), secret);
+  assert.equal(describeCheckoutUrl('https://checkout.stripe.com/c/pay/opaqueTokenXYZ123').path, '/c/pay/<token>');
+  assert.equal(describeCheckoutUrl('https://checkout.stripe.com/c/pay/cs_live_abc').path, '/c/pay/<cs_live_id>');
+  assert.deepEqual(describeCheckoutUrl('nope'), { valid_url: false });
+});
+
+test('the scenario script verifies every Checkout through the API before paying it', () => {
+  const run = read('scripts/lab/stripe-run.mjs');
+  const pays = [...run.matchAll(/payCheckout\(url, \{[^}]*\}/g)].map(m => m[0]);
+  assert.equal(pays.length, 2);
+  for (const p of pays) assert.match(p, /verified/);
+  assert.equal((run.match(/const verified = await verifiedCheckout\(url, /g) || []).length, 2);
+  assert.doesNotMatch(run, /console\.log\([^)]*\burl\b(?!_)[^)]*\)/, 'the raw URL is never logged');
+});

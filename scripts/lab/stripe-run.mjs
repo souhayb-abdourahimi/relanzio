@@ -21,7 +21,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 import { checkEnvironment, checkNetwork, checkStripe } from './isolation-check.mjs';
-import { payCheckout } from './checkout-browser.mjs';
+import { payCheckout, verifyCheckoutSession, describeCheckoutUrl } from './checkout-browser.mjs';
 import { billingEventSubscriptionId } from '../../server/billing.js';
 
 const env = process.env;
@@ -121,7 +121,7 @@ async function main() {
   };
   const openCheckout = async token => {
     const res = await fetch(`${env.LAB_SERVER_URL}/api/billing/checkout`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}' });
-    const body = await res.json().catch(() => ({})); if (res.status !== 200 || !body.url) fail(`app checkout route answered ${res.status} ${JSON.stringify(body)}`); return body.url;
+    const body = await res.json().catch(() => ({})); if (res.status !== 200 || !body.url) fail(`app checkout route answered ${res.status} ${JSON.stringify({ error: body.error || null })}`); return body.url;
   };
   const deliver = async event => {
     const payload = JSON.stringify(event);
@@ -143,6 +143,21 @@ async function main() {
     return null;
   };
   const subOf = e => billingEventSubscriptionId(e.type, e.data.object);
+  // The Checkout URL returned by the app is accepted only if it is exactly the url Stripe issued, through the lab
+  // sandbox API, for a verified cs_test_ session of this user with the lab price (see checkout-browser.mjs).
+  // Only a redacted structure of the URL is ever logged.
+  const verifiedCheckout = async (url, userId) => {
+    const shape = describeCheckoutUrl(url);
+    const customerId = (await profile(userId)).stripe_customer_id;
+    if (!customerId) fail(`checkout: the app stored no Stripe customer (url structure ${JSON.stringify(shape)})`);
+    const sessions = await stripe.checkout.sessions.list({ customer: customerId, limit: 20 });
+    const session = sessions.data.find(s => s.url === url) || null;
+    const lineItems = session ? await stripe.checkout.sessions.listLineItems(session.id, { limit: 10 }) : null;
+    const verdict = verifyCheckoutSession(url, session, lineItems, { customerId, userId, priceId: env.STRIPE_PRO_PRICE_ID });
+    console.log(`LAB_CHECKOUT_URL ${JSON.stringify({ ...shape, verified: verdict.ok, session_prefix: verdict.sessionId ? verdict.sessionId.slice(0, 8) : null })}`);
+    if (!verdict.ok) fail(`checkout refused: ${verdict.problems.join('; ')}`);
+    return verdict;
+  };
 
   // ---------------- Phase 1: linking order, redelivery, wrong mode, outage, stale event (deliveries held) --------
   const L = env.LINKING_USER_ID;
@@ -150,8 +165,9 @@ async function main() {
     const before = await profile(L);
     if (before.stripe_subscription_id || before.plan === 'pro') fail('linking user is not fresh');
     const url = await openCheckout(await signIn(env.LINKING_USER_EMAIL, env.LINKING_USER_PASSWORD));
-    await payCheckout(url, { successPrefix: env.APP_URL, screenshotPath: 'lab-checkout-linking.png' });
-    pass('P1_CHECKOUT', new URL(url).hostname);
+    const verified = await verifiedCheckout(url, L);
+    await payCheckout(url, { successPrefix: env.APP_URL, verified, screenshotPath: 'lab-checkout-linking.png' });
+    pass('P1_CHECKOUT', `${describeCheckoutUrl(url).host}, session cs_test_ vérifiée par l’API`);
   }
   const linking = await profile(L);
   if (!linking.stripe_customer_id) fail('the app did not store the Stripe customer');
@@ -247,8 +263,9 @@ async function main() {
     const customer = await stripe.customers.create({ email: start.email, test_clock: clock.id, metadata: { user_id: U }, invoice_settings: { footer: VAT } });
     { const { error } = await db.from('profiles').update({ stripe_customer_id: customer.id }).eq('id', U); if (error) fail(error.message); }
     const url = await openCheckout(await signIn(env.LIFECYCLE_USER_EMAIL, env.LIFECYCLE_USER_PASSWORD));
-    await payCheckout(url, { successPrefix: env.APP_URL, screenshotPath: 'lab-checkout-lifecycle.png' });
-    pass('P2_CHECKOUT');
+    const verified = await verifiedCheckout(url, U);
+    await payCheckout(url, { successPrefix: env.APP_URL, verified, screenshotPath: 'lab-checkout-lifecycle.png' });
+    pass('P2_CHECKOUT', 'session cs_test_ vérifiée par l’API');
     const pro = await waitProfile(U, 'Pro after real Checkout', p => p.plan === 'pro' && p.subscription_status === 'active' && p.stripe_subscription_id);
     if (!relayed.includes('checkout.session.completed:200')) fail(`Pro granted but checkout.session.completed was not accepted from Stripe (${relayed.join(', ')})`);
     pass('P2_PRO_BY_STRIPE', `ordre réel et réponses : ${relayed.slice(0, 10).join(', ')}`);
