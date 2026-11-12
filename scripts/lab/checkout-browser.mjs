@@ -3,12 +3,11 @@
 // test-mode Checkout URL on checkout.stripe.com.
 // Returns once the browser has been redirected to successPrefix (the app's success_url), or throws with a
 // screenshot path for diagnosis (test data only: example.com customer, test card).
-import { chromium } from '@playwright/test';
-
 export async function payCheckout(url, { successPrefix, screenshotPath = 'lab-checkout-failure.png', timeoutMs = 120000 } = {}) {
   const u = new URL(url);
   if (u.hostname !== 'checkout.stripe.com' || !/\/c\/pay\/cs_test_/.test(u.pathname)) throw new Error('CHECKOUT_URL_NOT_TEST_MODE');
   if (!successPrefix) throw new Error('CHECKOUT_SUCCESS_PREFIX_REQUIRED');
+  const { chromium } = await import('@playwright/test'); // loaded only when a real Checkout is paid
   const browser = await chromium.launch();
   const page = await browser.newPage({ locale: 'fr-FR' });
   const visible = async (selector, ms = 2000) => { try { await page.locator(selector).first().waitFor({ state: 'visible', timeout: ms }); return true; } catch { return false; } };

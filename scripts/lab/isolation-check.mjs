@@ -46,7 +46,7 @@ export function checkEnvironment(env) {
   return problems;
 }
 
-async function checkNetwork(hosts = PRODUCTION_HOSTS) {
+export async function checkNetwork(hosts = PRODUCTION_HOSTS) {
   const problems = [];
   for (const host of hosts) {
     let addresses = [];
@@ -61,7 +61,7 @@ async function checkNetwork(hosts = PRODUCTION_HOSTS) {
   return problems;
 }
 
-async function checkStripe(env) {
+export async function checkStripe(env) {
   const problems = [];
   if (!env.STRIPE_SECRET_KEY) return { problems: ['STRIPE_SECRET_KEY: missing (lab secret not configured)'], skipped: true };
   const { default: Stripe } = await import('stripe');

@@ -11,7 +11,34 @@ Il s'exécute dans GitHub Actions ([workflow](../.github/workflows/stripe-integr
 | `infra` | À chaque push sur une branche `lab/**` | **aucun** | Isolation, pile Supabase, schéma et migrations, serveur, connexion d'un utilisateur, facturation refusée par sécurité, navigateur |
 | `stripe` | **Uniquement** sur la branche `lab/stripe-run` **et** après approbation par le propriétaire de l'environnement protégé `stripe-lab` | Clé Test du bac à sable | Scénarios Stripe Test réels |
 
-Les deux verrous de la tâche `stripe` sont entre les mains du propriétaire : il crée la branche, puis approuve l'exécution.
+Les verrous de la tâche `stripe` sont entre les mains du propriétaire : il crée la branche, approuve l'exécution, et
+déclare le commit qu'il a relu. Avant toute étape qui reçoit la clé, la tâche vérifie et **s'arrête** sinon
+(`scripts/lab/gate-check.mjs`) :
+1. le commit exécuté est exactement celui déclaré dans la variable `LAB_APPROVED_COMMIT` de l'environnement ;
+2. le code applicatif est identique, octet pour octet, au commit de la PR #16 (`76a803bb`) : seuls les fichiers du
+   laboratoire diffèrent ;
+3. l'environnement `stripe-lab` exige bien un relecteur et n'est ouvert qu'à la branche `lab/stripe-run`, d'après l'API
+   GitHub lue avec le jeton en lecture seule de l'exécution. S'il est impossible de le vérifier, la tâche s'arrête.
+
+La tâche `infra` affiche à chaque push le même contrôle en mode rapport, sans bloquer : commit courant à approuver, code
+identique à la PR #16 et état de protection de l'environnement.
+
+## Certification du passage Stripe
+
+Les 22 scénarios de `REQUIRED` (`scripts/lab/stripe-run.mjs`) sont **obligatoires**. Le résultat global vaut :
+- **CERTIFIÉ** seulement si les 22 ont été réellement exécutés et réussis ;
+- **NON CERTIFIÉ** dans tous les autres cas.
+
+Un scénario non exécuté apparaît comme **MANQUANT** dans le résumé, jamais comme réussi. Toute erreur arrête le passage avec
+un code de sortie 1 et un résultat NON CERTIFIÉ.
+
+Le premier scénario est la preuve d'isolation : variables, hôtes de production, puis bac à sable Stripe. S'il échoue, rien
+d'autre n'est tenté : pas de navigateur, pas d'écriture chez Stripe, pas de webhook. Un test permanent
+(`test/lab-workflow-guard.test.js`) le vérifie.
+
+Pour le scénario « événement plus ancien », le laboratoire crée toujours lui-même deux modifications réelles de l'abonnement,
+espacées dans le temps. Il garde la plus ancienne de côté, puis la livre après la plus récente. Ce scénario est donc toujours
+exécuté.
 
 ## Le parcours testé : Checkout → profil → abonnement
 
@@ -107,6 +134,14 @@ Ce qui n'est pas couvert :
      aux seules étapes qui en ont besoin.
    - Le secret de signature et les mots de passe du laboratoire sont masqués dans les journaux.
    - La tâche `infra` n'a accès à aucun secret.
+   - **Secrets de dépôt et d'organisation.** GitHub ne transmet à une étape que les secrets qu'elle nomme explicitement. Le
+     laboratoire ne nomme que `STRIPE_LAB_SECRET_KEY`. Il n'utilise ni `toJSON(secrets)`, ni `secrets: inherit`. Un test
+     permanent échoue si une autre référence apparaît.
+   - Dans tout le dépôt, le seul autre secret référencé est `STAGING_URL` (workflow `smoke.yml`), qui est une adresse et non
+     un identifiant.
+   - Je ne peux pas lister les secrets enregistrés : l'API GitHub le refuse au jeton d'exécution. **Le propriétaire doit
+     vérifier** qu'aucun identifiant de production n'est stocké en secret de dépôt ou d'organisation. Le relecteur
+     obligatoire et l'approbation du commit protègent contre un workflow modifié qui chercherait à les lire.
 5. **Limites qui restent, à connaître.**
    - Une personne ayant le droit de pousser sur le dépôt pourrait modifier le workflow sur une branche `lab/**` pour exfiltrer
      la clé du bac à sable. La règle de relecteur obligatoire existe pour cela : **vérifier le commit avant d'approuver**.
@@ -125,7 +160,10 @@ Ce qui n'est pas couvert :
 - **Stripe.**
   - Tous les clients du laboratoire ont une adresse `@example.com`. Ce domaine est réservé (RFC 2606) et n'accepte aucun
     email.
-  - Le laboratoire vérifie en fin d'exécution que chaque client créé a bien une adresse de ce type.
+  - Au démarrage, le laboratoire refuse un utilisateur dont l'adresse n'est pas en `@example.com`.
+  - En fin d'exécution, il liste **tous** les clients créés dans le bac à sable pendant le passage. Le résultat est NON
+    CERTIFIÉ si un seul n'a pas une adresse `@example.com` (scénario `EMAIL_CUSTOMERS`).
+  - Le scénario `EMAIL_NONE` vérifie qu'aucun email n'a été réclamé par l'application pour les utilisateurs du laboratoire.
   - **Je ne peux pas vérifier par l'API Stripe les réglages d'emails du bac à sable.** Le propriétaire doit donc les
     désactiver (voir la procédure ci-dessous). Stripe n'envoie normalement pas d'emails clients automatiques depuis un bac à
     sable, mais le laboratoire ne compte pas sur ce comportement.
@@ -158,6 +196,7 @@ L'environnement a été créé vide automatiquement lors d'un premier lancement.
 | Variable | `STRIPE_LAB_ACCOUNT_ID` | `acct_…` du bac à sable |
 | Variable | `STRIPE_LAB_PRICE_ID` | `price_…` du prix Test à 29 € par mois |
 | Variable | `PRODUCTION_STRIPE_ACCOUNT_ID` | `acct_…` du compte principal (sert à prouver que le laboratoire en est distinct) |
+| Variable | `LAB_APPROVED_COMMIT` | SHA complet (40 caractères) du commit relu, celui que la tâche `infra` affiche dans `LAB_GATE_OK COMMIT` |
 
 Protections à activer :
 - **Required reviewers** : vous seul. Cocher **Prevent self-review** seulement si une autre personne de confiance peut
@@ -169,8 +208,15 @@ Protections à activer :
 
 ### C. Lancer les scénarios réels (étape à autoriser par le propriétaire)
 
-1. Créer la branche `lab/stripe-run` à partir de `lab/stripe-integration`, à l'identique, puis la pousser.
-2. GitHub exécute `infra`, puis met `stripe` **en attente d'approbation**.
-3. Vérifier que le commit est bien celui de `lab/stripe-integration`, puis approuver.
-4. Lire le résumé de l'exécution : tableau des étapes R, A, B et C.
-5. Ensuite : supprimer la branche `lab/stripe-run` et renouveler la clé Test.
+1. Renseigner `LAB_APPROVED_COMMIT` avec le SHA relu.
+2. Créer la branche `lab/stripe-run` **sur ce commit exact**, puis la pousser. Avec git :
+
+   ```bash
+   git push origin <SHA>:refs/heads/lab/stripe-run
+   ```
+
+3. GitHub exécute `infra`, puis met `stripe` **en attente d'approbation**. Approuver après avoir vérifié le commit affiché.
+4. Le contrôle d'accès (commit, code identique à la PR #16, protection de l'environnement), puis la preuve d'isolation,
+   arrêtent la tâche à la moindre anomalie.
+5. Lire le résumé : 22 scénarios, chacun RÉUSSI ou MANQUANT, et le résultat global CERTIFIÉ ou NON CERTIFIÉ.
+6. Ensuite : supprimer la branche `lab/stripe-run`, vider `LAB_APPROVED_COMMIT` et renouveler la clé Test.

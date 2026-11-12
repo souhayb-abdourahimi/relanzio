@@ -4,7 +4,10 @@ name: Stripe integration lab (isolated)
 #
 #   job "infra"  - every push on lab/** : no secret, no environment. Proves the infrastructure.
 #   job "stripe" - ONLY on branch lab/stripe-run AND only after a required reviewer approves the protected
-#                  environment "stripe-lab". Runs the real Stripe TEST scenarios. Two locks, both held by the owner.
+#                  environment "stripe-lab". Its first step (gate) checks, before the key is ever used, that the
+#                  commit is the one the owner approved (LAB_APPROVED_COMMIT), that the application code is
+#                  byte-identical to PR #16 (76a803bb) and that the environment really requires a reviewer.
+#                  Then the isolation proof; then the real Stripe TEST scenarios (certified only at 100 %).
 on:
   push:
     branches: ['lab/**']
@@ -29,10 +32,18 @@ jobs:
   infra:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: "Gate report (commit, application code = PR #16, environment protection) - never blocks here"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/lab/gate-check.mjs report
       - uses: ./.github/actions/lab-setup
       - name: "Without any Stripe key: server on the local stack, billing fails closed"
         env:
@@ -53,10 +64,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: stripe-lab
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: "Gate (fail closed, before the key is used): approved commit, code = PR #16, environment protected"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LAB_APPROVED_COMMIT: ${{ vars.LAB_APPROVED_COMMIT }}
+        run: node scripts/lab/gate-check.mjs enforce
       - uses: ./.github/actions/lab-setup
         with:
           pull-stripe-cli: 'true'
