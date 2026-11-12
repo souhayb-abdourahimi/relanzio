@@ -57,7 +57,8 @@ test('backup and restore, end to end, with every failure mode', { skip, timeout:
       assert.deepEqual(good.markers.filter(m => /^[A-Z_]+$/.test(m)), ['BACKUP_CREATED', 'BACKUP_INTEGRITY_VERIFIED', 'RESTORE_VERIFIED', 'AUTH_RESTORE_VERIFIED', 'BACKUP_RESULT']);
       const m = good.manifest;
       assert.equal(m.status, 'COMPLETE_AND_RESTORE_VERIFIED', JSON.stringify({ c: m.coverage, r: m.restore.problems, a: m.auth.problems, e: m.restore.error }));
-      assert.equal(Object.keys(m.tables).filter(t => t.startsWith('public.')).length, 21);
+      // 21 production tables + scheduled_job_leases (migration 20261112100000, pending deployment): every public table is covered.
+      assert.equal(Object.keys(m.tables).filter(t => t.startsWith('public.')).length, 22);
       assert.equal(m.tables['public.quotes'].rows, 3);
       assert.equal(m.tables['auth.users'].rows, 3);
       assert.equal(m.tables['auth.identities'].rows, 3);
@@ -130,7 +131,7 @@ test('backup and restore, end to end, with every failure mode', { skip, timeout:
       let r = await runRestore({ env: { ...base, RUN_RESTORE: 'true' }, store, pgBin: PG, log: quiet });
       assert.equal(r.ok, false); assert.match(r.reasons.join(), /RESTORE_TARGET_DB_URL missing/);
       r = await runRestore({ env: { ...base, RESTORE_TARGET_DB_URL: urlOf(source), RESTORE_MODE: 'apply' }, store, pgBin: PG, log: quiet });
-      assert.equal(r.ok, false); assert.match(r.reasons.join('\n'), /already has 21 table/); assert.match(r.reasons.join('\n'), /IS the source database/);
+      assert.equal(r.ok, false); assert.match(r.reasons.join('\n'), /already has 22 table/); assert.match(r.reasons.join('\n'), /IS the source database/);
       assert.equal((await sql(source, 'select count(*) from public.quotes')).trim(), '3', 'source untouched');
       const target = await startEphemeralCluster({ pgBin: PG, serverBin: SERVER });
       try {
@@ -161,7 +162,7 @@ test('backup and restore, end to end, with every failure mode', { skip, timeout:
       assert.equal(r.integrity, true); assert.equal(r.ok, false);
       assert.equal(r.legacy.data_restore_ok, true, r.legacy.problems.join('\n'));
       assert.equal(r.legacy.tables.quotes.restored, 3); assert.equal(r.legacy.tables.quotes.rows_not_identical, 0);
-      assert.deepEqual(r.legacy.missing_tables.sort(), ['digest_sends', 'followup_optouts', 'outreach_candidates', 'outreach_daily_slots', 'prospect_tombstones', 'quote_replies', 'sales_followups']);
+      assert.deepEqual(r.legacy.missing_tables.sort(), ['digest_sends', 'followup_optouts', 'outreach_candidates', 'outreach_daily_slots', 'prospect_tombstones', 'quote_replies', 'sales_followups', 'scheduled_job_leases']);
       assert.equal(r.legacy.auth_covered, false);
       assert.ok(r.legacy.orphans.some(o => /profiles_id_fkey/.test(o)), 'profiles point to auth users absent from a legacy backup');
       const wrongKey = await verifyStoredBackup({ store, key: 'daily/relanzio-20261105T021954030Z.rzbk', env: { BACKUP_ENCRYPTION_KEY_B64: Buffer.alloc(32, 1).toString('base64') }, pgBin: PG, log: () => {} }).catch(e => e);

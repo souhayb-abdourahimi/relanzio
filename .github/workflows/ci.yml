@@ -26,6 +26,11 @@ jobs:
         env:
           PGURL: postgresql://postgres@127.0.0.1:5432/postgres
         run: npm run test:sql
+      - name: shared job lease, independent processes (throwaway Postgres)
+        env:
+          JOB_LEASE_PG_URL: postgresql://postgres@127.0.0.1:5432/postgres
+          JOB_LEASE_REQUIRED: '1'
+        run: node --test test/job-lease-processes.test.js
       - name: mobile navigation browser DOM
         run: |
           # Keep the lockfile: --no-package-lock re-resolved the whole tree and hit a 404 on rollup 4.66.0.
