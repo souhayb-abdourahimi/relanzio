@@ -73,6 +73,21 @@ Le laboratoire suit donc le vrai parcours d'un client :
 3. la **vraie page Stripe Checkout (mode Test)** est payée dans un navigateur Chromium sans interface, avec la carte de test
    `4242 4242 4242 4242`.
 
+Remplissage de la page (`scripts/lab/checkout-browser.mjs`, adapté à la page observée lors de l'exécution 3) :
+- les champs de carte sont cherchés dans la page **et dans chaque iframe visible** (attribut `autocomplete`), avec une
+  attente explicite avant chaque action ;
+- si Stripe propose USD/EUR (tarification adaptative), **EUR est sélectionné** et la page doit afficher `29,00 €` sans
+  montant en dollars (la description « 29 € / mois » est présente dans toutes les devises et ne prouve rien), sinon
+  arrêt `CHECKOUT_AMOUNT_NOT_29_EUR` avant tout paiement ;
+- l'enregistrement Link est **décoché** et son état relu (sinon arrêt `CHECKOUT_LINK_SAVE_STILL_CHECKED`) ; le champ
+  téléphone n'est jamais rempli ; l'e-mail doit être prérempli par Stripe ;
+- en cas d'échec : capture d'écran et `LAB_CHECKOUT_DOM`, inventaire caviardé des contrôles de chaque frame (attributs et
+  états uniquement, jamais de valeur saisie) et des montants affichés.
+
+`scripts/lab/checkout-fixture.test.mjs` teste cette automatisation contre une **imitation locale** de la page
+(`scripts/lab/fixtures/checkout-fixture.mjs`, iframe d'une autre origine). Ce test ne contacte pas Stripe et **ne
+certifie rien** du vrai Checkout : seule une exécution réelle du job Stripe, autorisée séparément, le peut.
+
 `scripts/stripe-test-validation.mjs` (le script manuel du dépôt) n'est **plus utilisé** par le laboratoire. Il crée
 l'abonnement directement par l'API, sans Checkout, ce qui ne peut pas aboutir avec la PR #16. Il faudra l'aligner dans une PR
 de suivi.

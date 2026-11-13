@@ -28,7 +28,7 @@ runs:
         npm install --no-save @playwright/test@1.55.0
         npx playwright install --with-deps chromium
     - shell: bash
-      run: node --test test/lab-isolation.test.js test/lab-workflow-guard.test.js
+      run: node --test test/lab-isolation.test.js test/lab-workflow-guard.test.js scripts/lab/checkout-fixture.test.mjs
     - name: "Isolation 2/3: environment variables and production hosts"
       shell: bash
       env:
