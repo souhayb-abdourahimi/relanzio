@@ -73,20 +73,28 @@ Le laboratoire suit donc le vrai parcours d'un client :
 3. la **vraie page Stripe Checkout (mode Test)** est payée dans un navigateur Chromium sans interface, avec la carte de test
    `4242 4242 4242 4242`.
 
-Remplissage de la page (`scripts/lab/checkout-browser.mjs`, adapté à la page observée lors de l'exécution 3) :
-- les champs de carte sont cherchés dans la page **et dans chaque iframe visible** (attribut `autocomplete`), avec une
-  attente explicite avant chaque action ;
-- si Stripe propose USD/EUR (tarification adaptative), **EUR est sélectionné** et la page doit afficher `29,00 €` sans
-  montant en dollars (la description « 29 € / mois » est présente dans toutes les devises et ne prouve rien), sinon
-  arrêt `CHECKOUT_AMOUNT_NOT_29_EUR` avant tout paiement ;
-- l'enregistrement Link est **décoché** et son état relu (sinon arrêt `CHECKOUT_LINK_SAVE_STILL_CHECKED`) ; le champ
-  téléphone n'est jamais rempli ; l'e-mail doit être prérempli par Stripe ;
+Remplissage de la page (`scripts/lab/checkout-browser.mjs`, adapté au DOM réel relevé par `LAB_CHECKOUT_DOM` à
+l'exécution 4) :
+- chaque champ est cherché dans la page **et dans chaque iframe affichée** (attribut `autocomplete`), avec une attente
+  explicite avant chaque action ; interactions Playwright normales uniquement (jamais `force`, jamais d'état modifié par
+  script) ;
+- devise : les radios réelles `input#currency-usd` / `input#currency-eur` (iframe `js.stripe.com`, sans nom accessible)
+  sont trouvées par leur identifiant ; `currency-eur` est cochée par un clic normal (ou un clic sur son libellé si
+  l'entrée est recouverte), puis l'état est relu : **EUR cochée, aucune autre devise cochée, et chaque montant du
+  récapitulatif de la page égal à `29,00 €`** (la description « 29 € / mois », présente dans toutes les devises, ne
+  compte pas) ; contrôle refait juste avant le paiement, sinon arrêt `CHECKOUT_AMOUNT_NOT_29_EUR` ;
+- Link : `input#payment-linkOptInInput` est décochée et relue, le champ `payment-linkMobilePhoneInput` doit être vide
+  (jamais rempli) ; sinon `CHECKOUT_LINK_SAVE_STILL_CHECKED` / `CHECKOUT_LINK_PHONE_NOT_EMPTY` ; l'e-mail doit être
+  prérempli par Stripe ;
+- CAPTCHA : si un défi hCaptcha/reCAPTCHA est affiché (avant toute action, juste avant le paiement ou après l'envoi),
+  arrêt `CHECKOUT_CAPTCHA_REQUIRED` ; le laboratoire ne répond jamais à un CAPTCHA ;
 - en cas d'échec : capture d'écran et `LAB_CHECKOUT_DOM`, inventaire caviardé des contrôles de chaque frame (attributs et
-  états uniquement, jamais de valeur saisie) et des montants affichés.
+  états uniquement, jamais de valeur saisie), des montants affichés et de la présence d'un défi CAPTCHA.
 
-`scripts/lab/checkout-fixture.test.mjs` teste cette automatisation contre une **imitation locale** de la page
-(`scripts/lab/fixtures/checkout-fixture.mjs`, iframe d'une autre origine). Ce test ne contacte pas Stripe et **ne
-certifie rien** du vrai Checkout : seule une exécution réelle du job Stripe, autorisée séparément, le peut.
+`scripts/lab/checkout-fixture.test.mjs` teste cette automatisation contre une **imitation locale** de cette structure
+(`scripts/lab/fixtures/checkout-fixture.mjs` : radios de devise et formulaire de paiement dans deux iframes d'une autre
+origine, défi CAPTCHA servi localement). Aucune requête ne sort de la machine. Ce test **ne certifie rien** du vrai
+Checkout : seule une exécution réelle du job Stripe, autorisée séparément, le peut.
 
 `scripts/stripe-test-validation.mjs` (le script manuel du dépôt) n'est **plus utilisé** par le laboratoire. Il crée
 l'abonnement directement par l'API, sans Checkout, ce qui ne peut pas aboutir avec la PR #16. Il faudra l'aligner dans une PR

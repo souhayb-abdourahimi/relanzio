@@ -240,42 +240,60 @@ test('the scenario script verifies every Checkout through the API before paying 
   assert.doesNotMatch(run, /console\.log\([^)]*\burl\b(?!_)[^)]*\)/, 'the raw URL is never logged');
 });
 
-// Checkout page automation (observed run-3 layout): pure rules here; the browser behaviour is tested against a local
+// Checkout page automation (real DOM of lab run 4): pure rules here; the browser behaviour is tested against a local
 // fixture by scripts/lab/checkout-fixture.test.mjs in the lab set-up (a fixture certifies nothing about Stripe).
-import { isExpectedEuroAmount, hasUsdAmount, euroDecision, redactControl, visibleAmounts, FIELD_SELECTORS, TEST_CARD } from '../scripts/lab/checkout-browser.mjs';
+import { parseAmount, currencyDecision, redactControl, visibleAmounts, FIELD_SELECTORS, TEST_CARD, CAPTCHA_HOSTS } from '../scripts/lab/checkout-browser.mjs';
 
-test('checkout page: 29,00 € is required; the description "29 € / mois" shown in every currency is not enough', () => {
-  for (const ok of ['29,00 € par mois', '29,00 €', 'Total 29,00 €', '€29.00 per month', '€ 29.00']) assert.ok(isExpectedEuroAmount(ok), ok);
-  for (const ko of ['29 € / mois. TVA non applicable', '33,25 $US', '129,00 €', '29,001 €', '€290.00', '€29.001', '']) assert.ok(!isExpectedEuroAmount(ko), ko);
-  assert.ok(hasUsdAmount('33,25 $US par mois')); assert.ok(hasUsdAmount('$33.25')); assert.ok(hasUsdAmount('US$33.25'));
-  assert.ok(!hasUsdAmount('USD EUR 29,00 €')); assert.ok(!hasUsdAmount('29 € / mois'));
+test('checkout page: amounts are read as Stripe formats them; "29 € / mois" (no decimals) is not an amount', () => {
+  assert.deepEqual(parseAmount('29,00 €'), { currency: 'EUR', cents: 2900 });
+  assert.deepEqual(parseAmount('€29.00'), { currency: 'EUR', cents: 2900 });
+  assert.deepEqual(parseAmount('33,25 $US'), { currency: 'USD', cents: 3325 });
+  assert.deepEqual(parseAmount('US$1,029.00'), { currency: 'USD', cents: 102900 });
+  assert.equal(parseAmount('29 €'), null);
+  assert.deepEqual(visibleAmounts('33,25 $US par mois Relanzio Pro 33,25 $US 29 € / mois. TVA non applicable Total dû 33,25 $US carte 4242 4242'), ['33,25 $US', '33,25 $US', '33,25 $US']);
+  assert.deepEqual(visibleAmounts('129,00 € 29,001 € €290.00'), ['129,00 €', '€290.00']);
 });
 
-test('checkout page: currency decision refuses USD, an unselected EUR option, or a missing 29,00 €', () => {
-  const observedUsd = '33,25 $US par mois USD EUR 29 € / mois. TVA non applicable, art. 293 B du CGI';
-  assert.equal(euroDecision({ text: observedUsd }).ok, false, 'the page of run 3 (USD) is refused');
-  assert.equal(euroDecision({ text: '29,00 € par mois 29 € / mois' }).ok, true);
-  assert.equal(euroDecision({ text: '33,25 $US 29,00 €', eurSelected: true }).ok, true, 'toggle showing both amounts, EUR selected');
-  assert.equal(euroDecision({ text: '33,25 $US 29,00 €', eurSelected: false }).ok, false);
-  assert.equal(euroDecision({ text: '33,25 $US 29,00 €' }).ok, false, 'unknown selection with a dollar amount shown');
-  assert.equal(euroDecision({ text: 'USD selected', eurSelected: true }).ok, false, 'EUR selected but no 29,00 € shown');
+test('checkout page: EUR must be the only checked currency radio AND every summary amount 29,00 €', () => {
+  const usd = [{ key: 'usd', checked: true }, { key: 'eur', checked: false }];
+  const eur = [{ key: 'usd', checked: false }, { key: 'eur', checked: true }];
+  const run4 = ['33,25 $US', '33,25 $US', '33,25 $US', '33,25 $US'];
+  const euros = ['29,00 €', '29,00 €', '29,00 €', '29,00 €'];
+  assert.equal(currencyDecision({ radios: usd, amounts: run4 }).ok, false, 'the state of run 4 is refused');
+  assert.equal(currencyDecision({ radios: usd, amounts: euros }).reason, 'EUR radio not checked');
+  assert.equal(currencyDecision({ radios: eur, amounts: run4 }).reason, 'an amount is not in EUR', 'radio switched but summary still in dollars');
+  assert.equal(currencyDecision({ radios: eur, amounts: ['29,00 €', '33,25 $US'] }).ok, false);
+  assert.equal(currencyDecision({ radios: eur, amounts: ['29,00 €', '0,00 €'] }).reason, 'an amount differs from 29,00 €');
+  assert.equal(currencyDecision({ radios: eur, amounts: [] }).reason, 'no payable amount shown', 'the description alone never suffices');
+  assert.equal(currencyDecision({ radios: [{ key: 'usd', checked: null }, { key: 'eur', checked: true }], amounts: euros }).ok, false, 'unknown state of the other radio');
+  assert.equal(currencyDecision({ radios: [{ key: 'usd', checked: false }], amounts: euros }).ok, false, 'radios without an EUR option');
+  assert.equal(currencyDecision({ radios: eur, amounts: euros }).ok, true);
+  assert.equal(currencyDecision({ radios: [], amounts: euros }).ok, true, 'no currency choice offered, summary in EUR');
+  assert.equal(currencyDecision({ radios: [], amounts: run4 }).ok, false);
 });
 
 test('checkout page: diagnostics keep attributes only (no value, email or long digit run) and amounts only', () => {
-  const r = redactControl({ tag: 'input', type: 'tel', id: 'phone', name: 'phoneNumber', autocomplete: 'tel', aria: 'lab-linking@example.com', placeholder: '(201) 555-0123 4242424242424242', value: 'secret', checked: undefined, visible: true });
+  const r = redactControl({ tag: 'input', type: 'text', id: 'payment-linkMobilePhoneInput', name: 'linkMobilePhone', autocomplete: 'billing tel', aria: 'lab-linking@example.com', placeholder: '(201) 555-0123 4242424242424242', value: 'secret', checked: undefined, visible: true });
   assert.equal('value' in r, false);
   assert.equal(r.aria, '<email>');
   assert.doesNotMatch(JSON.stringify(r), /4242|lab-linking|secret/);
-  assert.deepEqual(visibleAmounts('Relanzio 33,25 $US par mois, 29 € / mois, ou 29,00 € ; carte 4242 4242'), ['33,25 $US', '29,00 €']);
 });
 
-test('checkout page: card fields are searched in iframes by autocomplete, test data only, never a phone number', () => {
+test('checkout page: real selectors, test data only, normal interactions, phone never typed, CAPTCHA never answered', () => {
   const src = read('scripts/lab/checkout-browser.mjs');
+  const code = src.replace(/\/\/.*$/gm, '');
   assert.equal(FIELD_SELECTORS.cardNumber[0], 'input[autocomplete="cc-number"]');
-  assert.match(src, /page\.frames\(\)/);
+  assert.ok(FIELD_SELECTORS.currency.includes('input[type="radio"][id^="currency-"]'));
+  assert.equal(FIELD_SELECTORS.linkSave[0], '#payment-linkOptInInput');
+  assert.equal(FIELD_SELECTORS.linkPhone[0], '#payment-linkMobilePhoneInput');
+  assert.match(code, /page\.frames\(\)/);
   assert.equal(TEST_CARD.number, '4242424242424242');
   assert.ok(Object.isFrozen(TEST_CARD) && Object.isFrozen(FIELD_SELECTORS));
   assert.doesNotMatch(JSON.stringify(TEST_CARD), /@|\+33|\b0[67]\d{8}\b/);
-  assert.doesNotMatch(src.replace(/\/\/.*$/gm, ''), /autocomplete="tel"|type="tel"|phone/i, 'the automation never targets the phone field (comments aside)');
+  assert.doesNotMatch(code, /force:\s*true/, 'no forced interaction');
+  assert.doesNotMatch(code, /\.checked\s*=(?!=)|dispatchEvent|setAttribute\(\s*['"]checked/, 'no state set by script');
+  assert.doesNotMatch(code, /linkPhone[^\n]*\.(fill|type|pressSequentially)|phone[^\n]*\.(fill|type|pressSequentially)/i, 'the phone field is only read, never typed into');
+  assert.ok(CAPTCHA_HOSTS.test('newassets.hcaptcha.com') && CAPTCHA_HOSTS.test('www.recaptcha.net') && !CAPTCHA_HOSTS.test('js.stripe.com'));
+  assert.match(code, /CHECKOUT_CAPTCHA_REQUIRED/);
   assert.match(action, /node --test test\/lab-isolation\.test\.js test\/lab-workflow-guard\.test\.js scripts\/lab\/checkout-fixture\.test\.mjs/, 'the lab set-up runs the fixture browser test');
 });

@@ -61,15 +61,19 @@ export function verifyCheckoutSession(url, session, lineItems, expected) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Page automation, adapted to the Checkout actually observed in the lab (screenshot of the failed run 3):
-//   - an Adaptive Pricing currency choice (USD preselected, EUR offered): EUR is selected and the page must then
-//     show the amount 29,00 € (with decimals: the product description "29 € / mois" is on the page in EVERY
-//     currency, so it proves nothing) and no US dollar amount, or a currency control that reports EUR as selected;
-//   - card number, expiry and security code may be top-level inputs or Stripe secure fields inside an iframe: every
-//     field is looked up in the page AND in every frame, and awaited explicitly before each action;
-//   - "Enregistrer mes informations pour un paiement plus rapide" (Link) is pre-checked and reveals a phone field:
-//     it is unchecked, its state is re-read, and the phone field is never typed into.
-// Test data only: Stripe test card, fictitious name, French postal code. Nothing typed is ever logged.
+// Page automation, adapted to the REAL Checkout DOM reported by LAB_CHECKOUT_DOM in lab run 4:
+//   - the Adaptive Pricing currency choice is a pair of radios, input#currency-usd (checked) and input#currency-eur,
+//     name="currency", alone in a js.stripe.com iframe and WITHOUT a usable accessible name;
+//   - the order summary on the page itself shows the payable amounts (four times 33,25 $US in USD);
+//   - card number, expiry, CVC, holder name, billing country and postal code are in another js.stripe.com iframe,
+//     with the standard autocomplete attributes;
+//   - Link enrolment is input#payment-linkOptInInput (pre-checked), which reveals a phone field;
+//   - hCaptcha frames are loaded (invisible unless Stripe decides to challenge).
+// Rules: every field is looked up in the page and in every displayed frame and awaited before each action; only
+// normal Playwright interactions (check/uncheck/click/type, never force, never setting a state by script); payment
+// is refused unless EUR is the only selected currency AND every amount of the summary is 29,00 € (the description
+// "29 € / mois" is on the page in every currency and proves nothing), Link is unchecked with an empty phone field,
+// and no CAPTCHA challenge is displayed. Test data only. Nothing typed is ever logged.
 
 export const TEST_CARD = Object.freeze({ number: '4242424242424242', expiry: '1234', cvc: '123', name: 'Laboratoire Relanzio', country: 'FR', postal: '75001' });
 export const FIELD_SELECTORS = Object.freeze({
@@ -77,35 +81,46 @@ export const FIELD_SELECTORS = Object.freeze({
   expiry: ['input[autocomplete="cc-exp"]', 'input[name="exp-date"]', 'input[name="expiry"]', '#cardExpiry'],
   cvc: ['input[autocomplete="cc-csc"]', 'input[name="cvc"]', '#cardCvc'],
   name: ['input[autocomplete="cc-name"]', 'input[name="billingName"]', '#billingName'],
-  country: ['select[autocomplete="country"]', 'select[autocomplete="billing country"]', 'select[name="billingCountry"]', '#billingCountry'],
-  postal: ['input[autocomplete="postal-code"]', 'input[autocomplete="billing postal-code"]', 'input[name="billingPostalCode"]', '#billingPostalCode'],
-  email: ['input[type="email"]', '#email'],
-  linkSave: ['input[type="checkbox"][name="enableStripePass"]', '#enableStripePass', 'input[type="checkbox"][name*="link" i]', 'input[type="checkbox"][id*="link" i]'],
+  country: ['select[autocomplete="billing country"]', 'select[autocomplete="country"]', 'select[name="billingCountry"]', '#billingCountry'],
+  postal: ['input[autocomplete="billing postal-code"]', 'input[autocomplete="postal-code"]', 'input[name="billingPostalCode"]', '#billingPostalCode'],
+  email: ['input[type="email"]', 'input[autocomplete="email"]', '#email'],
+  currency: ['input[type="radio"][name="currency"]', 'input[type="radio"][id^="currency-"]'],
+  linkSave: ['#payment-linkOptInInput', 'input[type="checkbox"][name="linkOptIn"]', 'input[type="checkbox"][name="enableStripePass"]', '#enableStripePass'],
+  linkPhone: ['#payment-linkMobilePhoneInput', 'input[name="linkMobilePhone"]', '#phoneNumber'],
   submit: ['button[data-testid="hosted-payment-submit-button"]', 'button[type="submit"]', '.SubmitButton']
 });
-export const LINK_SAVE_LABEL = /enregistrer mes informations|save my info/i;
 export const SUBMIT_LABEL = /s['’]abonner|subscribe/i;
 export const CARD_METHOD_LABEL = /^\s*(carte(?: bancaire)?|card)\s*$/i;
-export const EUR_OPTION_LABEL = /(^|\s)EUR(\s|$)|€\s*29[.,]00|29[,.]00\s*€/;
+export const CAPTCHA_HOSTS = /(^|\.)(hcaptcha\.com|recaptcha\.net)$|^www\.google\.com$/;
+export const EXPECTED = Object.freeze({ currency: 'EUR', cents: 2900 });
 
 const norm = t => String(t || '').replace(/[  ]/g, ' ');
-// The Stripe-formatted amount 29,00 € / €29.00 (decimals required, see above).
-export function isExpectedEuroAmount(text) {
-  const t = norm(text);
-  return /(^|[^\d,.])29,00\s*€/.test(t) || /€\s*29\.00(?!\d)/.test(t);
+// Stripe-formatted amounts (decimals required): "29,00 €", "€29.00", "33,25 $US", "$33.25", "US$33.25".
+const AMOUNT = /(?:€|US\s*\$|\$)\s*\d{1,3}(?:[ .,]\d{3})*[.,]\d{2}(?!\d)|(?<![\d.,])\d{1,3}(?:[ .]\d{3})*[,.]\d{2}\s*(?:€|\$\s*US|US\s*\$|\$)/g;
+export function visibleAmounts(text) {
+  return [...norm(text).matchAll(AMOUNT)].map(m => m[0].replace(/\s+/g, ' ').trim()).slice(0, 12);
 }
-// A US dollar AMOUNT (33,25 $US, $33.25, US$33.25), not just the word USD on a currency switch.
-export function hasUsdAmount(text) {
-  const t = norm(text);
-  return /\d[\d\s]*[,.]\d{2}\s*(\$\s*US|US\s*\$|\$)/.test(t) || /(US\s*)?\$\s*\d+[.,]\d{2}/.test(t);
+export function parseAmount(s) {
+  const t = norm(s);
+  const currency = t.includes('€') ? 'EUR' : t.includes('$') ? 'USD' : null;
+  const m = t.match(/(\d{1,3}(?:[ .,]\d{3})*)[.,](\d{2})(?!\d)/);
+  if (!currency || !m) return null;
+  return { currency, cents: Number(m[1].replace(/[ .,]/g, '')) * 100 + Number(m[2]) };
 }
-// Pure rule (unit-tested): may the page be paid, currency-wise?
-export function euroDecision({ text, eurSelected = null }) {
-  if (!isExpectedEuroAmount(text)) return { ok: false, reason: 'no 29,00 € amount on the page' };
-  if (eurSelected === true) return { ok: true, reason: 'EUR selected, 29,00 € shown' };
-  if (eurSelected === false) return { ok: false, reason: 'currency control does not report EUR selected' };
-  if (hasUsdAmount(text)) return { ok: false, reason: 'a US dollar amount is still shown' };
-  return { ok: true, reason: '29,00 € shown, no US dollar amount' };
+// Pure rule (unit-tested). radios: [{ key: 'eur'|'usd'|..., checked: bool }] found on the page (empty when Stripe
+// offers no currency choice); amounts: the Stripe-formatted amounts shown by the order summary of the page.
+export function currencyDecision({ radios = [], amounts = [] }) {
+  if (radios.length) {
+    const eur = radios.filter(r => r.key === 'eur');
+    if (eur.length !== 1) return { ok: false, reason: 'currency radios present but no single EUR radio' };
+    if (eur[0].checked !== true) return { ok: false, reason: 'EUR radio not checked' };
+    if (radios.some(r => r.key !== 'eur' && r.checked !== false)) return { ok: false, reason: 'another currency radio is still checked' };
+  }
+  const parsed = amounts.map(parseAmount);
+  if (!parsed.length) return { ok: false, reason: 'no payable amount shown' };
+  if (parsed.some(a => !a || a.currency !== EXPECTED.currency)) return { ok: false, reason: 'an amount is not in EUR' };
+  if (parsed.some(a => a.cents !== EXPECTED.cents)) return { ok: false, reason: 'an amount differs from 29,00 €' };
+  return { ok: true, reason: radios.length ? 'EUR radio checked, other currencies unchecked, every amount 29,00 €' : 'no currency choice, every amount 29,00 €' };
 }
 
 // Redacted description of a form control for diagnostics: attributes and states only, never values.
@@ -113,34 +128,38 @@ export function redactControl(c) {
   const cut = v => (v == null || v === '' ? null : String(v).replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '<email>').replace(/\d[\d\s-]{5,}\d/g, '<digits>').slice(0, 40));
   return { tag: c.tag, type: c.type || null, id: cut(c.id), name: cut(c.name), autocomplete: cut(c.autocomplete), aria: cut(c.aria), placeholder: cut(c.placeholder), role: cut(c.role), checked: typeof c.checked === 'boolean' ? c.checked : null, visible: !!c.visible };
 }
-// Amounts visible on the page (prices, never user data), to diagnose the currency.
-export function visibleAmounts(text) {
-  return [...norm(text).matchAll(/(?:€|US\s*\$|\$)\s*\d+[.,]\d{2}|\d+[,.]\d{2}\s*(?:€|\$\s*US|US\s*\$|\$)/g)].map(m => m[0].replace(/\s+/g, ' ').trim()).slice(0, 10);
+
+// Is this element really displayed (no hidden/transparent ancestor, non-trivial size)? Runs in the element's frame.
+const DISPLAYED = (e, min) => {
+  for (let n = e; n; n = n.parentElement) { const st = getComputedStyle(n); if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) return false; }
+  const r = e.getBoundingClientRect(); return r.width >= min.w && r.height >= min.h;
+};
+// A frame is usable only if its <iframe> and every ancestor iframe are displayed.
+async function frameShown(page, frame, min = { w: 1, h: 1 }) {
+  for (let f = frame; f && f !== page.mainFrame(); f = f.parentFrame()) {
+    const el = await f.frameElement().catch(() => null);
+    if (!el || !(await el.evaluate(DISPLAYED, f === frame ? min : { w: 1, h: 1 }).catch(() => false))) return false;
+  }
+  return true;
 }
+const hostOf = f => { try { return new URL(f.url()).hostname; } catch { return ''; } };
 
 export async function checkoutDomInventory(page) {
   const frames = [];
   for (const [i, f] of page.frames().entries()) {
-    let host = null; try { host = new URL(f.url()).hostname || null; } catch { /* about:blank */ }
     const controls = await f.evaluate(() => [...document.querySelectorAll('input,select,button,textarea,[role="checkbox"],[role="radio"]')].slice(0, 60).map(el => ({
       tag: el.tagName.toLowerCase(), type: el.getAttribute('type'), id: el.id, name: el.getAttribute('name'), autocomplete: el.getAttribute('autocomplete'),
       aria: el.getAttribute('aria-label'), placeholder: el.getAttribute('placeholder'), role: el.getAttribute('role'),
       checked: el.type === 'checkbox' || el.type === 'radio' ? el.checked : (el.getAttribute('aria-checked') ? el.getAttribute('aria-checked') === 'true' : undefined),
       visible: !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length)
     }))).catch(() => []);
-    frames.push({ frame: i, top: f === page.mainFrame(), host, title: i === 0 ? (await page.title().catch(() => '')).slice(0, 60) : undefined, controls: controls.map(redactControl) });
+    frames.push({ frame: i, top: f === page.mainFrame(), host: hostOf(f) || null, shown: await frameShown(page, f).catch(() => false),
+      title: i === 0 ? (await page.title().catch(() => '')).slice(0, 60) : undefined, controls: controls.map(redactControl) });
   }
-  return { frames, amounts: visibleAmounts(await page.locator('body').innerText().catch(() => '')) };
+  return { frames, amounts: visibleAmounts(await page.locator('body').innerText().catch(() => '')), captcha_challenge: await captchaChallengeShown(page).catch(() => null) };
 }
 
-// A frame is usable only if its <iframe> element is itself visible (inside a hidden iframe, fields still report
-// themselves visible to their own document but cannot be clicked).
-async function frameShown(page, frame) {
-  if (frame === page.mainFrame()) return true;
-  const el = await frame.frameElement().catch(() => null);
-  return !!el && (await el.isVisible().catch(() => false));
-}
-// First match among `selectors`, in the page or any frame, waiting up to `timeoutMs`.
+// First match among `selectors`, in the page or any displayed frame, waiting up to `timeoutMs`.
 async function findField(page, selectors, { timeoutMs = 20000, visible = true } = {}) {
   const end = Date.now() + timeoutMs;
   for (;;) {
@@ -167,67 +186,83 @@ async function typeInto(loc, value) {
   await loc.fill('');
   await loc.pressSequentially(value, { delay: 25 }); // Stripe fields format as you type
 }
+// Normal check/uncheck; if the input is covered by its styled <label>, click that label (still a user action).
+// The state is always re-read afterwards by the caller; nothing is forced.
+async function setChecked(frame, input, wanted) {
+  try { await (wanted ? input.check({ timeout: 5000 }) : input.uncheck({ timeout: 5000 })); return; } catch { /* covered input */ }
+  const id = await input.getAttribute('id').catch(() => null);
+  if (id) await frame.locator(`label[for="${id.replace(/"/g, '')}"]`).first().click({ timeout: 5000 }).catch(() => {});
+}
 
-async function eurSelectedState(page) {
+// Currency radios on the page: [{ frame, input, key, checked }].
+async function currencyRadios(page) {
+  const out = [];
   for (const frame of page.frames()) {
-    for (const role of ['radio', 'tab', 'button', 'option']) {
-      const opt = frame.getByRole(role, { name: EUR_OPTION_LABEL }).first();
-      if (!(await opt.isVisible().catch(() => false))) continue;
-      for (const attr of ['aria-checked', 'aria-pressed', 'aria-selected']) {
-        const v = await opt.getAttribute(attr).catch(() => null);
-        if (v === 'true') return true;
-        if (v === 'false') return false;
-      }
-      if (role === 'radio') return await opt.isChecked().catch(() => null);
-      return null;
+    if (!(await frameShown(page, frame))) continue;
+    const inputs = frame.locator(FIELD_SELECTORS.currency.join(', '));
+    const n = await inputs.count().catch(() => 0);
+    for (let i = 0; i < n; i++) {
+      const input = inputs.nth(i);
+      const id = (await input.getAttribute('id').catch(() => '')) || '';
+      const value = (await input.getAttribute('value').catch(() => '')) || '';
+      const key = (id.replace(/^currency-/i, '') || value).toLowerCase();
+      out.push({ frame, input, key, checked: await input.isChecked().catch(() => null) });
     }
   }
-  return null;
+  return out;
 }
-async function clickEurIfOffered(page) {
+async function readCurrency(page) {
+  const radios = await currencyRadios(page);
+  const amounts = visibleAmounts(await page.locator('body').innerText().catch(() => ''));
+  return { radios, amounts, decision: currencyDecision({ radios: radios.map(({ key, checked }) => ({ key, checked })), amounts }) };
+}
+// Selects EUR when offered (real radio #currency-eur), then requires the confirmed state before anything is paid.
+async function ensureEuro(page, { timeoutMs = 20000 } = {}) {
+  let clicked = false;
+  const end = Date.now() + timeoutMs;
+  for (;;) {
+    const state = await readCurrency(page);
+    if (state.decision.ok) return { currency: 'EUR', choice_offered: state.radios.length > 0, clicked, amounts: state.amounts.length, reason: state.decision.reason };
+    const eur = state.radios.find(r => r.key === 'eur');
+    if (eur && eur.checked === false && !clicked) { await setChecked(eur.frame, eur.input, true); clicked = true; continue; }
+    if (Date.now() >= end) throw new Error(`CHECKOUT_AMOUNT_NOT_29_EUR: ${state.decision.reason}`);
+    await page.waitForTimeout(300);
+  }
+}
+
+// Unchecks the optional Link enrolment and requires its phone field to be empty. Never types a phone number.
+async function linkState(page) {
+  const box = await findField(page, FIELD_SELECTORS.linkSave, { timeoutMs: 1500, visible: false });
+  if (!box) return { box: null, checked: null };
+  return { box, checked: await box.isChecked().catch(() => null) };
+}
+async function phoneEmpty(page) {
+  const phone = await findField(page, FIELD_SELECTORS.linkPhone, { timeoutMs: 500 });
+  return !phone || (await phone.inputValue().catch(() => 'unknown')) === '';
+}
+async function ownerFrame(page, loc) {
+  const handle = await loc.elementHandle({ timeout: 2000 });
+  try { return (await handle.ownerFrame()) || page.mainFrame(); } finally { await handle.dispose(); }
+}
+async function disableLinkSave(page) {
+  let { box, checked } = await linkState(page);
+  if (!box) return { link: 'absent' };
+  if (checked === true) {
+    await setChecked(await ownerFrame(page, box), box, false);
+    ({ checked } = await linkState(page));
+  }
+  if (checked !== false) throw new Error('CHECKOUT_LINK_SAVE_STILL_CHECKED');
+  if (!(await phoneEmpty(page))) throw new Error('CHECKOUT_LINK_PHONE_NOT_EMPTY');
+  return { link: 'unchecked', phone_empty: true };
+}
+
+// A CAPTCHA challenge is displayed when a frame from a CAPTCHA host is shown at a challenge-like size. The invisible
+// widgets Stripe always loads are hidden and do not count. The lab never answers a CAPTCHA.
+export async function captchaChallengeShown(page) {
   for (const frame of page.frames()) {
-    for (const role of ['radio', 'tab', 'button', 'option']) {
-      const opt = frame.getByRole(role, { name: EUR_OPTION_LABEL }).first();
-      if (await opt.isVisible().catch(() => false)) { await opt.click(); return true; }
-    }
+    if (CAPTCHA_HOSTS.test(hostOf(frame)) && (await frameShown(page, frame, { w: 100, h: 60 }))) return true;
   }
   return false;
-}
-// Selects EUR when a currency choice is offered, then requires 29,00 € before anything is paid.
-async function ensureEuro(page, { timeoutMs = 20000 } = {}) {
-  const offered = await clickEurIfOffered(page);
-  const end = Date.now() + timeoutMs;
-  let last;
-  for (;;) {
-    last = euroDecision({ text: await page.locator('body').innerText().catch(() => ''), eurSelected: await eurSelectedState(page) });
-    if (last.ok) return { currency: 'EUR', selector_offered: offered, reason: last.reason };
-    if (Date.now() >= end) throw new Error(`CHECKOUT_AMOUNT_NOT_29_EUR: ${last.reason}`);
-    await page.waitForTimeout(250);
-  }
-}
-
-// Unchecks the optional Link enrolment. The phone field it reveals is never typed into.
-async function disableLinkSave(page) {
-  let box = await findField(page, FIELD_SELECTORS.linkSave, { timeoutMs: 1500, visible: false });
-  if (!box) {
-    for (const frame of page.frames()) {
-      const byLabel = frame.getByRole('checkbox', { name: LINK_SAVE_LABEL }).first();
-      if ((await byLabel.count().catch(() => 0)) > 0) { box = byLabel; break; }
-    }
-  }
-  if (!box) return { link: 'absent' };
-  const checked = async () => (await box.isChecked().catch(() => null));
-  if ((await checked()) === true) {
-    await box.uncheck({ force: true, timeout: 5000 }).catch(() => {});
-    if ((await checked()) === true) { // custom checkbox: click its visible label instead
-      for (const frame of page.frames()) {
-        const label = frame.getByText(LINK_SAVE_LABEL).first();
-        if (await label.isVisible().catch(() => false)) { await label.click({ timeout: 5000 }).catch(() => {}); break; }
-      }
-    }
-  }
-  if ((await checked()) !== false) throw new Error('CHECKOUT_LINK_SAVE_STILL_CHECKED');
-  return { link: 'unchecked' };
 }
 
 // Fills the observed Checkout form with test data and submits it. Exported for the local fixture test (a fixture
@@ -235,9 +270,8 @@ async function disableLinkSave(page) {
 export async function fillAndSubmit(page, { successPrefix, timeoutMs = 120000 } = {}) {
   if (!successPrefix) throw new Error('CHECKOUT_SUCCESS_PREFIX_REQUIRED');
   const steps = [];
+  if (await captchaChallengeShown(page)) throw new Error('CHECKOUT_CAPTCHA_REQUIRED'); // never interact under a challenge
   steps.push({ step: 'currency', ...(await ensureEuro(page)) });
-  const email = await findField(page, FIELD_SELECTORS.email, { timeoutMs: 1000 });
-  if (email && (await email.isEditable().catch(() => false)) && !(await email.inputValue().catch(() => ''))) throw new Error('CHECKOUT_EMAIL_NOT_PREFILLED');
   let card = await findField(page, FIELD_SELECTORS.cardNumber, { timeoutMs: 8000 });
   if (!card) { // payment methods shown as an accordion: open "Carte"
     for (const frame of page.frames()) {
@@ -245,6 +279,8 @@ export async function fillAndSubmit(page, { successPrefix, timeoutMs = 120000 } 
       if (await method.isVisible().catch(() => false)) { await method.click(); steps.push({ step: 'card_method_opened' }); break; }
     }
   }
+  const email = await findField(page, FIELD_SELECTORS.email, { timeoutMs: 1000 });
+  if (email && (await email.isEditable().catch(() => false)) && !(await email.inputValue().catch(() => ''))) throw new Error('CHECKOUT_EMAIL_NOT_PREFILLED');
   await typeInto(await mustField(page, 'cardNumber'), TEST_CARD.number);
   await typeInto(await mustField(page, 'expiry'), TEST_CARD.expiry);
   await typeInto(await mustField(page, 'cvc'), TEST_CARD.cvc);
@@ -256,12 +292,26 @@ export async function fillAndSubmit(page, { successPrefix, timeoutMs = 120000 } 
   if (postal) await postal.fill(TEST_CARD.postal);
   steps.push({ step: 'fields', card: 'test', name: !!name, country: !!country, postal: !!postal });
   steps.push({ step: 'link', ...(await disableLinkSave(page)) });
-  steps.push({ step: 'currency_before_submit', ...(await ensureEuro(page, { timeoutMs: 5000 })) });
+  // Final checks right before paying: currency and amount again (a country change may re-render the summary),
+  // Link still unchecked with an empty phone field, no CAPTCHA challenge.
+  steps.push({ step: 'currency_before_submit', ...(await ensureEuro(page, { timeoutMs: 8000 })) });
+  const link = await linkState(page);
+  if (link.box && link.checked !== false) throw new Error('CHECKOUT_LINK_SAVE_STILL_CHECKED');
+  if (!(await phoneEmpty(page))) throw new Error('CHECKOUT_LINK_PHONE_NOT_EMPTY');
+  if (await captchaChallengeShown(page)) throw new Error('CHECKOUT_CAPTCHA_REQUIRED');
   let submit = await findField(page, FIELD_SELECTORS.submit, { timeoutMs: 3000 });
   if (!submit) submit = page.getByRole('button', { name: SUBMIT_LABEL }).first();
   await submit.waitFor({ state: 'visible', timeout: 10000 });
   await submit.click();
-  await page.waitForURL(target => target.href.startsWith(successPrefix), { timeout: timeoutMs });
+  steps.push({ step: 'submitted' });
+  // Success redirect, or stop at once if a CAPTCHA challenge appears (never answered by the lab).
+  const end = Date.now() + timeoutMs;
+  for (;;) {
+    if (page.url().startsWith(successPrefix)) break;
+    if (await captchaChallengeShown(page).catch(() => false)) throw new Error('CHECKOUT_CAPTCHA_REQUIRED');
+    if (Date.now() >= end) throw new Error('CHECKOUT_NO_SUCCESS_REDIRECT');
+    await page.waitForTimeout(500);
+  }
   return { paid: true, steps, redirectedTo: new URL(page.url()).origin };
 }
 
